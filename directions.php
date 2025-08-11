@@ -1,5 +1,12 @@
 <?php include 'header.php';
-$directions = $pdo->query('SELECT * FROM research_directions ORDER BY id DESC')->fetchAll();
+// Fetch research directions along with their members' names
+$stmt = $pdo->query("SELECT d.*, GROUP_CONCAT(m.name ORDER BY m.name SEPARATOR ', ') AS member_names
+                     FROM research_directions d
+                     LEFT JOIN direction_members dm ON d.id = dm.direction_id
+                     LEFT JOIN members m ON dm.member_id = m.id
+                     GROUP BY d.id
+                     ORDER BY d.id DESC");
+$directions = $stmt->fetchAll();
 ?>
 <div class="d-flex justify-content-between mb-3">
   <h2>Research Directions</h2>
@@ -8,10 +15,11 @@ $directions = $pdo->query('SELECT * FROM research_directions ORDER BY id DESC')-
   </div>
 </div>
 <table class="table table-bordered">
-<tr><th>Title</th><th>Actions</th></tr>
+<tr><th>Title</th><th>Members</th><th>Actions</th></tr>
 <?php foreach($directions as $d): ?>
 <tr>
   <td><?= htmlspecialchars($d['title']); ?></td>
+  <td><?= htmlspecialchars($d['member_names'] ?? '') ?: '<em>None</em>'; ?></td>
   <td>
     <a class="btn btn-sm btn-primary" href="direction_edit.php?id=<?= $d['id']; ?>">Edit</a>
     <a class="btn btn-sm btn-warning" href="direction_members.php?id=<?= $d['id']; ?>">Members</a>
