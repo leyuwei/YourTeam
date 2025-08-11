@@ -2,9 +2,9 @@
 require 'auth.php'; // must create $pdo (PDO) and connect to DB
 
 // --- Debug during development (comment out in production) ---
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+//ini_set('display_errors', 1);
+//error_reporting(E_ALL);
+//$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 // Helper: convert value to UTF-8 from common Chinese encodings if needed
 function to_utf8($s) {
