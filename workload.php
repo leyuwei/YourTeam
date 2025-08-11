@@ -62,20 +62,30 @@ if($start && $end){
         $report[$i]['rank'] = $i + 1;
     }
     if(isset($_GET['export'])){
-        header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="workload.csv"');
-        $out = fopen('php://output','w');
-        fputcsv($out,['Rank','CampusID','Name','Type','Item','Hours']);
+        header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="workload.xls"');
+        echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
+        echo "<table border='1'>";
+        echo "<tr><th>Rank</th><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Total Hours</th></tr>";
         foreach($report as $r){
+            echo "<tr>";
+            echo "<td>".htmlspecialchars($r['rank'])."</td>";
+            echo "<td>".htmlspecialchars($r['campus_id'])."</td>";
+            echo "<td>".htmlspecialchars($r['name'])."</td>";
+            echo "<td>";
             foreach($r['projects'] as $p){
-                fputcsv($out, [$r['rank'],$r['campus_id'],$r['name'],'Project',$p['title'],$p['hours']]);
+                echo htmlspecialchars($p['title'])." (".htmlspecialchars($p['hours'])."h)<br>";
             }
+            echo "</td>";
+            echo "<td>";
             foreach($r['tasks'] as $t){
-                fputcsv($out, [$r['rank'],$r['campus_id'],$r['name'],'Urgent Task',$t['key'],$t['hours']]);
+                echo htmlspecialchars($t['key'])." (".htmlspecialchars($t['hours'])."h)<br>";
             }
-            fputcsv($out, [$r['rank'],$r['campus_id'],$r['name'],'Total','',$r['total_hours']]);
+            echo "</td>";
+            echo "<td>".htmlspecialchars($r['total_hours'])."</td>";
+            echo "</tr>";
         }
-        fclose($out);
+        echo "</table>";
         exit();
     }
 }
@@ -96,7 +106,7 @@ include 'header.php';
   </div>
   <?php if($report): ?>
   <div class="col-auto align-self-end">
-    <a class="btn btn-success" href="workload.php?start=<?= urlencode($start); ?>&end=<?= urlencode($end); ?>&export=1">Export CSV</a>
+    <a class="btn btn-success" href="workload.php?start=<?= urlencode($start); ?>&end=<?= urlencode($end); ?>&export=1">Export Excel</a>
   </div>
   <?php endif; ?>
 </form>
