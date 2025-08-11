@@ -32,20 +32,21 @@ if($start && $end){
         }
 
         $task_hours = [];
-        $stmt = $pdo->prepare('SELECT t.title, a.start_time, a.end_time FROM task_affairs a JOIN tasks t ON a.task_id=t.id WHERE a.member_id=? AND a.start_time < ? AND a.end_time > ?');
+        $stmt = $pdo->prepare('SELECT t.title, a.description, a.start_time, a.end_time FROM task_affairs a JOIN tasks t ON a.task_id=t.id WHERE a.member_id=? AND a.start_time < ? AND a.end_time > ?');
         $stmt->execute([$m['id'],$end,$start]);
         foreach($stmt as $row){
             $join = max($row['start_time'],$start);
             $exit = min($row['end_time'],$end);
             if(strtotime($exit) > strtotime($join)){
                 $seconds = strtotime($exit) - strtotime($join);
-                $task_hours[$row['title']] = ($task_hours[$row['title']] ?? 0) + $seconds;
+                $key = $row['title'].' - '.$row['description'];
+                $task_hours[$key] = ($task_hours[$key] ?? 0) + $seconds;
                 $total += $seconds;
             }
         }
         $tasks = [];
-        foreach($task_hours as $title=>$sec){
-            $tasks[] = ['title'=>$title,'hours'=>round($sec/3600,2)];
+        foreach($task_hours as $key=>$sec){
+            $tasks[] = ['key'=>$key,'hours'=>round($sec/3600,2)];
         }
 
         $report[] = [
@@ -56,19 +57,23 @@ if($start && $end){
             'total_hours'=>round($total/3600,2)
         ];
     }
+    usort($report, function($a,$b){ return $b['total_hours'] <=> $a['total_hours']; });
+    foreach($report as $i=>$r){
+        $report[$i]['rank'] = $i + 1;
+    }
     if(isset($_GET['export'])){
         header('Content-Type: text/csv');
         header('Content-Disposition: attachment; filename="workload.csv"');
         $out = fopen('php://output','w');
-        fputcsv($out,['CampusID','Name','Type','Item','Hours']);
+        fputcsv($out,['Rank','CampusID','Name','Type','Item','Hours']);
         foreach($report as $r){
             foreach($r['projects'] as $p){
-                fputcsv($out, [$r['campus_id'],$r['name'],'Project',$p['title'],$p['hours']]);
+                fputcsv($out, [$r['rank'],$r['campus_id'],$r['name'],'Project',$p['title'],$p['hours']]);
             }
             foreach($r['tasks'] as $t){
-                fputcsv($out, [$r['campus_id'],$r['name'],'Urgent Task',$t['title'],$t['hours']]);
+                fputcsv($out, [$r['rank'],$r['campus_id'],$r['name'],'Urgent Task',$t['key'],$t['hours']]);
             }
-            fputcsv($out, [$r['campus_id'],$r['name'],'Total','',$r['total_hours']]);
+            fputcsv($out, [$r['rank'],$r['campus_id'],$r['name'],'Total','',$r['total_hours']]);
         }
         fclose($out);
         exit();
@@ -97,9 +102,10 @@ include 'header.php';
 </form>
 <?php if($report): ?>
 <table class="table table-bordered">
-<tr><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Total Hours</th></tr>
+<tr><th>Rank</th><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Total Hours</th></tr>
 <?php foreach($report as $r): ?>
 <tr>
+  <td><?= htmlspecialchars($r['rank']); ?></td>
   <td><?= htmlspecialchars($r['campus_id']); ?></td>
   <td><?= htmlspecialchars($r['name']); ?></td>
   <td>
@@ -109,7 +115,7 @@ include 'header.php';
   </td>
   <td>
     <?php foreach($r['tasks'] as $t): ?>
-      <?= htmlspecialchars($t['title']); ?> (<?= htmlspecialchars($t['hours']); ?>h)<br>
+      <?= htmlspecialchars($t['key']); ?> (<?= htmlspecialchars($t['hours']); ?>h)<br>
     <?php endforeach; ?>
   </td>
   <td><?= htmlspecialchars($r['total_hours']); ?></td>
