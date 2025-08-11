@@ -1,0 +1,37 @@
+<?php
+include 'header.php';
+$id = $_GET['id'] ?? null;
+$direction = ['title'=>'','description'=>''];
+if($id){
+    $stmt = $pdo->prepare('SELECT * FROM research_directions WHERE id=?');
+    $stmt->execute([$id]);
+    $direction = $stmt->fetch();
+}
+if($_SERVER['REQUEST_METHOD']==='POST'){
+    $title = $_POST['title'];
+    $description = $_POST['description'];
+    if($id){
+        $stmt = $pdo->prepare('UPDATE research_directions SET title=?, description=? WHERE id=?');
+        $stmt->execute([$title,$description,$id]);
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO research_directions(title,description) VALUES (?,?)');
+        $stmt->execute([$title,$description]);
+    }
+    header('Location: directions.php');
+    exit();
+}
+?>
+<h2><?= $id? 'Edit':'Add'; ?> Research Direction</h2>
+<form method="post">
+  <div class="mb-3">
+    <label class="form-label">Title</label>
+    <input type="text" name="title" class="form-control" value="<?= htmlspecialchars($direction['title']); ?>" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    <textarea name="description" class="form-control" rows="3"><?= htmlspecialchars($direction['description']); ?></textarea>
+  </div>
+  <button type="submit" class="btn btn-primary">Save</button>
+  <a href="directions.php" class="btn btn-secondary">Cancel</a>
+</form>
+<?php include 'footer.php'; ?>

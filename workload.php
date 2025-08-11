@@ -6,7 +6,8 @@ $report = [];
 if($start && $end){
     $members = $pdo->query('SELECT id, campus_id, name FROM members')->fetchAll();
     foreach($members as $m){
-        $total = 0;
+        $total_project = 0;
+        $total_task = 0;
         $project_hours = [];
         $stmt = $pdo->prepare('SELECT project_id, join_time, exit_time FROM project_member_log WHERE member_id=? AND join_time < ? AND (exit_time IS NULL OR exit_time > ?)');
         $stmt->execute([$m['id'],$end,$start]);
@@ -16,7 +17,7 @@ if($start && $end){
             if(strtotime($exit) > strtotime($join)){
                 $seconds = strtotime($exit) - strtotime($join);
                 $project_hours[$row['project_id']] = ($project_hours[$row['project_id']] ?? 0) + $seconds;
-                $total += $seconds;
+                $total_project += $seconds;
             }
         }
         $projects = [];
@@ -32,7 +33,7 @@ if($start && $end){
         }
 
         $task_hours = [];
-        $stmt = $pdo->prepare('SELECT t.title, a.description, a.start_time, a.end_time FROM task_affairs a JOIN tasks t ON a.task_id=t.id WHERE a.member_id=? AND a.start_time < ? AND a.end_time > ?');
+        $stmt = $pdo->prepare('SELECT t.title, a.description, a.start_time, a.end_time FROM task_affairs a JOIN task_affair_members am ON a.id=am.affair_id JOIN tasks t ON a.task_id=t.id WHERE am.member_id=? AND a.start_time < ? AND a.end_time > ?');
         $stmt->execute([$m['id'],$end,$start]);
         foreach($stmt as $row){
             $join = max($row['start_time'],$start);
@@ -41,7 +42,7 @@ if($start && $end){
                 $seconds = strtotime($exit) - strtotime($join);
                 $key = $row['title'].' - '.$row['description'];
                 $task_hours[$key] = ($task_hours[$key] ?? 0) + $seconds;
-                $total += $seconds;
+                $total_task += $seconds;
             }
         }
         $tasks = [];
@@ -54,7 +55,9 @@ if($start && $end){
             'name'=>$m['name'],
             'projects'=>$projects,
             'tasks'=>$tasks,
-            'total_hours'=>round($total/3600,2)
+            'project_total'=>round($total_project/3600,2),
+            'task_total'=>round($total_task/3600,2),
+            'total_hours'=>round(($total_project+$total_task)/3600,2)
         ];
     }
     usort($report, function($a,$b){ return $b['total_hours'] <=> $a['total_hours']; });
@@ -66,7 +69,7 @@ if($start && $end){
         header('Content-Disposition: attachment; filename="workload.xls"');
         echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
         echo "<table border='1'>";
-        echo "<tr><th>Rank</th><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Total Hours</th></tr>";
+        echo "<tr><th>Rank</th><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Project Hours</th><th>Urgent Hours</th></tr>";
         foreach($report as $r){
             echo "<tr>";
             echo "<td>".htmlspecialchars($r['rank'])."</td>";
@@ -82,7 +85,8 @@ if($start && $end){
                 echo htmlspecialchars($t['key'])." (".htmlspecialchars($t['hours'])."h)<br>";
             }
             echo "</td>";
-            echo "<td>".htmlspecialchars($r['total_hours'])."</td>";
+            echo "<td>".htmlspecialchars($r['project_total'])."</td>";
+            echo "<td>".htmlspecialchars($r['task_total'])."</td>";
             echo "</tr>";
         }
         echo "</table>";
@@ -112,7 +116,7 @@ include 'header.php';
 </form>
 <?php if($report): ?>
 <table class="table table-bordered">
-<tr><th>Rank</th><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Total Hours</th></tr>
+<tr><th>Rank</th><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Project Hours</th><th>Urgent Hours</th></tr>
 <?php foreach($report as $r): ?>
 <tr>
   <td><?= htmlspecialchars($r['rank']); ?></td>
@@ -128,7 +132,8 @@ include 'header.php';
       <?= htmlspecialchars($t['key']); ?> (<?= htmlspecialchars($t['hours']); ?>h)<br>
     <?php endforeach; ?>
   </td>
-  <td><?= htmlspecialchars($r['total_hours']); ?></td>
+  <td><?= htmlspecialchars($r['project_total']); ?></td>
+  <td><?= htmlspecialchars($r['task_total']); ?></td>
 </tr>
 <?php endforeach; ?>
 </table>

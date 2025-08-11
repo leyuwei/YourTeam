@@ -1,11 +1,11 @@
 <?php include 'header.php';
 $status = $_GET['status'] ?? '';
 if($status){
-    $stmt = $pdo->prepare('SELECT * FROM projects WHERE status=? ORDER BY id DESC');
+    $stmt = $pdo->prepare('SELECT p.*, GROUP_CONCAT(m.name SEPARATOR ", ") AS members FROM projects p LEFT JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL LEFT JOIN members m ON l.member_id=m.id WHERE p.status=? GROUP BY p.id ORDER BY p.id DESC');
     $stmt->execute([$status]);
     $projects = $stmt->fetchAll();
 } else {
-    $projects = $pdo->query('SELECT * FROM projects ORDER BY id DESC')->fetchAll();
+    $projects = $pdo->query('SELECT p.*, GROUP_CONCAT(m.name SEPARATOR ", ") AS members FROM projects p LEFT JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL LEFT JOIN members m ON l.member_id=m.id GROUP BY p.id ORDER BY p.id DESC')->fetchAll();
 }
 ?>
 <div class="d-flex justify-content-between mb-3">
@@ -29,10 +29,11 @@ if($status){
   </div>
 </form>
 <table class="table table-bordered">
-<tr><th>Title</th><th>Begin</th><th>End</th><th>Status</th><th>Actions</th></tr>
+<tr><th>Title</th><th>Members</th><th>Begin</th><th>End</th><th>Status</th><th>Actions</th></tr>
 <?php foreach($projects as $p): ?>
 <tr>
   <td><?= htmlspecialchars($p['title']); ?></td>
+  <td><?= htmlspecialchars($p['members']); ?></td>
   <td><?= htmlspecialchars($p['begin_date']); ?></td>
   <td><?= htmlspecialchars($p['end_date']); ?></td>
   <td><?= htmlspecialchars($p['status']); ?></td>

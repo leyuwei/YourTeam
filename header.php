@@ -18,6 +18,7 @@
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item"><a class="nav-link" href="members.php" data-i18n="nav.members">Members</a></li>
         <li class="nav-item"><a class="nav-link" href="projects.php" data-i18n="nav.projects">Projects</a></li>
+        <li class="nav-item"><a class="nav-link" href="directions.php">Research Directions</a></li>
         <li class="nav-item"><a class="nav-link" href="tasks.php" data-i18n="nav.tasks">Tasks</a></li>
         <li class="nav-item"><a class="nav-link" href="workload.php" data-i18n="nav.workload">Workload</a></li>
         <li class="nav-item"><a class="nav-link" href="account.php" data-i18n="nav.account">Account</a></li>

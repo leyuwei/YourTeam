@@ -8,18 +8,18 @@ if(!$task_id){
 $task = $pdo->prepare('SELECT * FROM tasks WHERE id=?');
 $task->execute([$task_id]);
 $task = $task->fetch();
-$affairs_stmt = $pdo->prepare('SELECT a.*, m.name, m.campus_id FROM task_affairs a JOIN members m ON a.member_id=m.id WHERE a.task_id=? ORDER BY a.start_time DESC');
+$affairs_stmt = $pdo->prepare('SELECT a.*, GROUP_CONCAT(CONCAT(m.name, " (", m.campus_id, ")") SEPARATOR ", ") AS members FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
 $affairs_stmt->execute([$task_id]);
 $affairs = $affairs_stmt->fetchAll();
 $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')->fetchAll();
 ?>
 <h2>Urgent Affairs - <?php echo htmlspecialchars($task['title']); ?></h2>
 <table class="table table-bordered">
-<tr><th>Description</th><th>Member</th><th>Start</th><th>End</th><th>Action</th></tr>
+<tr><th>Description</th><th>Members</th><th>Start</th><th>End</th><th>Action</th></tr>
 <?php foreach($affairs as $a): ?>
 <tr>
   <td><?= htmlspecialchars($a['description']); ?></td>
-  <td><?= htmlspecialchars($a['name']); ?> (<?= htmlspecialchars($a['campus_id']); ?>)</td>
+  <td><?= htmlspecialchars($a['members']); ?></td>
   <td><?= htmlspecialchars($a['start_time']); ?></td>
   <td><?= htmlspecialchars($a['end_time']); ?></td>
   <td><a class="btn btn-sm btn-danger" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" onclick="return doubleConfirm('Delete affair?');">Delete</a></td>
@@ -34,9 +34,8 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
     <textarea name="description" class="form-control" rows="2" required></textarea>
   </div>
   <div class="mb-3">
-    <label class="form-label">Member</label>
-    <select name="member_id" class="form-select" required>
-      <option value="">Select member</option>
+    <label class="form-label">Members</label>
+    <select name="member_ids[]" class="form-select" multiple required>
       <?php foreach($members as $m): ?>
       <option value="<?= $m['id']; ?>"><?= htmlspecialchars($m['name']); ?> (<?= $m['campus_id']; ?>)</option>
       <?php endforeach; ?>
