@@ -35,7 +35,7 @@ if($status){
   <td>
     <a class="btn btn-sm btn-primary" href="task_edit.php?id=<?= $t['id']; ?>">Edit</a>
     <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>">Urgent Affairs</a>
-    <a class="btn btn-sm btn-danger" href="task_delete.php?id=<?= $t['id']; ?>" onclick="return confirm('Delete task?');">Delete</a>
+    <a class="btn btn-sm btn-danger" href="task_delete.php?id=<?= $t['id']; ?>" onclick="return doubleConfirm('Delete task?');">Delete</a>
   </td>
 </tr>
 <?php endforeach; ?>

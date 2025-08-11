@@ -53,6 +53,10 @@ const translations = {
   }
 };
 
+function doubleConfirm(message) {
+  return confirm(message) && confirm('Please confirm again to proceed.');
+}
+
 function applyTranslations() {
   const lang = localStorage.getItem('lang') || 'en';
   document.documentElement.lang = lang;

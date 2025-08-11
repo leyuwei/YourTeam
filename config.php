@@ -16,5 +16,11 @@ try {
 } catch (\PDOException $e) {
     throw new \PDOException($e->getMessage(), (int)$e->getCode());
 }
+session_set_cookie_params([
+    'lifetime' => 86400 * 7,
+    'path' => '/',
+    'httponly' => true,
+    'samesite' => 'Lax'
+]);
 session_start();
 ?>
