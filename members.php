@@ -1,5 +1,30 @@
-<?php include 'header.php';
-$members = $pdo->query('SELECT * FROM members ORDER BY id')->fetchAll();
+<?php
+include 'header.php';
+
+// Determine sorting column and direction from query parameters
+$columns = [
+    'campus_id' => 'Campus ID',
+    'name' => 'Name',
+    'email' => 'Email',
+    'identity_number' => 'Identity No',
+    'year_of_join' => 'Year Joined',
+    'current_degree' => 'Current Degree',
+    'degree_pursuing' => 'Degree Pursuing',
+    'phone' => 'Phone',
+    'wechat' => 'WeChat',
+    'department' => 'Department',
+    'workplace' => 'Workplace',
+    'homeplace' => 'Homeplace'
+];
+
+$sort = $_GET['sort'] ?? 'id';
+if (!array_key_exists($sort, $columns) && $sort !== 'id') {
+    $sort = 'id';
+}
+$dir = strtolower($_GET['dir'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
+
+$stmt = $pdo->query("SELECT * FROM members ORDER BY $sort $dir");
+$members = $stmt->fetchAll();
 ?>
 <div class="d-flex justify-content-between mb-3">
   <h2>Team Members</h2>
@@ -9,8 +34,16 @@ $members = $pdo->query('SELECT * FROM members ORDER BY id')->fetchAll();
     <a class="btn btn-secondary" href="members_export.php">Export Excel</a>
   </div>
 </div>
-<table class="table table-bordered table-striped">
-  <tr><th>Campus ID</th><th>Name</th><th>Email</th><th>Identity No</th><th>Year Joined</th><th>Current Degree</th><th>Degree Pursuing</th><th>Phone</th><th>WeChat</th><th>Department</th><th>Workplace</th><th>Homeplace</th><th>Actions</th></tr>
+<div class="table-responsive">
+<table class="table table-bordered table-striped table-hover">
+  <tr>
+    <?php foreach($columns as $col => $label):
+        $newDir = ($sort === $col && $dir === 'ASC') ? 'desc' : 'asc';
+    ?>
+      <th><a href="?sort=<?= $col; ?>&amp;dir=<?= $newDir; ?>"><?= htmlspecialchars($label); ?></a></th>
+    <?php endforeach; ?>
+    <th>Actions</th>
+  </tr>
   <?php foreach($members as $m): ?>
   <tr>
     <td><?= htmlspecialchars($m['campus_id']); ?></td>
@@ -32,4 +65,5 @@ $members = $pdo->query('SELECT * FROM members ORDER BY id')->fetchAll();
   </tr>
   <?php endforeach; ?>
 </table>
+</div>
 <?php include 'footer.php'; ?>
