@@ -58,9 +58,29 @@ CREATE TABLE task_affairs (
   id INT AUTO_INCREMENT PRIMARY KEY,
   task_id INT NOT NULL,
   description TEXT,
-  member_id INT NOT NULL,
   start_time DATETIME NOT NULL,
   end_time DATETIME NOT NULL,
-  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+
+CREATE TABLE task_affair_members (
+  affair_id INT NOT NULL,
+  member_id INT NOT NULL,
+  PRIMARY KEY (affair_id, member_id),
+  FOREIGN KEY (affair_id) REFERENCES task_affairs(id) ON DELETE CASCADE,
+  FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE TABLE research_directions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(100) NOT NULL,
+  description TEXT
+);
+
+CREATE TABLE direction_members (
+  direction_id INT NOT NULL,
+  member_id INT NOT NULL,
+  PRIMARY KEY (direction_id, member_id),
+  FOREIGN KEY (direction_id) REFERENCES research_directions(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
