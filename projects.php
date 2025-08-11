@@ -39,7 +39,7 @@ if($status){
   <td>
     <a class="btn btn-sm btn-primary" href="project_edit.php?id=<?= $p['id']; ?>">Edit</a>
     <a class="btn btn-sm btn-warning" href="project_members.php?id=<?= $p['id']; ?>">Members</a>
-    <a class="btn btn-sm btn-danger" href="project_delete.php?id=<?= $p['id']; ?>" onclick="return confirm('Delete project?');">Delete</a>
+    <a class="btn btn-sm btn-danger" href="project_delete.php?id=<?= $p['id']; ?>" onclick="return doubleConfirm('Delete project?');">Delete</a>
   </td>
 </tr>
 <?php endforeach; ?>

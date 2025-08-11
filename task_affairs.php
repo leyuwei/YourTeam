@@ -22,7 +22,7 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
   <td><?= htmlspecialchars($a['name']); ?> (<?= htmlspecialchars($a['campus_id']); ?>)</td>
   <td><?= htmlspecialchars($a['start_time']); ?></td>
   <td><?= htmlspecialchars($a['end_time']); ?></td>
-  <td><a class="btn btn-sm btn-danger" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" onclick="return confirm('Delete affair?');">Delete</a></td>
+  <td><a class="btn btn-sm btn-danger" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" onclick="return doubleConfirm('Delete affair?');">Delete</a></td>
 </tr>
 <?php endforeach; ?>
 </table>

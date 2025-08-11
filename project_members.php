@@ -25,7 +25,7 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
   <td><?= htmlspecialchars($a['campus_id']); ?></td>
   <td><?= htmlspecialchars($a['name']); ?></td>
   <td><?= htmlspecialchars($a['join_time']); ?></td>
-  <td><a class="btn btn-sm btn-danger" href="project_member_remove.php?log_id=<?= $a['id']; ?>&project_id=<?= $project_id; ?>">Remove</a></td>
+  <td><a class="btn btn-sm btn-danger" href="project_member_remove.php?log_id=<?= $a['id']; ?>&project_id=<?= $project_id; ?>" onclick="return doubleConfirm('Remove member from project?');">Remove</a></td>
 </tr>
 <?php endforeach; ?>
 </table>

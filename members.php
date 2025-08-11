@@ -60,7 +60,7 @@ $members = $stmt->fetchAll();
     <td><?= htmlspecialchars($m['homeplace']); ?></td>
     <td>
       <a class="btn btn-sm btn-primary" href="member_edit.php?id=<?= $m['id']; ?>">Edit</a>
-      <a class="btn btn-sm btn-danger" href="member_delete.php?id=<?= $m['id']; ?>" onclick="return confirm('Delete member?');">Delete</a>
+      <a class="btn btn-sm btn-danger" href="member_delete.php?id=<?= $m['id']; ?>" onclick="return doubleConfirm('Delete member?');">Delete</a>
     </td>
   </tr>
   <?php endforeach; ?>
