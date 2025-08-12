@@ -5,6 +5,11 @@ if(!$task_id){
     echo 'Invalid task id';
     exit();
 }
+
+$taskStmt = $pdo->prepare('SELECT title FROM tasks WHERE id=?');
+$taskStmt->execute([$task_id]);
+$taskTitle = $taskStmt->fetchColumn();
+if (!$taskTitle) { echo 'Task not found'; exit(); }
 if(isset($_SESSION['fill_task_id']) && $_SESSION['fill_task_id'] != $task_id){
     unset($_SESSION['fill_task_id'], $_SESSION['fill_member_id']);
 }
@@ -54,7 +59,7 @@ if($member_id){
 </style>
 </head>
 <body class="container py-5">
-<h2>工作事务申报 - 与绩效挂钩</h2>
+<h2>工作事务申报 - <?= htmlspecialchars($taskTitle); ?></h2>
 
 <?php if(!$member_id): ?>
 <form method="post" class="mt-4">
