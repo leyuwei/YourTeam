@@ -27,6 +27,7 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
 <?php endforeach; ?>
 </tbody>
 </table>
+<br><br>
 <h4>新增成员</h4>
 <form method="post" action="direction_member_add.php">
   <input type="hidden" name="direction_id" value="<?= $direction_id; ?>">

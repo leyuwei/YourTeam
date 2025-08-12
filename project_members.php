@@ -32,6 +32,7 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
 <?php endforeach; ?>
 </tbody>
 </table>
+<br><br>
 <h4>新增成员</h4>
 <form method="post" action="project_member_add.php">
   <input type="hidden" name="project_id" value="<?= $project_id; ?>">
@@ -51,6 +52,7 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
   <button type="submit" class="btn btn-primary">新增</button>
   <a href="projects.php" class="btn btn-secondary">返回</a>
 </form>
+<br>
 <h4 class="mt-5">成员变动历史</h4>
 <table class="table table-bordered">
 <tr><th>成员</th><th>入项时间</th><th>退出时间</th></tr>

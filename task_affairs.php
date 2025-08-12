@@ -26,6 +26,7 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
 </tr>
 <?php endforeach; ?>
 </table>
+<br><br>
 <h4>新建紧急事务</h4>
 <form method="post" action="affair_add.php">
   <input type="hidden" name="task_id" value="<?= $task_id; ?>">
