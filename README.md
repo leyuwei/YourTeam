@@ -1,6 +1,7 @@
-# Team Management Website
+# Research Team Management Website
+## 一款适用于国内牛马研究生体质的团队管理网站
 
-A simple responsive website for managing team members, projects, small tasks and workload reports. Built with PHP, MySQL and Bootstrap 5.
+A simple responsive website for managing research team members, projects, small tasks and workload reports. Built with PHP, MySQL and Bootstrap 5.
 
 ## Features
 - Manager login (multiple accounts defined in database)
