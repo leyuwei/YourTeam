@@ -14,7 +14,7 @@ $active_members = $active->fetchAll();
 $logs = $pdo->prepare('SELECT l.*, m.name, m.campus_id FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? ORDER BY l.join_time');
 $logs->execute([$project_id]);
 $logs = $logs->fetchAll();
-$members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')->fetchAll();
+$members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
 ?>
 <h2>项目成员 - <?php echo htmlspecialchars($project['title']); ?></h2>
 <h4>当前成员</h4>

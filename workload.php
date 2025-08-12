@@ -4,7 +4,7 @@ $start = $_GET['start'] ?? '';
 $end = $_GET['end'] ?? '';
 $report = [];
 if($start && $end){
-    $members = $pdo->query('SELECT id, campus_id, name FROM members')->fetchAll();
+    $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited'")->fetchAll();
     foreach($members as $m){
         $total_task = 0;
         $task_hours = [];

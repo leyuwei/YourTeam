@@ -11,7 +11,7 @@ $direction = $direction_stmt->fetch();
 $current_stmt = $pdo->prepare('SELECT m.id, m.campus_id, m.name FROM direction_members dm JOIN members m ON dm.member_id=m.id WHERE dm.direction_id=? ORDER BY dm.sort_order');
 $current_stmt->execute([$direction_id]);
 $current_members = $current_stmt->fetchAll();
-$members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')->fetchAll();
+$members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
 ?>
 <h2>研究方向成员 - <?= htmlspecialchars($direction['title']); ?></h2>
 <table class="table table-bordered">
