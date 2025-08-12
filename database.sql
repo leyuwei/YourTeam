@@ -25,7 +25,8 @@ CREATE TABLE members (
   wechat VARCHAR(50),
   department VARCHAR(100),
   workplace VARCHAR(100),
-  homeplace VARCHAR(100)
+  homeplace VARCHAR(100),
+  status ENUM('in_work','exited') DEFAULT 'in_work'
 );
 
 CREATE TABLE projects (

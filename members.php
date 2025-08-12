@@ -5,6 +5,7 @@ include 'header.php';
 $columns = [
     'campus_id' => '一卡通号',
     'name' => '姓名',
+    'status' => '状态',
     'email' => '正式邮箱',
     'identity_number' => '身份证号',
     'year_of_join' => '入学年份',
@@ -23,7 +24,16 @@ if (!array_key_exists($sort, $columns) && $sort !== 'sort_order') {
 }
 $dir = strtolower($_GET['dir'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
 
-$stmt = $pdo->query("SELECT * FROM members ORDER BY $sort $dir");
+$statusFilter = $_GET['status'] ?? 'all';
+$where = '';
+$params = [];
+if (in_array($statusFilter, ['in_work','exited'])) {
+    $where = 'WHERE status = ?';
+    $params[] = $statusFilter;
+}
+$sql = "SELECT * FROM members $where ORDER BY (status='exited'), $sort $dir";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
 $members = $stmt->fetchAll();
 ?>
 <div class="d-flex justify-content-between mb-3">
@@ -35,6 +45,11 @@ $members = $stmt->fetchAll();
     <a class="btn btn-warning" href="member_self_update.php">请求信息更新</a>
   </div>
 </div>
+<div class="mb-3">
+  <a class="btn btn-sm <?= $statusFilter==='all'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=all&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>">全部</a>
+  <a class="btn btn-sm <?= $statusFilter==='in_work'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=in_work&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>">在岗</a>
+  <a class="btn btn-sm <?= $statusFilter==='exited'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=exited&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>">已离退</a>
+</div>
 <div class="table-responsive">
 <table class="table table-bordered table-striped table-hover">
   <thead>
@@ -43,7 +58,7 @@ $members = $stmt->fetchAll();
     <?php foreach($columns as $col => $label):
         $newDir = ($sort === $col && $dir === 'ASC') ? 'desc' : 'asc';
     ?>
-      <th><a href="?sort=<?= $col; ?>&amp;dir=<?= $newDir; ?>"><?= htmlspecialchars($label); ?></a></th>
+      <th><a href="?sort=<?= $col; ?>&amp;dir=<?= $newDir; ?>&amp;status=<?= $statusFilter; ?>"><?= htmlspecialchars($label); ?></a></th>
     <?php endforeach; ?>
     <th>操作</th>
   </tr>
@@ -54,6 +69,7 @@ $members = $stmt->fetchAll();
     <td class="drag-handle">&#9776;</td>
     <td><?= htmlspecialchars($m['campus_id']); ?></td>
     <td><?= htmlspecialchars($m['name']); ?></td>
+    <td><?= $m['status']==='in_work' ? '在岗' : '已离退'; ?></td>
     <td><?= htmlspecialchars($m['email']); ?></td>
     <td><?= htmlspecialchars($m['identity_number']); ?></td>
     <td><?= htmlspecialchars($m['year_of_join']); ?></td>
