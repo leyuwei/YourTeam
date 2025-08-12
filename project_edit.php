@@ -26,26 +26,26 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     exit();
 }
 ?>
-<h2><?php echo $id? 'Edit':'Add'; ?> Project</h2>
+<h2><?php echo $id? 'Edit':'Add'; ?> 横纵项目</h2>
 <form method="post">
   <div class="mb-3">
-    <label class="form-label">Title</label>
+    <label class="form-label">项目标题</label>
     <input type="text" name="title" class="form-control" value="<?php echo htmlspecialchars($project['title']); ?>" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">Description</label>
+    <label class="form-label">项目描述</label>
     <textarea name="description" class="form-control" rows="3"><?php echo htmlspecialchars($project['description']); ?></textarea>
   </div>
   <div class="mb-3">
-    <label class="form-label">Begin Date</label>
+    <label class="form-label">立项时间</label>
     <input type="date" name="begin_date" class="form-control" value="<?php echo htmlspecialchars($project['begin_date']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">End Date</label>
+    <label class="form-label">结项时间</label>
     <input type="date" name="end_date" class="form-control" value="<?php echo htmlspecialchars($project['end_date']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">Status</label>
+    <label class="form-label">状态</label>
     <select name="status" class="form-select">
       <?php
       $statuses = ['todo'=>'Todo','ongoing'=>'Ongoing','paused'=>'Paused','finished'=>'Finished'];
@@ -56,7 +56,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
       ?>
     </select>
   </div>
-  <button type="submit" class="btn btn-primary">Save</button>
-  <a href="projects.php" class="btn btn-secondary">Cancel</a>
+  <button type="submit" class="btn btn-primary">更新</button>
+  <a href="projects.php" class="btn btn-secondary">取消</a>
 </form>
 <?php include 'footer.php'; ?>

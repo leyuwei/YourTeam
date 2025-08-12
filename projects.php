@@ -58,15 +58,15 @@ if($status){
   <?php endforeach; ?>
   </tbody>
 </table>
-<h3 class="mt-4">Member Project Assignments</h3>
+<h3 class="mt-4">项目参与人员情况</h3>
 <table class="table table-bordered">
-  <tr><th>Member</th><th>Projects</th></tr>
+  <tr><th>成员</th><th>参与项目</th></tr>
   <?php
   $memberProjects = $pdo->query('SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(p.title ORDER BY l.sort_order SEPARATOR ", ") AS proj FROM members m LEFT JOIN project_member_log l ON m.id=l.member_id AND l.exit_time IS NULL LEFT JOIN projects p ON l.project_id=p.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll();
   foreach($memberProjects as $mp): ?>
   <tr>
     <td><?= htmlspecialchars($mp["name"]); ?><span style="color:#cccccc;">(<?= htmlspecialchars($mp["degree_pursuing"]); ?>,<?= htmlspecialchars($mp["year_of_join"]); ?>)</span></td>
-    <td><?= $mp['proj'] ? htmlspecialchars($mp['proj']) : '<em>None</em>'; ?></td>
+    <td><?= $mp['proj'] ? htmlspecialchars($mp['proj']) : '<span style="color:red"><em>暂无</em></span>'; ?></td>
   </tr>
   <?php endforeach; ?>
 </table>

@@ -38,15 +38,15 @@ $directions = $stmt->fetchAll();
   <?php endforeach; ?>
   </tbody>
 </table>
-<h3 class="mt-4">Member Direction Assignments</h3>
+<h3 class="mt-4">研究方向指派情况</h3>
 <table class="table table-bordered">
-  <tr><th>Member</th><th>Research Directions</th></tr>
+  <tr><th>成员</th><th>研究方向</th></tr>
   <?php
   $memberDirs = $pdo->query('SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(d.title ORDER BY dm.sort_order SEPARATOR ", ") AS dirs FROM members m LEFT JOIN direction_members dm ON m.id=dm.member_id LEFT JOIN research_directions d ON dm.direction_id=d.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll();
   foreach($memberDirs as $md): ?>
   <tr>
     <td><?= htmlspecialchars($md["name"]); ?><span style="color:#cccccc;">(<?= htmlspecialchars($md["degree_pursuing"]); ?>,<?= htmlspecialchars($md["year_of_join"]); ?>)</span></td>
-    <td><?= $md['dirs'] ? htmlspecialchars($md['dirs']) : '<em>None</em>'; ?></td>
+    <td><?= $md['dirs'] ? htmlspecialchars($md['dirs']) : '<span style="color:red"><em>暂无</em></span>'; ?></td>
   </tr>
   <?php endforeach; ?>
 </table>

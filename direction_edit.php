@@ -23,17 +23,17 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     exit();
 }
 ?>
-<h2><?= $id? 'Edit':'Add'; ?> Research Direction</h2>
+<h2><?= $id? 'Edit':'Add'; ?> 研究方向</h2>
 <form method="post">
   <div class="mb-3">
-    <label class="form-label">Title</label>
+    <label class="form-label">方向题目</label>
     <input type="text" name="title" class="form-control" value="<?= htmlspecialchars($direction['title']); ?>" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">Description</label>
+    <label class="form-label">方向具体描述</label>
     <textarea name="description" class="form-control" rows="3"><?= htmlspecialchars($direction['description']); ?></textarea>
   </div>
-  <button type="submit" class="btn btn-primary">Save</button>
-  <a href="directions.php" class="btn btn-secondary">Cancel</a>
+  <button type="submit" class="btn btn-primary">保存</button>
+  <a href="directions.php" class="btn btn-secondary">取消</a>
 </form>
 <?php include 'footer.php'; ?>

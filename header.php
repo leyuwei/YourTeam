@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Team Management</title>
+<title>团队管理平台</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -18,7 +18,7 @@
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item"><a class="nav-link" href="members.php" data-i18n="nav.members">Members</a></li>
         <li class="nav-item"><a class="nav-link" href="projects.php" data-i18n="nav.projects">Projects</a></li>
-        <li class="nav-item"><a class="nav-link" href="directions.php" data-i18n="nav.directions">Research Directions</a></li>
+        <li class="nav-item"><a class="nav-link" href="directions.php" data-i18n="nav.directions">Research</a></li>
         <li class="nav-item"><a class="nav-link" href="tasks.php" data-i18n="nav.tasks">Tasks</a></li>
         <li class="nav-item"><a class="nav-link" href="workload.php" data-i18n="nav.workload">Workload</a></li>
         <li class="nav-item"><a class="nav-link" href="account.php" data-i18n="nav.account">Account</a></li>

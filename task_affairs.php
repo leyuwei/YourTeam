@@ -13,9 +13,9 @@ $affairs_stmt->execute([$task_id]);
 $affairs = $affairs_stmt->fetchAll();
 $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')->fetchAll();
 ?>
-<h2>Urgent Affairs - <?php echo htmlspecialchars($task['title']); ?></h2>
+<h2>下辖紧急事务 / Urgent Affairs - <?php echo htmlspecialchars($task['title']); ?></h2>
 <table class="table table-bordered">
-<tr><th>Description</th><th>Members</th><th>Start</th><th>End</th><th>Action</th></tr>
+<tr><th>紧急事务描述</th><th>负责成员</th><th>起始时间</th><th>结束时间</th><th>操作</th></tr>
 <?php foreach($affairs as $a): ?>
 <tr>
   <td><?= htmlspecialchars($a['description']); ?></td>
@@ -26,15 +26,15 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
 </tr>
 <?php endforeach; ?>
 </table>
-<h4>Add Urgent Affair</h4>
+<h4>新建紧急事务</h4>
 <form method="post" action="affair_add.php">
   <input type="hidden" name="task_id" value="<?= $task_id; ?>">
   <div class="mb-3">
-    <label class="form-label">Description</label>
+    <label class="form-label">紧急事务描述</label>
     <textarea name="description" class="form-control" rows="2" required></textarea>
   </div>
   <div class="mb-3">
-    <label class="form-label">Members</label>
+    <label class="form-label">负责成员 (按住Ctrl键点选多个人)</label>
     <select name="member_ids[]" class="form-select" multiple required>
       <?php foreach($members as $m): ?>
       <option value="<?= $m['id']; ?>"><?= htmlspecialchars($m['name']); ?> (<?= $m['campus_id']; ?>)</option>
@@ -42,14 +42,14 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
     </select>
   </div>
   <div class="mb-3">
-    <label class="form-label">Start Time</label>
+    <label class="form-label">起始时间</label>
     <input type="datetime-local" name="start_time" class="form-control" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">End Time</label>
+    <label class="form-label">结束时间</label>
     <input type="datetime-local" name="end_time" class="form-control" required>
   </div>
-  <button type="submit" class="btn btn-primary">Add</button>
-  <a href="tasks.php" class="btn btn-secondary">Back</a>
+  <button type="submit" class="btn btn-primary">新增事务</button>
+  <a href="tasks.php" class="btn btn-secondary">返回</a>
 </form>
 <?php include 'footer.php'; ?>

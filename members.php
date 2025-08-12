@@ -3,18 +3,18 @@ include 'header.php';
 
 // Determine sorting column and direction from query parameters
 $columns = [
-    'campus_id' => 'Campus ID',
-    'name' => 'Name',
-    'email' => 'Email',
-    'identity_number' => 'Identity No',
-    'year_of_join' => 'Year Joined',
-    'current_degree' => 'Current Degree',
-    'degree_pursuing' => 'Degree Pursuing',
-    'phone' => 'Phone',
-    'wechat' => 'WeChat',
-    'department' => 'Department',
-    'workplace' => 'Workplace',
-    'homeplace' => 'Homeplace'
+    'campus_id' => '一卡通号',
+    'name' => '姓名',
+    'email' => '正式邮箱',
+    'identity_number' => '身份证号',
+    'year_of_join' => '入学年份',
+    'current_degree' => '已获学位',
+    'degree_pursuing' => '当前学历',
+    'phone' => '手机号',
+    'wechat' => '微信号',
+    'department' => '所处学院/单位',
+    'workplace' => '工作地点',
+    'homeplace' => '家庭住址'
 ];
 
 $sort = $_GET['sort'] ?? 'sort_order';
@@ -27,12 +27,12 @@ $stmt = $pdo->query("SELECT * FROM members ORDER BY $sort $dir");
 $members = $stmt->fetchAll();
 ?>
 <div class="d-flex justify-content-between mb-3">
-  <h2>Team Members</h2>
+  <h2>团队成员</h2>
   <div>
-    <a class="btn btn-success" href="member_edit.php">Add Member</a>
-    <a class="btn btn-secondary" href="members_import.php">Import Excel</a>
-    <a class="btn btn-secondary" href="members_export.php">Export Excel</a>
-    <a class="btn btn-warning" href="member_self_update.php">Ask for Update</a>
+    <a class="btn btn-success" href="member_edit.php">新增成员</a>
+    <a class="btn btn-secondary" href="members_import.php">从表格导入</a>
+    <a class="btn btn-secondary" href="members_export.php">导出至表格</a>
+    <a class="btn btn-warning" href="member_self_update.php">请求信息更新</a>
   </div>
 </div>
 <div class="table-responsive">
@@ -45,7 +45,7 @@ $members = $stmt->fetchAll();
     ?>
       <th><a href="?sort=<?= $col; ?>&amp;dir=<?= $newDir; ?>"><?= htmlspecialchars($label); ?></a></th>
     <?php endforeach; ?>
-    <th>Actions</th>
+    <th>操作</th>
   </tr>
   </thead>
   <tbody id="memberList">

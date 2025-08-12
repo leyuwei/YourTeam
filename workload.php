@@ -69,7 +69,7 @@ if($start && $end){
         header('Content-Disposition: attachment; filename="workload.xls"');
         echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
         echo "<table border='1'>";
-        echo "<tr><th>Rank</th><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Project Hours</th><th>Urgent Hours</th></tr>";
+        echo "<tr><th>排名</th><th>一卡通号</th><th>姓名</th><th>项目</th><th>紧急任务</th><th>项目时长</th><th>紧急任务时长</th></tr>";
         foreach($report as $r){
             echo "<tr>";
             echo "<td>".htmlspecialchars($r['rank'])."</td>";
@@ -95,28 +95,28 @@ if($start && $end){
 }
 include 'header.php';
 ?>
-<h2>Member Workload Report</h2>
+<h2>工作量统计报表 / Workload Report</h2>
 <form method="get" class="row g-3 mb-3">
   <div class="col-auto">
-    <label class="form-label">Start</label>
+    <label class="form-label">报表起始时间</label>
     <input type="datetime-local" name="start" class="form-control" value="<?= htmlspecialchars($start); ?>" required>
   </div>
   <div class="col-auto">
-    <label class="form-label">End</label>
+    <label class="form-label">报表截止时间</label>
     <input type="datetime-local" name="end" class="form-control" value="<?= htmlspecialchars($end); ?>" required>
   </div>
   <div class="col-auto align-self-end">
-    <button type="submit" class="btn btn-primary">Generate</button>
+    <button type="submit" class="btn btn-primary">生成报表</button>
   </div>
   <?php if($report): ?>
   <div class="col-auto align-self-end">
-    <a class="btn btn-success" href="workload.php?start=<?= urlencode($start); ?>&end=<?= urlencode($end); ?>&export=1">Export Excel</a>
+    <a class="btn btn-success" href="workload.php?start=<?= urlencode($start); ?>&end=<?= urlencode($end); ?>&export=1">导出为EXCEL</a>
   </div>
   <?php endif; ?>
 </form>
 <?php if($report): ?>
 <table class="table table-bordered">
-<tr><th>Rank</th><th>Campus ID</th><th>Name</th><th>Projects</th><th>Urgent Tasks</th><th>Project Hours</th><th>Urgent Hours</th></tr>
+<tr><th>排名</th><th>一卡通号</th><th>姓名</th><th>项目</th><th>紧急任务</th><th>项目时长</th><th>紧急任务时长</th></tr>
 <?php foreach($report as $r): ?>
 <tr>
   <td><?= htmlspecialchars($r['rank']); ?></td>
