@@ -11,7 +11,7 @@ $task = $task->fetch();
 $affairs_stmt = $pdo->prepare('SELECT a.*, GROUP_CONCAT(CONCAT(m.name, " (", m.campus_id, ")") SEPARATOR ", ") AS members FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
 $affairs_stmt->execute([$task_id]);
 $affairs = $affairs_stmt->fetchAll();
-$members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')->fetchAll();
+$members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
 ?>
 <h2>下辖具体事务 - <?php echo htmlspecialchars($task['title']); ?></h2>
 <table class="table table-bordered">
