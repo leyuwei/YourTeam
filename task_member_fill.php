@@ -54,8 +54,8 @@ if($member_id){
 </style>
 </head>
 <body class="container py-5">
-<h2>工作事务申报</h2>
-<h3>与绩效挂钩</h3>
+<h2>工作事务申报 - 与绩效挂钩</h2>
+
 <?php if(!$member_id): ?>
 <form method="post" class="mt-4">
   <input type="hidden" name="action" value="verify">
@@ -84,6 +84,7 @@ if($member_id){
 </tr>
 <?php endforeach; ?>
 </table>
+<br>
 <h4>新增工作事务量</h4>
 <form method="post" class="mt-3">
   <input type="hidden" name="action" value="add">

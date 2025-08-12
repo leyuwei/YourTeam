@@ -48,8 +48,8 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
     <label class="form-label">入项时间</label>
     <input type="datetime-local" name="join_time" class="form-control" required>
   </div>
-  <button type="submit" class="btn btn-primary">Add</button>
-  <a href="projects.php" class="btn btn-secondary">Back</a>
+  <button type="submit" class="btn btn-primary">新增</button>
+  <a href="projects.php" class="btn btn-secondary">返回</a>
 </form>
 <h4 class="mt-5">成员变动历史</h4>
 <table class="table table-bordered">
