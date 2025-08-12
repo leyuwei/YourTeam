@@ -32,6 +32,7 @@ $members = $stmt->fetchAll();
     <a class="btn btn-success" href="member_edit.php">Add Member</a>
     <a class="btn btn-secondary" href="members_import.php">Import Excel</a>
     <a class="btn btn-secondary" href="members_export.php">Export Excel</a>
+    <a class="btn btn-warning" href="member_self_update.php">Ask for Update</a>
   </div>
 </div>
 <div class="table-responsive">

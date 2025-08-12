@@ -40,6 +40,7 @@ CREATE TABLE project_member_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
   project_id INT NOT NULL,
   member_id INT NOT NULL,
+  sort_order INT DEFAULT 0,
   join_time DATETIME NOT NULL,
   exit_time DATETIME DEFAULT NULL,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -80,6 +81,7 @@ CREATE TABLE research_directions (
 CREATE TABLE direction_members (
   direction_id INT NOT NULL,
   member_id INT NOT NULL,
+  sort_order INT DEFAULT 0,
   PRIMARY KEY (direction_id, member_id),
   FOREIGN KEY (direction_id) REFERENCES research_directions(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE

@@ -8,7 +8,7 @@ if(!$project_id){
 $project = $pdo->prepare('SELECT * FROM projects WHERE id=?');
 $project->execute([$project_id]);
 $project = $project->fetch();
-$active = $pdo->prepare('SELECT l.id, m.campus_id, m.name, l.join_time FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? AND l.exit_time IS NULL');
+$active = $pdo->prepare('SELECT l.id, m.campus_id, m.name, l.join_time FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? AND l.exit_time IS NULL ORDER BY l.sort_order');
 $active->execute([$project_id]);
 $active_members = $active->fetchAll();
 $logs = $pdo->prepare('SELECT l.*, m.name, m.campus_id FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? ORDER BY l.join_time');
@@ -19,15 +19,18 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
 <h2>Project Members - <?php echo htmlspecialchars($project['title']); ?></h2>
 <h4>Current Members</h4>
 <table class="table table-bordered">
-<tr><th>Campus ID</th><th>Name</th><th>Join Time</th><th>Action</th></tr>
+<tr><th></th><th>Campus ID</th><th>Name</th><th>Join Time</th><th>Action</th></tr>
+<tbody id="memberList">
 <?php foreach($active_members as $a): ?>
-<tr>
+<tr data-id="<?= $a['id']; ?>">
+  <td class="drag-handle">&#9776;</td>
   <td><?= htmlspecialchars($a['campus_id']); ?></td>
   <td><?= htmlspecialchars($a['name']); ?></td>
   <td><?= htmlspecialchars($a['join_time']); ?></td>
   <td><a class="btn btn-sm btn-danger" href="project_member_remove.php?log_id=<?= $a['id']; ?>&project_id=<?= $project_id; ?>" onclick="return doubleConfirm('Remove member from project?');">Remove</a></td>
 </tr>
 <?php endforeach; ?>
+</tbody>
 </table>
 <h4>Add Member</h4>
 <form method="post" action="project_member_add.php">
@@ -59,4 +62,21 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
 </tr>
 <?php endforeach; ?>
 </table>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  Sortable.create(document.getElementById('memberList'), {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: function() {
+      const order = Array.from(document.querySelectorAll('#memberList tr')).map((row, index) => ({id: row.dataset.id, position: index}));
+      fetch('project_member_order.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order: order})
+      });
+    }
+  });
+});
+</script>
 <?php include 'footer.php'; ?>
