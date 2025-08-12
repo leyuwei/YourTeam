@@ -3,7 +3,7 @@
 $stmt = $pdo->query("SELECT d.*, GROUP_CONCAT(CONCAT(m.name, '(', COALESCE(m.degree_pursuing, ''), ',', COALESCE(m.year_of_join, ''), ')') ORDER BY dm.sort_order SEPARATOR ', ') AS member_names
                      FROM research_directions d
                      LEFT JOIN direction_members dm ON d.id = dm.direction_id
-                     LEFT JOIN members m ON dm.member_id = m.id
+                     LEFT JOIN members m ON dm.member_id = m.id AND m.status != 'exited'
                      GROUP BY d.id
                      ORDER BY d.sort_order");
 $directions = $stmt->fetchAll();
@@ -42,7 +42,7 @@ $directions = $stmt->fetchAll();
 <table class="table table-bordered">
   <tr><th>成员</th><th>研究方向</th></tr>
   <?php
-  $memberDirs = $pdo->query('SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(d.title ORDER BY dm.sort_order SEPARATOR ", ") AS dirs FROM members m LEFT JOIN direction_members dm ON m.id=dm.member_id LEFT JOIN research_directions d ON dm.direction_id=d.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll();
+  $memberDirs = $pdo->query("SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(d.title ORDER BY dm.sort_order SEPARATOR ', ') AS dirs FROM members m LEFT JOIN direction_members dm ON m.id=dm.member_id LEFT JOIN research_directions d ON dm.direction_id=d.id WHERE m.status != 'exited' GROUP BY m.id ORDER BY m.sort_order")->fetchAll();
   foreach($memberDirs as $md): ?>
   <tr>
     <td><?= htmlspecialchars($md["name"]); ?><span style="color:#cccccc;">(<?= htmlspecialchars($md["degree_pursuing"]); ?>,<?= htmlspecialchars($md["year_of_join"]); ?>)</span></td>

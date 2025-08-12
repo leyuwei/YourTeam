@@ -91,23 +91,52 @@ if($member_id){
 <?php endforeach; ?>
 </table>
 <br>
-<h4>新增工作量</h4>
-<form method="post" class="mt-3">
-  <input type="hidden" name="action" value="add">
-  <div class="mb-3">
-    <label class="form-label">工作事务描述(例如跑腿、开会、出差、临时材料等事务)</label>
-    <textarea name="description" class="form-control" rows="2" required></textarea>
-  </div>
-  <div class="mb-3">
-    <label class="form-label">起始时间（请诚信填写，时长与工资挂钩）</label>
-    <input type="datetime-local" name="start_time" class="form-control" required>
-  </div>
-  <div class="mb-3">
-    <label class="form-label">结束时间（请诚信填写，时长与工资挂钩）</label>
-    <input type="datetime-local" name="end_time" class="form-control" required>
-  </div>
-  <button type="submit" class="btn btn-primary">申报该工作量</button>
-</form>
+ <h4>新增工作量</h4>
+ <form method="post" class="mt-3" id="taskForm">
+   <input type="hidden" name="action" value="add">
+   <div class="mb-3">
+     <label class="form-label">工作事务描述(例如跑腿、开会、出差、临时材料等事务)</label>
+     <textarea name="description" class="form-control" rows="2" required></textarea>
+   </div>
+   <div class="mb-3">
+     <label class="form-label">起始时间（请诚信填写，时长与工资挂钩）</label>
+     <input type="datetime-local" name="start_time" id="startTime" class="form-control" required>
+   </div>
+   <div class="mb-3">
+     <label class="form-label">结束时间（请诚信填写，时长与工资挂钩）</label>
+     <input type="datetime-local" name="end_time" id="endTime" class="form-control" required>
+     <div id="timeWarning" class="text-danger mt-2" style="display:none;">请确认您所选择的任务时长，任务不得超过6天，超过6天的任务请切分填写（注意此处任务需保持较细颗粒度，便于考核）</div>
+   </div>
+   <button type="submit" class="btn btn-primary">申报该工作量</button>
+ </form>
+ <script>
+ const startInput = document.getElementById('startTime');
+ const endInput = document.getElementById('endTime');
+ const warning = document.getElementById('timeWarning');
+ const form = document.getElementById('taskForm');
+ function checkInterval(){
+   const start = new Date(startInput.value);
+   const end = new Date(endInput.value);
+   if(startInput.value && endInput.value){
+     const diff = (end - start) / (1000 * 60 * 60 * 24);
+     if(diff > 6){
+       warning.style.display = 'block';
+       endInput.value = '';
+       return false;
+     } else {
+       warning.style.display = 'none';
+     }
+   }
+   return true;
+ }
+ startInput.addEventListener('change', checkInterval);
+ endInput.addEventListener('change', checkInterval);
+ form.addEventListener('submit', function(e){
+   if(!checkInterval()){
+     e.preventDefault();
+   }
+ });
+ </script>
 <?php endif; ?>
 </body>
 </html>
