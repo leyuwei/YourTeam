@@ -13,6 +13,7 @@ INSERT INTO managers (username,password) VALUES
 
 CREATE TABLE members (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  sort_order INT DEFAULT 0,
   campus_id VARCHAR(20) UNIQUE NOT NULL,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(100),
@@ -29,6 +30,7 @@ CREATE TABLE members (
 
 CREATE TABLE projects (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  sort_order INT DEFAULT 0,
   title VARCHAR(100) NOT NULL,
   description TEXT,
   begin_date DATE,
@@ -74,6 +76,7 @@ CREATE TABLE task_affair_members (
 
 CREATE TABLE research_directions (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  sort_order INT DEFAULT 0,
   title VARCHAR(100) NOT NULL,
   description TEXT
 );
