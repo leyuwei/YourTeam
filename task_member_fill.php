@@ -59,8 +59,9 @@ if($member_id){
 </style>
 </head>
 <body class="container py-5">
-<h2>工作事务申报 - <?= htmlspecialchars($taskTitle); ?></h2>
-
+<h2>工作事务申报 - 与绩效挂钩！</h2>
+<h4>您正在申报任务：<?= htmlspecialchars($taskTitle); ?></h4>
+<br>
 <?php if(!$member_id): ?>
 <form method="post" class="mt-4">
   <input type="hidden" name="action" value="verify">
