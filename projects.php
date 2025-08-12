@@ -1,11 +1,11 @@
 <?php include 'header.php';
 $status = $_GET['status'] ?? '';
 if($status){
-    $stmt = $pdo->prepare('SELECT p.*, GROUP_CONCAT(m.name ORDER BY l.sort_order SEPARATOR ", ") AS members FROM projects p LEFT JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL LEFT JOIN members m ON l.member_id=m.id WHERE p.status=? GROUP BY p.id ORDER BY p.sort_order');
+    $stmt = $pdo->prepare('SELECT p.*, GROUP_CONCAT(CONCAT(m.name, "(", COALESCE(m.degree_pursuing, ""), ",", COALESCE(m.year_of_join, ""), ")") ORDER BY l.sort_order SEPARATOR ", ") AS members FROM projects p LEFT JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL LEFT JOIN members m ON l.member_id=m.id WHERE p.status=? GROUP BY p.id ORDER BY p.sort_order');
     $stmt->execute([$status]);
     $projects = $stmt->fetchAll();
 } else {
-    $projects = $pdo->query('SELECT p.*, GROUP_CONCAT(m.name ORDER BY l.sort_order SEPARATOR ", ") AS members FROM projects p LEFT JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL LEFT JOIN members m ON l.member_id=m.id GROUP BY p.id ORDER BY p.sort_order')->fetchAll();
+    $projects = $pdo->query('SELECT p.*, GROUP_CONCAT(CONCAT(m.name, "(", COALESCE(m.degree_pursuing, ""), ",", COALESCE(m.year_of_join, ""), ")") ORDER BY l.sort_order SEPARATOR ", ") AS members FROM projects p LEFT JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL LEFT JOIN members m ON l.member_id=m.id GROUP BY p.id ORDER BY p.sort_order')->fetchAll();
 }
 ?>
 <div class="d-flex justify-content-between mb-3">
@@ -62,10 +62,10 @@ if($status){
 <table class="table table-bordered">
   <tr><th>Member</th><th>Projects</th></tr>
   <?php
-  $memberProjects = $pdo->query('SELECT m.name, GROUP_CONCAT(p.title ORDER BY l.sort_order SEPARATOR ", ") AS proj FROM members m LEFT JOIN project_member_log l ON m.id=l.member_id AND l.exit_time IS NULL LEFT JOIN projects p ON l.project_id=p.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll();
+  $memberProjects = $pdo->query('SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(p.title ORDER BY l.sort_order SEPARATOR ", ") AS proj FROM members m LEFT JOIN project_member_log l ON m.id=l.member_id AND l.exit_time IS NULL LEFT JOIN projects p ON l.project_id=p.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll();
   foreach($memberProjects as $mp): ?>
   <tr>
-    <td><?= htmlspecialchars($mp["name"]); ?></td>
+    <td><?= htmlspecialchars($mp["name"] . "(" . $mp["degree_pursuing"] . "," . $mp["year_of_join"] . ")"); ?></td>
     <td><?= $mp['proj'] ? htmlspecialchars($mp['proj']) : '<em>None</em>'; ?></td>
   </tr>
   <?php endforeach; ?>
