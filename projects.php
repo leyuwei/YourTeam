@@ -45,7 +45,7 @@ if($status){
   <tr data-id="<?= $p['id']; ?>">
     <td class="drag-handle">&#9776;</td>
     <td><?= htmlspecialchars($p['title']); ?></td>
-    <td><?= htmlspecialchars($p['members']); ?></td>
+    <td><?= preg_replace('/\([^()]*\)/', '<span style="color:#cccccc;">$0</span>', htmlspecialchars($p['members'])); ?></td>
     <td><?= htmlspecialchars($p['begin_date']); ?></td>
     <td><?= htmlspecialchars($p['end_date']); ?></td>
     <td><?= htmlspecialchars($p['status']); ?></td>
@@ -65,7 +65,7 @@ if($status){
   $memberProjects = $pdo->query('SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(p.title ORDER BY l.sort_order SEPARATOR ", ") AS proj FROM members m LEFT JOIN project_member_log l ON m.id=l.member_id AND l.exit_time IS NULL LEFT JOIN projects p ON l.project_id=p.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll();
   foreach($memberProjects as $mp): ?>
   <tr>
-    <td><?= htmlspecialchars($mp["name"] . "(" . $mp["degree_pursuing"] . "," . $mp["year_of_join"] . ")"); ?></td>
+    <td><?= htmlspecialchars($mp["name"]); ?><span style="color:#cccccc;">(<?= htmlspecialchars($mp["degree_pursuing"]); ?>,<?= htmlspecialchars($mp["year_of_join"]); ?>)</span></td>
     <td><?= $mp['proj'] ? htmlspecialchars($mp['proj']) : '<em>None</em>'; ?></td>
   </tr>
   <?php endforeach; ?>
