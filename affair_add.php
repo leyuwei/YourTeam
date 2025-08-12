@@ -6,6 +6,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $member_ids = $_POST['member_ids'] ?? [];
     $start_time = $_POST['start_time'];
     $end_time = $_POST['end_time'];
+    if(strtotime($end_time) <= strtotime($start_time)){
+        echo '结束时间必须晚于起始时间';
+        exit();
+    }
     $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time) VALUES (?,?,?,?)');
     $stmt->execute([$task_id,$description,$start_time,$end_time]);
     $affair_id = $pdo->lastInsertId();

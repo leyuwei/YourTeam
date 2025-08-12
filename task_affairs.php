@@ -53,4 +53,15 @@ $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 
   <button type="submit" class="btn btn-primary">新增事务</button>
   <a href="tasks.php" class="btn btn-secondary">返回</a>
 </form>
+<script>
+const affairForm = document.querySelector('form[action="affair_add.php"]');
+affairForm.addEventListener('submit', function(e){
+  const start = affairForm.querySelector('input[name="start_time"]').value;
+  const end = affairForm.querySelector('input[name="end_time"]').value;
+  if(start && end && new Date(end) <= new Date(start)){
+    alert('结束时间必须晚于起始时间');
+    e.preventDefault();
+  }
+});
+</script>
 <?php include 'footer.php'; ?>

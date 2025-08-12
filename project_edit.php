@@ -2,6 +2,7 @@
 include 'header.php';
 $id = $_GET['id'] ?? null;
 $project = ['title'=>'','description'=>'','begin_date'=>'','end_date'=>'','status'=>'todo'];
+$error = '';
 if($id){
     $stmt = $pdo->prepare('SELECT * FROM projects WHERE id=?');
     $stmt->execute([$id]);
@@ -13,20 +14,25 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $begin_date = $_POST['begin_date'];
     $end_date = $_POST['end_date'];
     $status = $_POST['status'];
-    if($id){
-        $stmt = $pdo->prepare('UPDATE projects SET title=?, description=?, begin_date=?, end_date=?, status=? WHERE id=?');
-        $stmt->execute([$title,$description,$begin_date,$end_date,$status,$id]);
+    if($begin_date && $end_date && strtotime($end_date) <= strtotime($begin_date)){
+        $error = '结项时间必须晚于立项时间';
     } else {
-        $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM projects');
-        $nextOrder = $orderStmt->fetchColumn();
-        $stmt = $pdo->prepare('INSERT INTO projects(title,description,begin_date,end_date,status,sort_order) VALUES (?,?,?,?,?,?)');
-        $stmt->execute([$title,$description,$begin_date,$end_date,$status,$nextOrder]);
+        if($id){
+            $stmt = $pdo->prepare('UPDATE projects SET title=?, description=?, begin_date=?, end_date=?, status=? WHERE id=?');
+            $stmt->execute([$title,$description,$begin_date,$end_date,$status,$id]);
+        } else {
+            $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM projects');
+            $nextOrder = $orderStmt->fetchColumn();
+            $stmt = $pdo->prepare('INSERT INTO projects(title,description,begin_date,end_date,status,sort_order) VALUES (?,?,?,?,?,?)');
+            $stmt->execute([$title,$description,$begin_date,$end_date,$status,$nextOrder]);
+        }
+        header('Location: projects.php');
+        exit();
     }
-    header('Location: projects.php');
-    exit();
 }
 ?>
 <h2><?php echo $id? 'Edit':'Add'; ?> 横纵项目</h2>
+<?php if($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 <form method="post">
   <div class="mb-3">
     <label class="form-label">项目标题</label>
@@ -59,4 +65,15 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   <button type="submit" class="btn btn-primary">更新</button>
   <a href="projects.php" class="btn btn-secondary">取消</a>
 </form>
+<script>
+const projForm = document.querySelector('form');
+projForm.addEventListener('submit', function(e){
+  const begin = projForm.querySelector('input[name="begin_date"]').value;
+  const end = projForm.querySelector('input[name="end_date"]').value;
+  if(begin && end && new Date(end) <= new Date(begin)){
+    alert('结项时间必须晚于立项时间');
+    e.preventDefault();
+  }
+});
+</script>
 <?php include 'footer.php'; ?>
