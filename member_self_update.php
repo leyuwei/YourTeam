@@ -1,0 +1,130 @@
+<?php
+require 'config.php';
+$member_id = $_SESSION['self_update_member_id'] ?? null;
+$member = null;
+$error = '';
+$msg = '';
+
+if(isset($_POST['action']) && $_POST['action'] === 'verify'){
+    $name = $_POST['name'];
+    $identity = $_POST['identity_number'];
+    $stmt = $pdo->prepare('SELECT * FROM members WHERE name=? AND identity_number=?');
+    $stmt->execute([$name, $identity]);
+    $member = $stmt->fetch();
+    if($member){
+        $_SESSION['self_update_member_id'] = $member['id'];
+        $member_id = $member['id'];
+    } else {
+        $error = 'No matching member found.';
+    }
+}
+
+if($member_id){
+    if(!$member){
+        $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
+        $stmt->execute([$member_id]);
+        $member = $stmt->fetch();
+    }
+    if(isset($_POST['action']) && $_POST['action'] === 'update'){
+        $campus_id = $_POST['campus_id'];
+        $name = $_POST['name'];
+        $email = $_POST['email'];
+        $identity_number = $_POST['identity_number'];
+        $year_of_join = $_POST['year_of_join'];
+        $current_degree = $_POST['current_degree'];
+        $degree_pursuing = $_POST['degree_pursuing'];
+        $phone = $_POST['phone'];
+        $wechat = $_POST['wechat'];
+        $department = $_POST['department'];
+        $workplace = $_POST['workplace'];
+        $homeplace = $_POST['homeplace'];
+        $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=? WHERE id=?');
+        $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$member_id]);
+        $msg = 'Information updated successfully.';
+        $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
+        $stmt->execute([$member_id]);
+        $member = $stmt->fetch();
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Member Update</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container py-5">
+<h2>Member Information Update</h2>
+<?php if(!$member_id): ?>
+<form method="post" class="mt-4">
+  <input type="hidden" name="action" value="verify">
+  <div class="mb-3">
+    <label class="form-label">Name</label>
+    <input type="text" name="name" class="form-control" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Identity Number</label>
+    <input type="text" name="identity_number" class="form-control" required>
+  </div>
+  <?php if($error): ?><div class="text-danger mb-3"><?= $error; ?></div><?php endif; ?>
+  <button type="submit" class="btn btn-primary">Verify</button>
+</form>
+<?php else: ?>
+<?php if($msg): ?><div class="alert alert-success mt-3"><?= $msg; ?></div><?php endif; ?>
+<form method="post" class="mt-4">
+  <input type="hidden" name="action" value="update">
+  <div class="mb-3">
+    <label class="form-label">Campus ID</label>
+    <input type="text" name="campus_id" class="form-control" value="<?= htmlspecialchars($member['campus_id']); ?>" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Name</label>
+    <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($member['name']); ?>" required>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Email</label>
+    <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($member['email']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Identity Number</label>
+    <input type="text" name="identity_number" class="form-control" value="<?= htmlspecialchars($member['identity_number']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Year of Join</label>
+    <input type="number" name="year_of_join" class="form-control" value="<?= htmlspecialchars($member['year_of_join']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Current Degree</label>
+    <input type="text" name="current_degree" class="form-control" value="<?= htmlspecialchars($member['current_degree']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Degree Pursuing</label>
+    <input type="text" name="degree_pursuing" class="form-control" value="<?= htmlspecialchars($member['degree_pursuing']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Phone</label>
+    <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($member['phone']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">WeChat</label>
+    <input type="text" name="wechat" class="form-control" value="<?= htmlspecialchars($member['wechat']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Department</label>
+    <input type="text" name="department" class="form-control" value="<?= htmlspecialchars($member['department']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Workplace</label>
+    <input type="text" name="workplace" class="form-control" value="<?= htmlspecialchars($member['workplace']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Homeplace</label>
+    <input type="text" name="homeplace" class="form-control" value="<?= htmlspecialchars($member['homeplace']); ?>">
+  </div>
+  <button type="submit" class="btn btn-primary">Save</button>
+</form>
+<?php endif; ?>
+</body>
+</html>
