@@ -34,7 +34,7 @@ if($status){
   <td><?= htmlspecialchars($t['status']); ?></td>
   <td>
     <a class="btn btn-sm btn-primary" href="task_edit.php?id=<?= $t['id']; ?>">编辑信息</a>
-    <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>">下辖紧急事务</a>
+    <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>">下辖具体事务</a>
     <a class="btn btn-sm btn-info" href="task_member_fill.php?task_id=<?= $t['id']; ?>">请成员自己填</a>
     <a class="btn btn-sm btn-danger" href="task_delete.php?id=<?= $t['id']; ?>" onclick="return doubleConfirm('Delete task?');">删除</a>
   </td>

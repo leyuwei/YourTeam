@@ -60,7 +60,7 @@ if($member_id){
 </head>
 <body class="container py-5">
 <h2>工作量报备 - 与绩效挂钩！</h2>
-<h4><span style="color:red">您正在申报：<?= htmlspecialchars($taskTitle); ?></span></h4>
+<h4><span style="color:red">您正在申报：<?= htmlspecialchars($taskTitle); ?>方面的工作</span></h4>
 <br>
 <?php if(!$member_id): ?>
 <form method="post" class="mt-4">
@@ -78,7 +78,7 @@ if($member_id){
 </form>
 <?php else: ?>
 <?php if($msg): ?><div class="alert alert-success"><?php echo htmlspecialchars($msg); ?></div><?php endif; ?>
-<h4>已填工作事务</h4>
+<h4><b>已填工作事务</b></h4>
 <table class="table table-bordered">
 <tr><th>描述</th><th>负责成员</th><th>起始时间</th><th>结束时间</th></tr>
 <?php foreach($affairs as $a): ?>
@@ -91,11 +91,12 @@ if($member_id){
 <?php endforeach; ?>
 </table>
 <br>
- <h4>新增工作量</h4>
+ <h4><b>新增工作量</b></h4>
+ <h5><span style="color:red">请注意：此处申报的工作必须有很细的颗粒度，不可以是"做研究"等长时/属于自己的任务，时长不可超过6天，多次跑腿/多次开会请分次申报！</span></h5>
  <form method="post" class="mt-3" id="taskForm">
    <input type="hidden" name="action" value="add">
    <div class="mb-3">
-     <label class="form-label">工作事务描述(例如跑腿、开会、出差、临时材料等事务)</label>
+     <label class="form-label">工作事务描述(例如跑腿、开会、出差、临时材料等几天完成的紧急/具体事务)</label>
      <textarea name="description" class="form-control" rows="2" required></textarea>
    </div>
    <div class="mb-3">
@@ -105,7 +106,7 @@ if($member_id){
    <div class="mb-3">
      <label class="form-label">结束时间（请诚信填写，时长与工资挂钩）</label>
      <input type="datetime-local" name="end_time" id="endTime" class="form-control" required>
-     <div id="timeWarning" class="text-danger mt-2" style="display:none;">请确认您所选择的任务时长，任务不得超过6天，超过6天的任务请切分填写（注意此处任务需保持较细颗粒度，便于考核）</div>
+     <div id="timeWarning" class="text-danger mt-2" style="display:none;">请确认您所选择的任务时长不超过6天，超过6天的任务请切分填写！（注意此处任务需保持较细颗粒度，便于考核）</div>
    </div>
    <button type="submit" class="btn btn-primary">申报该工作量</button>
  </form>

@@ -13,9 +13,9 @@ $affairs_stmt->execute([$task_id]);
 $affairs = $affairs_stmt->fetchAll();
 $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')->fetchAll();
 ?>
-<h2>下辖紧急事务 - <?php echo htmlspecialchars($task['title']); ?></h2>
+<h2>下辖具体事务 - <?php echo htmlspecialchars($task['title']); ?></h2>
 <table class="table table-bordered">
-<tr><th>紧急事务描述</th><th>负责成员</th><th>起始时间</th><th>结束时间</th><th>操作</th></tr>
+<tr><th>具体事务描述</th><th>负责成员</th><th>起始时间</th><th>结束时间</th><th>操作</th></tr>
 <?php foreach($affairs as $a): ?>
 <tr>
   <td><?= htmlspecialchars($a['description']); ?></td>
@@ -27,11 +27,11 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
 <?php endforeach; ?>
 </table>
 <br><br>
-<h4>新建紧急事务</h4>
+<h4>新建具体事务</h4>
 <form method="post" action="affair_add.php">
   <input type="hidden" name="task_id" value="<?= $task_id; ?>">
   <div class="mb-3">
-    <label class="form-label">紧急事务描述</label>
+    <label class="form-label">具体事务描述</label>
     <textarea name="description" class="form-control" rows="2" required></textarea>
   </div>
   <div class="mb-3">
