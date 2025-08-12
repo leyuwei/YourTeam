@@ -46,7 +46,7 @@ if($start && $end){
         header('Content-Disposition: attachment; filename="workload.xls"');
         echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
         echo "<table border='1'>";
-        echo "<tr><th>排名</th><th>一卡通号</th><th>姓名</th><th>紧急任务</th><th>紧急任务时长</th></tr>";
+        echo "<tr><th>排名</th><th>一卡通号</th><th>姓名</th><th>具体任务</th><th>任务投入时长</th></tr>";
         foreach($report as $r){
             echo "<tr>";
             echo "<td>".htmlspecialchars($r['rank'])."</td>";
