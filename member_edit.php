@@ -1,7 +1,7 @@
 <?php
 include 'header.php';
 $id = $_GET['id'] ?? null;
-$member = ['campus_id'=>'','name'=>'','email'=>'','identity_number'=>'','year_of_join'=>'','current_degree'=>'','degree_pursuing'=>'','phone'=>'','wechat'=>'','department'=>'','workplace'=>'','homeplace'=>''];
+$member = ['campus_id'=>'','name'=>'','email'=>'','identity_number'=>'','year_of_join'=>'','current_degree'=>'','degree_pursuing'=>'','phone'=>'','wechat'=>'','department'=>'','workplace'=>'','homeplace'=>'','status'=>'in_work'];
 if($id){
     $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
     $stmt->execute([$id]);
@@ -20,14 +20,15 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $department = $_POST['department'];
     $workplace = $_POST['workplace'];
     $homeplace = $_POST['homeplace'];
+    $status = $_POST['status'] ?? 'in_work';
     if($id){
-        $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=? WHERE id=?');
-        $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$id]);
+        $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=?, status=? WHERE id=?');
+        $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$status,$id]);
     } else {
         $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM members');
         $nextOrder = $orderStmt->fetchColumn();
-        $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)');
-        $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$nextOrder]);
+        $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$status,$nextOrder]);
     }
     header('Location: members.php');
     exit();
@@ -82,6 +83,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   <div class="mb-3">
     <label class="form-label">家庭地址</label>
     <input type="text" name="homeplace" class="form-control" value="<?php echo htmlspecialchars($member['homeplace']); ?>">
+  </div>
+  <div class="mb-3">
+    <label class="form-label">状态</label>
+    <select name="status" class="form-select">
+      <option value="in_work" <?php echo $member['status']==='in_work'?'selected':''; ?>>在岗</option>
+      <option value="exited" <?php echo $member['status']==='exited'?'selected':''; ?>>已离退</option>
+    </select>
   </div>
   <button type="submit" class="btn btn-primary">更新</button>
   <a href="members.php" class="btn btn-secondary">取消</a>

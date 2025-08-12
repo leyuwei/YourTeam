@@ -63,11 +63,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'department'      => 'department',
                     'workplace'       => 'workplace',
                     'homeplace'       => 'homeplace',
+                    'status'         => 'status',
                 ];
 
                 // Verify required headers exist
                 $missing = [];
                 foreach ($expected as $hdr => $col) {
+                    if ($hdr === 'status') continue; // status column optional
                     if (!array_key_exists($hdr, $hmap)) {
                         $missing[] = $hdr;
                     }
@@ -81,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     // Prepare SQL
                     $sql = 'INSERT INTO members
-                        (campus_id, name, email, identity_number, year_of_join, current_degree, degree_pursuing, phone, wechat, department, workplace, homeplace)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                        (campus_id, name, email, identity_number, year_of_join, current_degree, degree_pursuing, phone, wechat, department, workplace, homeplace, status)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                         ON DUPLICATE KEY UPDATE
                             name=VALUES(name),
                             email=VALUES(email),
@@ -94,7 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             wechat=VALUES(wechat),
                             department=VALUES(department),
                             workplace=VALUES(workplace),
-                            homeplace=VALUES(homeplace)';
+                            homeplace=VALUES(homeplace),
+                            status=VALUES(status)';
 
                     $stmt = $pdo->prepare($sql);
 
@@ -115,6 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         // Build record in DB order
                         $get = function($key) use ($row, $hmap) {
+                            if (!array_key_exists($key, $hmap)) return null;
                             $idx = $hmap[$key];
                             return array_key_exists($idx, $row) ? $row[$idx] : null;
                         };
@@ -131,6 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $department      = $get('department');
                         $workplace       = $get('workplace');
                         $homeplace       = $get('homeplace');
+                        $status          = $get('status');
+                        if ($status === '' || $status === null) { $status = 'in_work'; }
 
                         // Light validation: need at least one unique key
                         if ($campus_id === '' && $email === '') { $skipped++; continue; }
@@ -146,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $stmt->execute([
                                 $campus_id, $name, $email, $identity_number, $year_of_join,
                                 $current_degree, $degree_pursuing, $phone, $wechat,
-                                $department, $workplace, $homeplace
+                                $department, $workplace, $homeplace, $status
                             ]);
 
                             // Rowcount is 1 for insert, 2 for update when using ODKU
