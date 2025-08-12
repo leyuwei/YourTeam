@@ -17,9 +17,9 @@ $columns = [
     'homeplace' => 'Homeplace'
 ];
 
-$sort = $_GET['sort'] ?? 'id';
-if (!array_key_exists($sort, $columns) && $sort !== 'id') {
-    $sort = 'id';
+$sort = $_GET['sort'] ?? 'sort_order';
+if (!array_key_exists($sort, $columns) && $sort !== 'sort_order') {
+    $sort = 'sort_order';
 }
 $dir = strtolower($_GET['dir'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
 
@@ -37,7 +37,9 @@ $members = $stmt->fetchAll();
 </div>
 <div class="table-responsive">
 <table class="table table-bordered table-striped table-hover">
+  <thead>
   <tr>
+    <th></th>
     <?php foreach($columns as $col => $label):
         $newDir = ($sort === $col && $dir === 'ASC') ? 'desc' : 'asc';
     ?>
@@ -45,8 +47,11 @@ $members = $stmt->fetchAll();
     <?php endforeach; ?>
     <th>Actions</th>
   </tr>
+  </thead>
+  <tbody id="memberList">
   <?php foreach($members as $m): ?>
-  <tr>
+  <tr data-id="<?= $m['id']; ?>">
+    <td class="drag-handle">&#9776;</td>
     <td><?= htmlspecialchars($m['campus_id']); ?></td>
     <td><?= htmlspecialchars($m['name']); ?></td>
     <td><?= htmlspecialchars($m['email']); ?></td>
@@ -65,6 +70,24 @@ $members = $stmt->fetchAll();
     </td>
   </tr>
   <?php endforeach; ?>
+  </tbody>
 </table>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  Sortable.create(document.getElementById('memberList'), {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: function(){
+      const order = Array.from(document.querySelectorAll('#memberList tr')).map((row, index) => ({id: row.dataset.id, position: index}));
+      fetch('member_order.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order: order})
+      });
+    }
+  });
+});
+</script>
 <?php include 'footer.php'; ?>

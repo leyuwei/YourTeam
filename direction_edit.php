@@ -14,8 +14,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $stmt = $pdo->prepare('UPDATE research_directions SET title=?, description=? WHERE id=?');
         $stmt->execute([$title,$description,$id]);
     } else {
-        $stmt = $pdo->prepare('INSERT INTO research_directions(title,description) VALUES (?,?)');
-        $stmt->execute([$title,$description]);
+        $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM research_directions');
+        $nextOrder = $orderStmt->fetchColumn();
+        $stmt = $pdo->prepare('INSERT INTO research_directions(title,description,sort_order) VALUES (?,?,?)');
+        $stmt->execute([$title,$description,$nextOrder]);
     }
     header('Location: directions.php');
     exit();
