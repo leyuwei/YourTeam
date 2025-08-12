@@ -98,6 +98,8 @@ if($member_id){
 <br>
  <h4><b>新增工作量</b></h4>
  <h5><span style="color:red">请注意：此处申报的工作必须有很细的颗粒度，不可以是"做研究"等长时/属于自己的任务，时长不可超过6天，多次跑腿/多次开会请分次申报！</span></h5>
+ <h5><span style="color:red">填报工作量和时长必须具体，如周一、周五各干一天活，则需分两次，每次填报一天任务，切勿一次性申报5天，管理员会定期清除不合理申报！</span></h5>
+ <h5><span style="color:red">不必填报过于细碎：如一天中断断续续有工作，不要纠结，请一次性填写一整天工作量；如连续两天断断续续的细碎任务，请一次性填报两整天工作量</span></h5>
  <form method="post" class="mt-3" id="taskForm">
    <input type="hidden" name="action" value="add">
    <div class="mb-3">
