@@ -16,10 +16,10 @@ $logs->execute([$project_id]);
 $logs = $logs->fetchAll();
 $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')->fetchAll();
 ?>
-<h2>Project Members - <?php echo htmlspecialchars($project['title']); ?></h2>
-<h4>Current Members</h4>
+<h2>项目成员 - <?php echo htmlspecialchars($project['title']); ?></h2>
+<h4>当前成员</h4>
 <table class="table table-bordered">
-<tr><th></th><th>Campus ID</th><th>Name</th><th>Join Time</th><th>Action</th></tr>
+<tr><th></th><th>一卡通号</th><th>姓名</th><th>入项时间</th><th>操作</th></tr>
 <tbody id="memberList">
 <?php foreach($active_members as $a): ?>
 <tr data-id="<?= $a['id']; ?>">
@@ -32,28 +32,28 @@ $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')-
 <?php endforeach; ?>
 </tbody>
 </table>
-<h4>Add Member</h4>
+<h4>新增成员</h4>
 <form method="post" action="project_member_add.php">
   <input type="hidden" name="project_id" value="<?= $project_id; ?>">
   <div class="mb-3">
-    <label class="form-label">Member</label>
+    <label class="form-label">成员</label>
     <select name="member_id" class="form-select" required>
-      <option value="">Select member</option>
+      <option value="">选择成员</option>
       <?php foreach($members as $m): ?>
       <option value="<?= $m['id']; ?>"><?= htmlspecialchars($m['name']); ?> (<?= $m['campus_id']; ?>)</option>
       <?php endforeach; ?>
     </select>
   </div>
   <div class="mb-3">
-    <label class="form-label">Join Time</label>
+    <label class="form-label">入项时间</label>
     <input type="datetime-local" name="join_time" class="form-control" required>
   </div>
   <button type="submit" class="btn btn-primary">Add</button>
   <a href="projects.php" class="btn btn-secondary">Back</a>
 </form>
-<h4 class="mt-5">Member History</h4>
+<h4 class="mt-5">成员变动历史</h4>
 <table class="table table-bordered">
-<tr><th>Member</th><th>Join Time</th><th>Exit Time</th></tr>
+<tr><th>成员</th><th>入项时间</th><th>退出时间</th></tr>
 <?php foreach($logs as $l): ?>
 <tr>
   <td><?= htmlspecialchars($l['name']); ?> (<?= htmlspecialchars($l['campus_id']); ?>)</td>

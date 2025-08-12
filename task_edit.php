@@ -23,22 +23,22 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     exit();
 }
 ?>
-<h2><?php echo $id? 'Edit':'Add'; ?> Task</h2>
+<h2><?php echo $id? 'Edit':'Add'; ?> 任务指派</h2>
 <form method="post">
   <div class="mb-3">
-    <label class="form-label">Title</label>
+    <label class="form-label">任务标题</label>
     <input type="text" name="title" class="form-control" value="<?php echo htmlspecialchars($task['title']); ?>" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">Description</label>
+    <label class="form-label">任务描述</label>
     <textarea name="description" class="form-control" rows="3"><?php echo htmlspecialchars($task['description']); ?></textarea>
   </div>
   <div class="mb-3">
-    <label class="form-label">Start Date</label>
+    <label class="form-label">起始时间</label>
     <input type="date" name="start_date" class="form-control" value="<?php echo htmlspecialchars($task['start_date']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">Status</label>
+    <label class="form-label">状态</label>
     <select name="status" class="form-select">
       <?php $statuses=['active'=>'Active','paused'=>'Paused','finished'=>'Finished'];
       foreach($statuses as $k=>$v){
@@ -47,7 +47,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
       }?>
     </select>
   </div>
-  <button type="submit" class="btn btn-primary">Save</button>
-  <a href="tasks.php" class="btn btn-secondary">Cancel</a>
+  <button type="submit" class="btn btn-primary">更新</button>
+  <a href="tasks.php" class="btn btn-secondary">取消</a>
 </form>
 <?php include 'footer.php'; ?>

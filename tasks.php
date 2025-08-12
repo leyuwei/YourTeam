@@ -9,8 +9,8 @@ if($status){
 }
 ?>
 <div class="d-flex justify-content-between mb-3">
-  <h2>任务指派 / Task Assign</h2>
-  <a class="btn btn-success" href="task_edit.php">Add Task</a>
+  <h2>任务指派</h2>
+  <a class="btn btn-success" href="task_edit.php">新建任务</a>
 </div>
 <form class="row g-3 mb-3" method="get">
   <div class="col-auto">
@@ -35,7 +35,7 @@ if($status){
   <td>
     <a class="btn btn-sm btn-primary" href="task_edit.php?id=<?= $t['id']; ?>">编辑信息</a>
     <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>">下辖紧急事务</a>
-    <a class="btn btn-sm btn-info" href="task_member_fill.php?task_id=<?= $t['id']; ?>">Ask for Members to Fill Up</a>
+    <a class="btn btn-sm btn-info" href="task_member_fill.php?task_id=<?= $t['id']; ?>">请成员自己填</a>
     <a class="btn btn-sm btn-danger" href="task_delete.php?id=<?= $t['id']; ?>" onclick="return doubleConfirm('Delete task?');">删除</a>
   </td>
 </tr>

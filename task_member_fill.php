@@ -47,14 +47,15 @@ if($member_id){
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>紧急事务填写</title>
+<title>团队成员工作事务申报</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
   .container { max-width: 80%; }
 </style>
 </head>
 <body class="container py-5">
-<h2>紧急事务填写</h2>
+<h2>工作事务申报</h2>
+<h3>与绩效挂钩</h3>
 <?php if(!$member_id): ?>
 <form method="post" class="mt-4">
   <input type="hidden" name="action" value="verify">
@@ -67,11 +68,11 @@ if($member_id){
     <input type="text" name="identity_number" class="form-control" required>
   </div>
   <?php if($error): ?><div class="text-danger mb-3"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
-  <button type="submit" class="btn btn-primary">验证</button>
+  <button type="submit" class="btn btn-primary">验证身份</button>
 </form>
 <?php else: ?>
 <?php if($msg): ?><div class="alert alert-success"><?php echo htmlspecialchars($msg); ?></div><?php endif; ?>
-<h4>已有紧急事务</h4>
+<h4>已填工作事务</h4>
 <table class="table table-bordered">
 <tr><th>描述</th><th>负责成员</th><th>起始时间</th><th>结束时间</th></tr>
 <?php foreach($affairs as $a): ?>
@@ -83,11 +84,11 @@ if($member_id){
 </tr>
 <?php endforeach; ?>
 </table>
-<h4>新增紧急事务</h4>
+<h4>新增工作事务量</h4>
 <form method="post" class="mt-3">
   <input type="hidden" name="action" value="add">
   <div class="mb-3">
-    <label class="form-label">紧急事务描述</label>
+    <label class="form-label">工作事务描述</label>
     <textarea name="description" class="form-control" rows="2" required></textarea>
   </div>
   <div class="mb-3">
@@ -98,7 +99,7 @@ if($member_id){
     <label class="form-label">结束时间</label>
     <input type="datetime-local" name="end_time" class="form-control" required>
   </div>
-  <button type="submit" class="btn btn-primary">提交</button>
+  <button type="submit" class="btn btn-primary">申报该工作量</button>
 </form>
 <?php endif; ?>
 </body>

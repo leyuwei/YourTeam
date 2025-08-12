@@ -13,7 +13,7 @@ $affairs_stmt->execute([$task_id]);
 $affairs = $affairs_stmt->fetchAll();
 $members = $pdo->query('SELECT id, campus_id, name FROM members ORDER BY name')->fetchAll();
 ?>
-<h2>下辖紧急事务 / Urgent Affairs - <?php echo htmlspecialchars($task['title']); ?></h2>
+<h2>下辖紧急事务 - <?php echo htmlspecialchars($task['title']); ?></h2>
 <table class="table table-bordered">
 <tr><th>紧急事务描述</th><th>负责成员</th><th>起始时间</th><th>结束时间</th><th>操作</th></tr>
 <?php foreach($affairs as $a): ?>

@@ -62,7 +62,7 @@ if($start && $end){
 }
 include 'header.php';
 ?>
-<h2>工作量统计报表 / Workload Report</h2>
+<h2>工作量统计报表</h2>
 <form method="get" class="row g-3 mb-3">
   <div class="col-auto">
     <label class="form-label">报表起始时间</label>
