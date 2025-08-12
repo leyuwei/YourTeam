@@ -4,6 +4,8 @@ $member_id = $_SESSION['self_update_member_id'] ?? null;
 $member = null;
 $error = '';
 $msg = '';
+$current_projects = [];
+$current_directions = [];
 
 if(isset($_POST['action']) && $_POST['action'] === 'verify'){
     $name = $_POST['name'];
@@ -45,6 +47,12 @@ if($member_id){
         $stmt->execute([$member_id]);
         $member = $stmt->fetch();
     }
+    $projStmt = $pdo->prepare('SELECT p.title FROM project_member_log l JOIN projects p ON l.project_id=p.id WHERE l.member_id=? AND l.exit_time IS NULL ORDER BY l.sort_order');
+    $projStmt->execute([$member_id]);
+    $current_projects = $projStmt->fetchAll(PDO::FETCH_COLUMN);
+    $dirStmt = $pdo->prepare('SELECT d.title FROM direction_members dm JOIN research_directions d ON dm.direction_id=d.id WHERE dm.member_id=? ORDER BY dm.sort_order');
+    $dirStmt->execute([$member_id]);
+    $current_directions = $dirStmt->fetchAll(PDO::FETCH_COLUMN);
 }
 ?>
 <!DOCTYPE html>
@@ -125,6 +133,22 @@ if($member_id){
   </div>
   <button type="submit" class="btn btn-primary">Save</button>
 </form>
+<h4 class="mt-5">Current Projects</h4>
+<ul>
+  <?php if($current_projects): foreach($current_projects as $p): ?>
+    <li><?= htmlspecialchars($p); ?></li>
+  <?php endforeach; else: ?>
+    <li><em>None</em></li>
+  <?php endif; ?>
+</ul>
+<h4>Research Directions</h4>
+<ul>
+  <?php if($current_directions): foreach($current_directions as $d): ?>
+    <li><?= htmlspecialchars($d); ?></li>
+  <?php endforeach; else: ?>
+    <li><em>None</em></li>
+  <?php endif; ?>
+</ul>
 <?php endif; ?>
 </body>
 </html>

@@ -17,8 +17,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $stmt = $pdo->prepare('UPDATE projects SET title=?, description=?, begin_date=?, end_date=?, status=? WHERE id=?');
         $stmt->execute([$title,$description,$begin_date,$end_date,$status,$id]);
     } else {
-        $stmt = $pdo->prepare('INSERT INTO projects(title,description,begin_date,end_date,status) VALUES (?,?,?,?,?)');
-        $stmt->execute([$title,$description,$begin_date,$end_date,$status]);
+        $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM projects');
+        $nextOrder = $orderStmt->fetchColumn();
+        $stmt = $pdo->prepare('INSERT INTO projects(title,description,begin_date,end_date,status,sort_order) VALUES (?,?,?,?,?,?)');
+        $stmt->execute([$title,$description,$begin_date,$end_date,$status,$nextOrder]);
     }
     header('Location: projects.php');
     exit();
