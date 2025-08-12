@@ -59,8 +59,8 @@ if($member_id){
 </style>
 </head>
 <body class="container py-5">
-<h2>工作事务申报 - 与绩效挂钩！</h2>
-<h4>您正在申报任务：<?= htmlspecialchars($taskTitle); ?></h4>
+<h2>工作量报备 - 与绩效挂钩！</h2>
+<h4>您正在申报：<?= htmlspecialchars($taskTitle); ?></h4>
 <br>
 <?php if(!$member_id): ?>
 <form method="post" class="mt-4">
@@ -91,19 +91,19 @@ if($member_id){
 <?php endforeach; ?>
 </table>
 <br>
-<h4>新增工作事务量</h4>
+<h4>新增工作量</h4>
 <form method="post" class="mt-3">
   <input type="hidden" name="action" value="add">
   <div class="mb-3">
-    <label class="form-label">工作事务描述</label>
+    <label class="form-label">工作事务描述(例如跑腿、开会、出差、临时材料等事务)</label>
     <textarea name="description" class="form-control" rows="2" required></textarea>
   </div>
   <div class="mb-3">
-    <label class="form-label">起始时间</label>
+    <label class="form-label">起始时间（请诚信填写，时长与工资挂钩）</label>
     <input type="datetime-local" name="start_time" class="form-control" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">结束时间</label>
+    <label class="form-label">结束时间（请诚信填写，时长与工资挂钩）</label>
     <input type="datetime-local" name="end_time" class="form-control" required>
   </div>
   <button type="submit" class="btn btn-primary">申报该工作量</button>
