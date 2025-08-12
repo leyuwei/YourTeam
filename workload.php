@@ -3,8 +3,12 @@ include 'auth.php';
 $start = $_GET['start'] ?? '';
 $end = $_GET['end'] ?? '';
 $report = [];
+$error = '';
 if($start && $end){
-    $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited'")->fetchAll();
+    if(strtotime($end) <= strtotime($start)){
+        $error = '报表截止时间必须晚于起始时间';
+    } else {
+        $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited'")->fetchAll();
     foreach($members as $m){
         $total_task = 0;
         $task_hours = [];
@@ -59,10 +63,12 @@ if($start && $end){
         echo "</table>";
         exit();
     }
+    }
 }
 include 'header.php';
 ?>
 <h2>工作量统计报表</h2>
+<?php if($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 <form method="get" class="row g-3 mb-3">
   <div class="col-auto">
     <label class="form-label">报表起始时间</label>
@@ -81,6 +87,17 @@ include 'header.php';
   </div>
   <?php endif; ?>
 </form>
+<script>
+const rangeForm = document.querySelector('form');
+rangeForm.addEventListener('submit', function(e){
+  const startField = rangeForm.querySelector('input[name="start"]').value;
+  const endField = rangeForm.querySelector('input[name="end"]').value;
+  if(startField && endField && new Date(endField) <= new Date(startField)){
+    alert('报表截止时间必须晚于起始时间');
+    e.preventDefault();
+  }
+});
+</script>
 <?php if($report): ?>
 <table class="table table-bordered">
 <tr><th>排名</th><th>一卡通号</th><th>姓名</th><th>紧急任务</th><th>紧急任务时长</th></tr>

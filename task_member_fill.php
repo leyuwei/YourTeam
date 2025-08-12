@@ -34,11 +34,15 @@ if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']
     $description = $_POST['description'];
     $start_time = $_POST['start_time'];
     $end_time = $_POST['end_time'];
-    $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time) VALUES (?,?,?,?)');
-    $stmt->execute([$task_id,$description,$start_time,$end_time]);
-    $affair_id = $pdo->lastInsertId();
-    $pdo->prepare('INSERT INTO task_affair_members(affair_id,member_id) VALUES (?,?)')->execute([$affair_id,$member_id]);
-    $msg = '已提交';
+    if(strtotime($end_time) <= strtotime($start_time)){
+        $error = '结束时间必须晚于起始时间';
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time) VALUES (?,?,?,?)');
+        $stmt->execute([$task_id,$description,$start_time,$end_time]);
+        $affair_id = $pdo->lastInsertId();
+        $pdo->prepare('INSERT INTO task_affair_members(affair_id,member_id) VALUES (?,?)')->execute([$affair_id,$member_id]);
+        $msg = '已提交';
+    }
 }
 $affairs = [];
 if($member_id){
@@ -78,6 +82,7 @@ if($member_id){
 </form>
 <?php else: ?>
 <?php if($msg): ?><div class="alert alert-success"><?php echo htmlspecialchars($msg); ?></div><?php endif; ?>
+<?php if($error && !$msg): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 <h4><b>已填工作事务</b></h4>
 <table class="table table-bordered">
 <tr><th>描述</th><th>负责成员</th><th>起始时间</th><th>结束时间</th></tr>
@@ -120,7 +125,13 @@ if($member_id){
    const end = new Date(endInput.value);
    if(startInput.value && endInput.value){
      const diff = (end - start) / (1000 * 60 * 60 * 24);
-     if(diff > 6){
+     if(diff <= 0){
+       warning.textContent = '结束时间必须晚于起始时间';
+       warning.style.display = 'block';
+       endInput.value = '';
+       return false;
+     } else if(diff > 6){
+       warning.textContent = '请确认您所选择的任务时长不超过6天，超过6天的任务请切分填写！（注意此处任务需保持较细颗粒度，便于考核）';
        warning.style.display = 'block';
        endInput.value = '';
        return false;
