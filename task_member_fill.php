@@ -60,7 +60,7 @@ if($member_id){
 </head>
 <body class="container py-5">
 <h2>工作量报备 - 与绩效挂钩！</h2>
-<h4>您正在申报：<?= htmlspecialchars($taskTitle); ?></h4>
+<h4><span style="color:red">您正在申报：<?= htmlspecialchars($taskTitle); ?></span></h4>
 <br>
 <?php if(!$member_id): ?>
 <form method="post" class="mt-4">
