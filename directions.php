@@ -1,6 +1,6 @@
 <?php include 'header.php';
-// Fetch research directions along with their members' names
-$stmt = $pdo->query("SELECT d.*, GROUP_CONCAT(m.name ORDER BY dm.sort_order SEPARATOR ', ') AS member_names
+// Fetch research directions along with their members' details
+$stmt = $pdo->query("SELECT d.*, GROUP_CONCAT(CONCAT(m.name, '(', COALESCE(m.degree_pursuing, ''), ',', COALESCE(m.year_of_join, ''), ')') ORDER BY dm.sort_order SEPARATOR ', ') AS member_names
                      FROM research_directions d
                      LEFT JOIN direction_members dm ON d.id = dm.direction_id
                      LEFT JOIN members m ON dm.member_id = m.id
@@ -28,7 +28,7 @@ $directions = $stmt->fetchAll();
   <tr data-id="<?= $d['id']; ?>">
     <td class="drag-handle">&#9776;</td>
     <td><?= htmlspecialchars($d['title']); ?></td>
-    <td><?= $d['member_names'] ? htmlspecialchars($d['member_names']) : '<em data-i18n="directions.none">None</em>'; ?></td>
+    <td><?= $d['member_names'] ? preg_replace('/\([^()]*\)/', '<span style="color:#cccccc;">$0</span>', htmlspecialchars($d['member_names'])) : '<em data-i18n="directions.none">None</em>'; ?></td>
     <td>
       <a class="btn btn-sm btn-primary" href="direction_edit.php?id=<?= $d['id']; ?>" data-i18n="directions.action_edit">Edit</a>
       <a class="btn btn-sm btn-warning" href="direction_members.php?id=<?= $d['id']; ?>" data-i18n="directions.action_members">Members</a>
@@ -42,10 +42,10 @@ $directions = $stmt->fetchAll();
 <table class="table table-bordered">
   <tr><th>Member</th><th>Research Directions</th></tr>
   <?php
-  $memberDirs = $pdo->query('SELECT m.name, GROUP_CONCAT(d.title ORDER BY dm.sort_order SEPARATOR ", ") AS dirs FROM members m LEFT JOIN direction_members dm ON m.id=dm.member_id LEFT JOIN research_directions d ON dm.direction_id=d.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll();
+  $memberDirs = $pdo->query('SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(d.title ORDER BY dm.sort_order SEPARATOR ", ") AS dirs FROM members m LEFT JOIN direction_members dm ON m.id=dm.member_id LEFT JOIN research_directions d ON dm.direction_id=d.id GROUP BY m.id ORDER BY m.sort_order')->fetchAll();
   foreach($memberDirs as $md): ?>
   <tr>
-    <td><?= htmlspecialchars($md["name"]); ?></td>
+    <td><?= htmlspecialchars($md["name"]); ?><span style="color:#cccccc;">(<?= htmlspecialchars($md["degree_pursuing"]); ?>,<?= htmlspecialchars($md["year_of_join"]); ?>)</span></td>
     <td><?= $md['dirs'] ? htmlspecialchars($md['dirs']) : '<em>None</em>'; ?></td>
   </tr>
   <?php endforeach; ?>
