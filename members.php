@@ -42,7 +42,7 @@ $members = $stmt->fetchAll();
     <a class="btn btn-success" href="member_edit.php">新增成员</a>
     <a class="btn btn-secondary" href="members_import.php">从表格导入</a>
     <a class="btn btn-secondary" href="members_export.php">导出至表格</a>
-    <a class="btn btn-warning" href="member_self_update.php">请求信息更新</a>
+    <button type="button" class="btn btn-warning qr-btn" data-url="member_self_update.php">请求信息更新</button>
   </div>
 </div>
 <div class="mb-3">
