@@ -34,6 +34,7 @@ CREATE TABLE projects (
   sort_order INT DEFAULT 0,
   title VARCHAR(100) NOT NULL,
   description TEXT,
+  bg_color VARCHAR(20),
   begin_date DATE,
   end_date DATE,
   status ENUM('todo','ongoing','paused','finished') DEFAULT 'todo'
@@ -44,8 +45,8 @@ CREATE TABLE project_member_log (
   project_id INT NOT NULL,
   member_id INT NOT NULL,
   sort_order INT DEFAULT 0,
-  join_time DATETIME NOT NULL,
-  exit_time DATETIME DEFAULT NULL,
+  join_time DATE NOT NULL,
+  exit_time DATE DEFAULT NULL,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
@@ -79,7 +80,8 @@ CREATE TABLE research_directions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   sort_order INT DEFAULT 0,
   title VARCHAR(100) NOT NULL,
-  description TEXT
+  description TEXT,
+  bg_color VARCHAR(20)
 );
 
 CREATE TABLE direction_members (

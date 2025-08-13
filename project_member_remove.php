@@ -17,8 +17,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 <h2>Remove Member</h2>
 <form method="post">
   <div class="mb-3">
-    <label class="form-label">Exit Time</label>
-    <input type="datetime-local" name="exit_time" class="form-control" required>
+    <label class="form-label">Exit Date</label>
+    <input type="date" name="exit_time" class="form-control" required>
   </div>
   <button type="submit" class="btn btn-danger">Remove</button>
   <a href="project_members.php?id=<?= $project_id; ?>" class="btn btn-secondary">Cancel</a>
