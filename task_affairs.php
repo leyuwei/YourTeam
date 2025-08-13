@@ -38,7 +38,7 @@ $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 
   </div>
   <div class="mb-3">
     <label class="form-label">负责成员 (按住Ctrl键点选多个人)</label>
-    <select name="member_ids[]" class="form-select" multiple required>
+    <select name="member_ids[]" class="form-select" multiple required size="10">
       <?php foreach($members as $m): ?>
       <option value="<?= $m['id']; ?>"><?= htmlspecialchars($m['name']); ?> (<?= $m['campus_id']; ?>)</option>
       <?php endforeach; ?>

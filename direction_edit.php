@@ -1,7 +1,7 @@
 <?php
 include 'header.php';
 $id = $_GET['id'] ?? null;
-$direction = ['title'=>'','description'=>''];
+$direction = ['title'=>'','description'=>'','bg_color'=>'#ffffff'];
 if($id){
     $stmt = $pdo->prepare('SELECT * FROM research_directions WHERE id=?');
     $stmt->execute([$id]);
@@ -10,14 +10,15 @@ if($id){
 if($_SERVER['REQUEST_METHOD']==='POST'){
     $title = $_POST['title'];
     $description = $_POST['description'];
+    $bg_color = $_POST['bg_color'];
     if($id){
-        $stmt = $pdo->prepare('UPDATE research_directions SET title=?, description=? WHERE id=?');
-        $stmt->execute([$title,$description,$id]);
+        $stmt = $pdo->prepare('UPDATE research_directions SET title=?, description=?, bg_color=? WHERE id=?');
+        $stmt->execute([$title,$description,$bg_color,$id]);
     } else {
         $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM research_directions');
         $nextOrder = $orderStmt->fetchColumn();
-        $stmt = $pdo->prepare('INSERT INTO research_directions(title,description,sort_order) VALUES (?,?,?)');
-        $stmt->execute([$title,$description,$nextOrder]);
+        $stmt = $pdo->prepare('INSERT INTO research_directions(title,description,bg_color,sort_order) VALUES (?,?,?,?)');
+        $stmt->execute([$title,$description,$bg_color,$nextOrder]);
     }
     header('Location: directions.php');
     exit();
@@ -32,6 +33,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   <div class="mb-3">
     <label class="form-label">方向具体描述</label>
     <textarea name="description" class="form-control" rows="3"><?= htmlspecialchars($direction['description']); ?></textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">背景颜色</label>
+    <input type="color" name="bg_color" class="form-control form-control-color" value="<?= htmlspecialchars($direction['bg_color'] ?? '#ffffff'); ?>">
   </div>
   <button type="submit" class="btn btn-primary">保存</button>
   <a href="directions.php" class="btn btn-secondary">取消</a>

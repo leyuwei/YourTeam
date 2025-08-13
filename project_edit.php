@@ -1,7 +1,7 @@
 <?php
 include 'header.php';
 $id = $_GET['id'] ?? null;
-$project = ['title'=>'','description'=>'','begin_date'=>'','end_date'=>'','status'=>'todo'];
+$project = ['title'=>'','description'=>'','bg_color'=>'#ffffff','begin_date'=>'','end_date'=>'','status'=>'todo'];
 $error = '';
 if($id){
     $stmt = $pdo->prepare('SELECT * FROM projects WHERE id=?');
@@ -11,6 +11,7 @@ if($id){
 if($_SERVER['REQUEST_METHOD']==='POST'){
     $title = $_POST['title'];
     $description = $_POST['description'];
+    $bg_color = $_POST['bg_color'];
     $begin_date = $_POST['begin_date'];
     $end_date = $_POST['end_date'];
     $status = $_POST['status'];
@@ -18,13 +19,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $error = '结项时间必须晚于立项时间';
     } else {
         if($id){
-            $stmt = $pdo->prepare('UPDATE projects SET title=?, description=?, begin_date=?, end_date=?, status=? WHERE id=?');
-            $stmt->execute([$title,$description,$begin_date,$end_date,$status,$id]);
+            $stmt = $pdo->prepare('UPDATE projects SET title=?, description=?, bg_color=?, begin_date=?, end_date=?, status=? WHERE id=?');
+            $stmt->execute([$title,$description,$bg_color,$begin_date,$end_date,$status,$id]);
         } else {
             $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM projects');
             $nextOrder = $orderStmt->fetchColumn();
-            $stmt = $pdo->prepare('INSERT INTO projects(title,description,begin_date,end_date,status,sort_order) VALUES (?,?,?,?,?,?)');
-            $stmt->execute([$title,$description,$begin_date,$end_date,$status,$nextOrder]);
+            $stmt = $pdo->prepare('INSERT INTO projects(title,description,bg_color,begin_date,end_date,status,sort_order) VALUES (?,?,?,?,?,?,?)');
+            $stmt->execute([$title,$description,$bg_color,$begin_date,$end_date,$status,$nextOrder]);
         }
         header('Location: projects.php');
         exit();
@@ -41,6 +42,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   <div class="mb-3">
     <label class="form-label">项目描述</label>
     <textarea name="description" class="form-control" rows="3"><?php echo htmlspecialchars($project['description']); ?></textarea>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">背景颜色</label>
+    <input type="color" name="bg_color" class="form-control form-control-color" value="<?php echo htmlspecialchars($project['bg_color'] ?? '#ffffff'); ?>">
   </div>
   <div class="mb-3">
     <label class="form-label">立项时间</label>
