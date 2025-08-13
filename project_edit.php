@@ -46,6 +46,14 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   <div class="mb-3">
     <label class="form-label">背景颜色</label>
     <input type="color" name="bg_color" class="form-control form-control-color" value="<?php echo htmlspecialchars($project['bg_color'] ?? '#ffffff'); ?>">
+    <div class="mt-2">
+      <?php
+      $suggestedColors = ['#f1f9f7','#fffffa','#ffffff','#f1f5f9','#fbf4f6'];
+      foreach ($suggestedColors as $color) {
+          echo "<button type=\"button\" class=\"btn btn-sm border me-1\" style=\"background-color:$color;\" title=\"$color\" onclick=\"document.querySelector('input[name=bg_color]').value='$color'\"></button>";
+      }
+      ?>
+    </div>
   </div>
   <div class="mb-3">
     <label class="form-label">立项时间</label>
