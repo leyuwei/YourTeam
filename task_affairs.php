@@ -24,10 +24,48 @@ $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['start_time']))); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['end_time'] . ' -1 day'))); ?></td>
   <td><?= htmlspecialchars($days); ?></td>
-  <td><a class="btn btn-sm btn-danger" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" onclick="return doubleConfirm('Delete affair?');">Delete</a></td>
+  <td>
+    <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#editModal<?= $a['id']; ?>">编辑</button>
+    <a class="btn btn-sm btn-danger" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" onclick="return doubleConfirm('Delete affair?');">Delete</a>
+  </td>
 </tr>
 <?php endforeach; ?>
 </table>
+
+<?php foreach($affairs as $a): ?>
+<div class="modal fade" id="editModal<?= $a['id']; ?>" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="affair_edit.php" class="edit-affair-form">
+        <div class="modal-header">
+          <h5 class="modal-title">编辑事务</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="id" value="<?= $a['id']; ?>">
+          <input type="hidden" name="task_id" value="<?= $task_id; ?>">
+          <div class="mb-3">
+            <label class="form-label">具体事务描述</label>
+            <textarea name="description" class="form-control" rows="2" required><?= htmlspecialchars($a['description']); ?></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">起始日期</label>
+            <input type="date" name="start_time" class="form-control edit-start" required value="<?= date('Y-m-d', strtotime($a['start_time'])); ?>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">结束日期</label>
+            <input type="date" name="end_time" class="form-control edit-end" required value="<?= date('Y-m-d', strtotime($a['end_time'] . ' -1 day')); ?>">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">保存</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<?php endforeach; ?>
 <br><br>
 <h4>新建具体事务</h4>
 <form method="post" action="affair_add.php">
@@ -84,6 +122,17 @@ affairForm.addEventListener('submit', function(e){
   if(!updateDays()){
     e.preventDefault();
   }
+});
+
+document.querySelectorAll('.edit-affair-form').forEach(function(form){
+  form.addEventListener('submit', function(e){
+    const s = form.querySelector('.edit-start').value;
+    const ed = form.querySelector('.edit-end').value;
+    if(s && ed && new Date(ed) < new Date(s)){
+      e.preventDefault();
+      alert('结束日期必须不早于起始日期');
+    }
+  });
 });
 </script>
 <?php include 'footer.php'; ?>
