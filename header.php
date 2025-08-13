@@ -8,6 +8,8 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
   .container { max-width: 80%; }
+  .member-detail { color: #CCCCCC !important; }
+  tr[style*="background-color"] > * { background-color: inherit !important; }
 </style>
 </head>
 <body>
