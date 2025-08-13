@@ -26,7 +26,7 @@ $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 
   <td><?= htmlspecialchars($days); ?></td>
   <td>
     <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#editModal<?= $a['id']; ?>">编辑</button>
-    <a class="btn btn-sm btn-danger" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" onclick="return doubleConfirm('Delete affair?');">Delete</a>
+    <a class="btn btn-sm btn-danger" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" onclick="return doubleConfirm('Delete affair?');">删除</a>
   </td>
 </tr>
 <?php endforeach; ?>
