@@ -159,4 +159,16 @@ document.addEventListener('DOMContentLoaded', () => {
     applyTheme();
     applyTranslations();
   });
+
+  document.querySelectorAll('.qr-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url = btn.dataset.url;
+      const img = document.getElementById('qrImage');
+      if (url && img) {
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(url);
+        const modal = new bootstrap.Modal(document.getElementById('qrModal'));
+        modal.show();
+      }
+    });
+  });
 });
