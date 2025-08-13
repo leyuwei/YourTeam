@@ -32,11 +32,13 @@ if(!$member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'
 }
 if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add'){
     $description = $_POST['description'];
-    $start_time = $_POST['start_time'];
-    $end_time = $_POST['end_time'];
-    if(strtotime($end_time) <= strtotime($start_time)){
-        $error = '结束时间必须晚于起始时间';
+    $start_date = $_POST['start_time'];
+    $end_date = $_POST['end_time'];
+    if(strtotime($end_date) < strtotime($start_date)){
+        $error = '结束日期必须不早于起始日期';
     } else {
+        $start_time = $start_date . ' 00:00:00';
+        $end_time = date('Y-m-d 00:00:00', strtotime($end_date . ' +1 day'));
         $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time) VALUES (?,?,?,?)');
         $stmt->execute([$task_id,$description,$start_time,$end_time]);
         $affair_id = $pdo->lastInsertId();
@@ -86,21 +88,27 @@ if($member_id){
 <?php if($error && !$msg): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 <h4><b>已填工作事务</b></h4>
 <table class="table table-bordered">
-<tr><th>描述</th><th>负责成员</th><th>起始时间</th><th>结束时间</th></tr>
+<tr><th>描述</th><th>负责成员</th><th>起始日期</th><th>结束日期</th><th>天数</th></tr>
 <?php foreach($affairs as $a): ?>
+<?php $days = (strtotime($a['end_time']) - strtotime($a['start_time'])) / 86400; ?>
 <tr>
   <td><?= htmlspecialchars($a['description']); ?></td>
   <td><?= htmlspecialchars($a['members']); ?></td>
-  <td><?= htmlspecialchars($a['start_time']); ?></td>
-  <td><?= htmlspecialchars($a['end_time']); ?></td>
+  <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['start_time']))); ?></td>
+  <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['end_time'] . ' -1 day'))); ?></td>
+  <td><?= htmlspecialchars($days); ?></td>
 </tr>
 <?php endforeach; ?>
 </table>
 <br>
  <h4><b>新增工作量</b></h4>
- <h5><span style="color:red">请注意：此处申报的工作必须有很细的颗粒度，不可以是"做研究"等长时/属于自己的任务，时长不可超过6天，多次跑腿/多次开会请分次申报！</span></h5>
- <h5><span style="color:red">填报工作量和时长必须具体，如周一、周五各干一天活，则需分两次，每次填报一天任务，切勿一次性申报5天，管理员会定期清除不合理申报！</span></h5>
- <h5><span style="color:red">不必填报过于细碎：如一天中断断续续有工作，不要纠结，请一次性填写一整天工作量；如连续两天断断续续的细碎任务，请一次性填报两整天工作量</span></h5>
+ <div class="alert alert-danger">
+   <ul class="mb-0">
+     <li>请注意：此处申报的工作必须有很细的颗粒度，不可以是"做研究"等长时/属于自己的任务，时长不可超过6天，多次跑腿/多次开会请分次申报！</li>
+     <li>填报工作量和时长必须具体，如周一、周五各干一天活，则需分两次，每次填报一天任务，切勿一次性申报5天，管理员会定期清除不合理申报！</li>
+     <li>不必填报过于细碎：如一天中断断续续有工作，不要纠结，请一次性填写一整天工作量；如连续两天断断续续的细碎任务，请一次性填报两整天工作量</li>
+   </ul>
+ </div>
  <form method="post" class="mt-3" id="taskForm">
    <input type="hidden" name="action" value="add">
    <div class="mb-3">
@@ -108,13 +116,14 @@ if($member_id){
      <textarea name="description" class="form-control" rows="2" required></textarea>
    </div>
    <div class="mb-3">
-     <label class="form-label">起始时间（请诚信填写，时长与工资挂钩）</label>
-     <input type="datetime-local" name="start_time" id="startTime" class="form-control" required>
+     <label class="form-label">起始日期（请诚信填写，时长与工资挂钩）</label>
+     <input type="date" name="start_time" id="startTime" class="form-control" required>
    </div>
    <div class="mb-3">
-     <label class="form-label">结束时间（请诚信填写，时长与工资挂钩）</label>
-     <input type="datetime-local" name="end_time" id="endTime" class="form-control" required>
-     <div id="timeWarning" class="text-danger mt-2" style="display:none;">请确认您所选择的任务时长不超过6天，超过6天的任务请切分填写！（注意此处任务需保持较细颗粒度，便于考核）</div>
+     <label class="form-label">结束日期（请诚信填写，时长与工资挂钩）</label>
+     <input type="date" name="end_time" id="endTime" class="form-control" required>
+     <div id="timeWarning" class="text-danger mt-2" style="display:none;"></div>
+     <div id="dayCount" class="mt-2"></div>
    </div>
    <button type="submit" class="btn btn-primary">申报该工作量</button>
  </form>
@@ -122,32 +131,39 @@ if($member_id){
  const startInput = document.getElementById('startTime');
  const endInput = document.getElementById('endTime');
  const warning = document.getElementById('timeWarning');
+ const dayCount = document.getElementById('dayCount');
  const form = document.getElementById('taskForm');
- function checkInterval(){
-   const start = new Date(startInput.value);
-   const end = new Date(endInput.value);
+ function updateInfo(){
    if(startInput.value && endInput.value){
-     const diff = (end - start) / (1000 * 60 * 60 * 24);
+     const start = new Date(startInput.value);
+     const end = new Date(endInput.value);
+     let diff = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
      if(diff <= 0){
-       warning.textContent = '结束时间必须晚于起始时间';
+       warning.textContent = '结束日期必须不早于起始日期';
        warning.style.display = 'block';
+       dayCount.textContent = '';
        endInput.value = '';
        return false;
      } else if(diff > 6){
        warning.textContent = '请确认您所选择的任务时长不超过6天，超过6天的任务请切分填写！（注意此处任务需保持较细颗粒度，便于考核）';
        warning.style.display = 'block';
+       dayCount.textContent = '';
        endInput.value = '';
        return false;
      } else {
        warning.style.display = 'none';
+       dayCount.textContent = `本次申报工作量：${diff} 天`;
      }
+   } else {
+     warning.style.display = 'none';
+     dayCount.textContent = '';
    }
    return true;
  }
- startInput.addEventListener('change', checkInterval);
- endInput.addEventListener('change', checkInterval);
+ startInput.addEventListener('change', updateInfo);
+ endInput.addEventListener('change', updateInfo);
  form.addEventListener('submit', function(e){
-   if(!checkInterval()){
+   if(!updateInfo()){
      e.preventDefault();
    }
  });
