@@ -10,7 +10,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $new = $_POST['new_password'] ?? '';
         $confirm = $_POST['confirm_password'] ?? '';
         if($new !== $confirm){
-            $password_msg = 'New passwords do not match';
+            $password_msg = 'account.msg.password_mismatch';
         } else {
             $stmt = $pdo->prepare('SELECT password FROM managers WHERE id = ?');
             $stmt->execute([$_SESSION['manager_id']]);
@@ -18,9 +18,9 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             if($manager && password_verify($current, $manager['password'])){
                 $stmt = $pdo->prepare('UPDATE managers SET password = ? WHERE id = ?');
                 $stmt->execute([password_hash($new, PASSWORD_DEFAULT), $_SESSION['manager_id']]);
-                $password_msg = 'Password updated successfully';
+                $password_msg = 'account.msg.password_updated';
             } else {
-                $password_msg = 'Current password is incorrect';
+                $password_msg = 'account.msg.current_incorrect';
             }
         }
     } elseif($_POST['action'] === 'add_manager'){
@@ -30,9 +30,9 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             try{
                 $stmt = $pdo->prepare('INSERT INTO managers (username, password) VALUES (?, ?)');
                 $stmt->execute([$username, password_hash($password, PASSWORD_DEFAULT)]);
-                $add_msg = 'Manager added';
+                $add_msg = 'account.msg.manager_added';
             } catch(PDOException $e){
-                $add_msg = 'Error adding manager';
+                $add_msg = 'account.msg.manager_add_error';
             }
         }
     }
@@ -44,7 +44,7 @@ include 'header.php';
 <div class="row">
   <div class="col-md-6">
     <h3 data-i18n="account.change_password">Change Password</h3>
-    <?php if($password_msg): ?><div class="alert alert-info"><?php echo htmlspecialchars($password_msg); ?></div><?php endif; ?>
+    <?php if($password_msg): ?><div class="alert alert-info" data-i18n="<?= $password_msg; ?>"></div><?php endif; ?>
     <form method="post">
       <input type="hidden" name="action" value="change_password">
       <div class="mb-3">
@@ -64,7 +64,7 @@ include 'header.php';
   </div>
   <div class="col-md-6">
     <h3 data-i18n="account.add_manager">Add Manager</h3>
-    <?php if($add_msg): ?><div class="alert alert-info"><?php echo htmlspecialchars($add_msg); ?></div><?php endif; ?>
+    <?php if($add_msg): ?><div class="alert alert-info" data-i18n="<?= $add_msg; ?>"></div><?php endif; ?>
     <form method="post">
       <input type="hidden" name="action" value="add_manager">
       <div class="mb-3">

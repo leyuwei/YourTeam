@@ -2,11 +2,12 @@
 include 'auth_manager.php';
 $start = $_GET['start'] ?? '';
 $end = $_GET['end'] ?? '';
+$lang = $_GET['lang'] ?? 'en';
 $report = [];
 $error = '';
 if($start && $end){
     if(strtotime($end) <= strtotime($start)){
-        $error = '报表截止时间必须晚于起始时间';
+        $error = 'workload.error.range';
     } else {
         $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited'")->fetchAll();
     foreach($members as $m){
@@ -45,8 +46,12 @@ if($start && $end){
         header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
         header('Content-Disposition: attachment; filename="workload.xls"');
         echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
+        $labels = [
+            'en'=>['rank'=>'Rank','campus_id'=>'Campus ID','name'=>'Name','tasks'=>'Tasks','hours'=>'Task Hours'],
+            'zh'=>['rank'=>'排名','campus_id'=>'一卡通号','name'=>'姓名','tasks'=>'具体任务','hours'=>'任务投入时长']
+        ];
         echo "<table border='1'>";
-        echo "<tr><th>排名</th><th>一卡通号</th><th>姓名</th><th>具体任务</th><th>任务投入时长</th></tr>";
+        echo "<tr><th>".$labels[$lang]['rank']."</th><th>".$labels[$lang]['campus_id']."</th><th>".$labels[$lang]['name']."</th><th>".$labels[$lang]['tasks']."</th><th>".$labels[$lang]['hours']."</th></tr>";
         foreach($report as $r){
             echo "<tr>";
             echo "<td>".htmlspecialchars($r['rank'])."</td>";
@@ -67,23 +72,23 @@ if($start && $end){
 }
 include 'header.php';
 ?>
-<h2>工作量统计报表</h2>
-<?php if($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
+<h2 data-i18n="workload.title">Workload Report</h2>
+<?php if($error): ?><div class="alert alert-danger" data-i18n="<?= $error; ?>"></div><?php endif; ?>
 <form method="get" class="row g-3 mb-3">
   <div class="col-auto">
-    <label class="form-label">报表起始时间</label>
+    <label class="form-label" data-i18n="workload.label.start">Start Date</label>
     <input type="date" name="start" class="form-control" value="<?= htmlspecialchars($start); ?>" required>
   </div>
   <div class="col-auto">
-    <label class="form-label">报表截止时间</label>
+    <label class="form-label" data-i18n="workload.label.end">End Date</label>
     <input type="date" name="end" class="form-control" value="<?= htmlspecialchars($end); ?>" required>
   </div>
   <div class="col-auto align-self-end">
-    <button type="submit" class="btn btn-primary">生成报表</button>
+    <button type="submit" class="btn btn-primary" data-i18n="workload.generate">Generate</button>
   </div>
   <?php if($report): ?>
   <div class="col-auto align-self-end">
-    <a class="btn btn-success" href="workload.php?start=<?= urlencode($start); ?>&end=<?= urlencode($end); ?>&export=1">导出为EXCEL</a>
+    <a class="btn btn-success" id="exportBtn" href="workload.php?start=<?= urlencode($start); ?>&end=<?= urlencode($end); ?>&export=1&lang=<?= $lang; ?>" data-i18n="workload.export">Export to EXCEL</a>
   </div>
   <?php endif; ?>
 </form>
@@ -93,14 +98,14 @@ rangeForm.addEventListener('submit', function(e){
   const startField = rangeForm.querySelector('input[name="start"]').value;
   const endField = rangeForm.querySelector('input[name="end"]').value;
   if(startField && endField && new Date(endField) <= new Date(startField)){
-    alert('报表截止时间必须晚于起始时间');
+    alert(translations[document.documentElement.lang]['workload.error.range']);
     e.preventDefault();
   }
 });
 </script>
 <?php if($report): ?>
 <table class="table table-bordered">
-<tr><th>排名</th><th>一卡通号</th><th>姓名</th><th>具体任务</th><th>任务投入时长</th></tr>
+<tr><th data-i18n="workload.table.rank">Rank</th><th data-i18n="workload.table.campus_id">Campus ID</th><th data-i18n="workload.table.name">Name</th><th data-i18n="workload.table.task_detail">Task Detail</th><th data-i18n="workload.table.task_hours">Task Hours</th></tr>
 <?php foreach($report as $r): ?>
 <tr>
   <td><?= htmlspecialchars($r['rank']); ?></td>
@@ -116,4 +121,10 @@ rangeForm.addEventListener('submit', function(e){
 <?php endforeach; ?>
 </table>
 <?php endif; ?>
+<script>
+document.getElementById('exportBtn')?.addEventListener('click',function(){
+  const lang=document.documentElement.lang||'en';
+  this.href=`workload.php?start=<?= urlencode($start); ?>&end=<?= urlencode($end); ?>&export=1&lang=${lang}`;
+});
+</script>
 <?php include 'footer.php'; ?>

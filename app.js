@@ -58,6 +58,15 @@ const translations = {
     'projects.action_edit': 'Edit',
     'projects.action_members': 'Members',
     'projects.action_delete': 'Delete',
+    'projects.toggle_details': 'Show Member Details',
+    'projects.participation_title': 'Project Participation',
+    'projects.participation.member': 'Member',
+    'projects.participation.projects': 'Projects',
+    'projects.status.todo': 'Todo',
+    'projects.status.ongoing': 'Ongoing',
+    'projects.status.paused': 'Paused',
+    'projects.status.finished': 'Finished',
+    'projects.no_direction': 'No direction',
     'index.title': 'Dashboard',
     'index.info': 'Use the navigation bar to manage team members, projects, tasks, and workload reports.',
     'theme.dark': 'Dark',
@@ -102,7 +111,42 @@ const translations = {
     'todolist.days.thu': 'Thu',
     'todolist.days.fri': 'Fri',
     'todolist.days.sat': 'Sat',
-    'todolist.days.sun': 'Sun'
+    'todolist.days.sun': 'Sun',
+    'tasks.title': 'Tasks Assignment',
+    'tasks.add': 'New Task',
+    'tasks.filter_all': 'All Status',
+    'tasks.filter.active': 'Active',
+    'tasks.filter.paused': 'Paused',
+    'tasks.filter.finished': 'Finished',
+    'tasks.filter.button': 'Filter',
+    'tasks.table_title': 'Title',
+    'tasks.table_start': 'Start',
+    'tasks.table_status': 'Status',
+    'tasks.table_actions': 'Actions',
+    'tasks.action_edit': 'Edit',
+    'tasks.action_affairs': 'Affairs',
+    'tasks.action_fill': 'Self Fill',
+    'tasks.action_delete': 'Delete',
+    'tasks.status.active': 'Active',
+    'tasks.status.paused': 'Paused',
+    'tasks.status.finished': 'Finished',
+    'tasks.confirm.delete': 'Delete task?',
+    'workload.title': 'Workload Report',
+    'workload.error.range': 'End date must be after start date',
+    'workload.label.start': 'Start Date',
+    'workload.label.end': 'End Date',
+    'workload.generate': 'Generate',
+    'workload.export': 'Export to EXCEL',
+    'workload.table.rank': 'Rank',
+    'workload.table.campus_id': 'Campus ID',
+    'workload.table.name': 'Name',
+    'workload.table.task_detail': 'Task Detail',
+    'workload.table.task_hours': 'Task Hours',
+    'account.msg.password_mismatch': 'New passwords do not match',
+    'account.msg.password_updated': 'Password updated successfully',
+    'account.msg.current_incorrect': 'Current password is incorrect',
+    'account.msg.manager_added': 'Manager added',
+    'account.msg.manager_add_error': 'Error adding manager'
   },
   zh: {
     'nav.home': '团队管理',
@@ -163,6 +207,15 @@ const translations = {
     'projects.action_edit': '编辑',
     'projects.action_members': '成员',
     'projects.action_delete': '删除',
+    'projects.toggle_details': '显示成员详情',
+    'projects.participation_title': '项目参与人员情况',
+    'projects.participation.member': '成员',
+    'projects.participation.projects': '参与项目',
+    'projects.status.todo': '待办',
+    'projects.status.ongoing': '进行中',
+    'projects.status.paused': '暂停',
+    'projects.status.finished': '已完成',
+    'projects.no_direction': '无研究方向',
     'index.title': '仪表板',
     'index.info': '使用导航栏来管理团队成员、项目、任务和工作量报告。',
     'theme.dark': '暗色',
@@ -207,7 +260,42 @@ const translations = {
     'todolist.days.thu': '周四',
     'todolist.days.fri': '周五',
     'todolist.days.sat': '周六',
-    'todolist.days.sun': '周日'
+    'todolist.days.sun': '周日',
+    'tasks.title': '任务指派',
+    'tasks.add': '新建任务',
+    'tasks.filter_all': '所有状态',
+    'tasks.filter.active': '进行中',
+    'tasks.filter.paused': '暂停',
+    'tasks.filter.finished': '已结束',
+    'tasks.filter.button': '筛选',
+    'tasks.table_title': '任务标题',
+    'tasks.table_start': '开始日期',
+    'tasks.table_status': '状态',
+    'tasks.table_actions': '操作',
+    'tasks.action_edit': '编辑信息',
+    'tasks.action_affairs': '下辖具体事务',
+    'tasks.action_fill': '请成员自己填',
+    'tasks.action_delete': '删除',
+    'tasks.status.active': '进行中',
+    'tasks.status.paused': '暂停',
+    'tasks.status.finished': '已结束',
+    'tasks.confirm.delete': '删除任务？',
+    'workload.title': '工作量统计报表',
+    'workload.error.range': '报表截止时间必须晚于起始时间',
+    'workload.label.start': '报表起始时间',
+    'workload.label.end': '报表截止时间',
+    'workload.generate': '生成报表',
+    'workload.export': '导出为EXCEL',
+    'workload.table.rank': '排名',
+    'workload.table.campus_id': '一卡通号',
+    'workload.table.name': '姓名',
+    'workload.table.task_detail': '具体任务',
+    'workload.table.task_hours': '任务投入时长',
+    'account.msg.password_mismatch': '两次新密码不一致',
+    'account.msg.password_updated': '密码更新成功',
+    'account.msg.current_incorrect': '当前密码错误',
+    'account.msg.manager_added': '管理员已添加',
+    'account.msg.manager_add_error': '添加管理员出错'
   }
 };
 
@@ -223,6 +311,13 @@ function applyTranslations() {
     const text = translations[lang][key];
     if(text) {
       el.textContent = text;
+    }
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    const text = translations[lang][key];
+    if(text) {
+      el.setAttribute('title', text);
     }
   });
   const langToggle = document.getElementById('langToggle');
