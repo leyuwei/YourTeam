@@ -304,7 +304,7 @@ const translations = {
     'members_import.title': '从 Excel (CSV) 导入成员',
     'members_import.import': '导入',
     'members_import.cancel': '取消',
-    'projects.title': '项目',
+    'projects.title': '横纵项目',
     'projects.add': '添加项目',
     'projects.filter_all': '所有状态',
     'projects.filter.todo': '待办',
