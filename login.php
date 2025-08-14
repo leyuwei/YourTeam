@@ -57,6 +57,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     <button id="langToggle" class="btn btn-outline-secondary btn-sm">中文</button>
     <button id="themeToggle" class="btn btn-outline-secondary btn-sm" data-i18n="theme.dark">Dark</button>
   </div>
+  <h2 class="text-center mb-4" data-i18n="header.title">Team Management Platform</h2>
   <div class="row justify-content-center">
     <div class="col-md-4">
       <div class="card">
@@ -123,6 +124,7 @@ document.addEventListener('DOMContentLoaded',function(){
   });
 });
 </script>
+<script src="team_name.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

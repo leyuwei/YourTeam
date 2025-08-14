@@ -188,6 +188,29 @@ const translations = {
     'tasks.status.paused': 'Paused',
     'tasks.status.finished': 'Finished',
     'tasks.confirm.delete': 'Delete task?',
+    'task_affairs.title_prefix': 'Task Affairs - ',
+    'task_affairs.table_description': 'Description',
+    'task_affairs.table_members': 'Members',
+    'task_affairs.table_start': 'Start Date',
+    'task_affairs.table_end': 'End Date',
+    'task_affairs.table_days': 'Days',
+    'task_affairs.table_actions': 'Actions',
+    'task_affairs.action_edit': 'Edit',
+    'task_affairs.action_delete': 'Delete',
+    'task_affairs.edit_title': 'Edit Affair',
+    'task_affairs.label_description': 'Description',
+    'task_affairs.label_start': 'Start Date',
+    'task_affairs.label_end': 'End Date',
+    'task_affairs.save': 'Save',
+    'task_affairs.cancel': 'Cancel',
+    'task_affairs.new_title': 'New Affair',
+    'task_affairs.label_members': 'Members (hold Ctrl to select multiple)',
+    'task_affairs.add': 'Add Affair',
+    'task_affairs.back': 'Back',
+    'task_affairs.error.range': 'End date must not be earlier than start date',
+    'task_affairs.workload_prefix': 'Workload: ',
+    'task_affairs.workload_suffix': ' days',
+    'task_affairs.confirm.delete': 'Delete affair?',
     'workload.title': 'Workload Report',
     'workload.error.range': 'End date must be after start date',
     'workload.label.start': 'Start Date',
@@ -394,6 +417,29 @@ const translations = {
     'tasks.status.paused': '暂停',
     'tasks.status.finished': '已结束',
     'tasks.confirm.delete': '删除任务？',
+    'task_affairs.title_prefix': '下辖具体事务 - ',
+    'task_affairs.table_description': '具体事务描述',
+    'task_affairs.table_members': '负责成员',
+    'task_affairs.table_start': '起始日期',
+    'task_affairs.table_end': '结束日期',
+    'task_affairs.table_days': '天数',
+    'task_affairs.table_actions': '操作',
+    'task_affairs.action_edit': '编辑',
+    'task_affairs.action_delete': '删除',
+    'task_affairs.edit_title': '编辑事务',
+    'task_affairs.label_description': '具体事务描述',
+    'task_affairs.label_start': '起始日期',
+    'task_affairs.label_end': '结束日期',
+    'task_affairs.save': '保存',
+    'task_affairs.cancel': '取消',
+    'task_affairs.new_title': '新建具体事务',
+    'task_affairs.label_members': '负责成员 (按住Ctrl键点选多个人)',
+    'task_affairs.add': '新增事务',
+    'task_affairs.back': '返回',
+    'task_affairs.error.range': '结束日期必须不早于起始日期',
+    'task_affairs.workload_prefix': '本次事务工作量：',
+    'task_affairs.workload_suffix': ' 天',
+    'task_affairs.confirm.delete': '删除事务?',
     'workload.title': '工作量统计报表',
     'workload.error.range': '报表截止时间必须晚于起始时间',
     'workload.label.start': '报表起始时间',
@@ -451,24 +497,30 @@ function applyTheme() {
   document.documentElement.setAttribute('data-bs-theme', theme);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
   applyTheme();
   applyTranslations();
 
-  document.getElementById('langToggle')?.addEventListener('click', () => {
-    const current = localStorage.getItem('lang') || 'en';
-    const next = current === 'en' ? 'zh' : 'en';
-    localStorage.setItem('lang', next);
-    applyTranslations();
-  });
+  const langBtn = document.getElementById('langToggle');
+  if (langBtn) {
+    langBtn.addEventListener('click', () => {
+      const current = localStorage.getItem('lang') || 'en';
+      const next = current === 'en' ? 'zh' : 'en';
+      localStorage.setItem('lang', next);
+      applyTranslations();
+    });
+  }
 
-  document.getElementById('themeToggle')?.addEventListener('click', () => {
-    const current = localStorage.getItem('theme') || 'light';
-    const next = current === 'light' ? 'dark' : 'light';
-    localStorage.setItem('theme', next);
-    applyTheme();
-    applyTranslations();
-  });
+  const themeBtn = document.getElementById('themeToggle');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const current = localStorage.getItem('theme') || 'light';
+      const next = current === 'light' ? 'dark' : 'light';
+      localStorage.setItem('theme', next);
+      applyTheme();
+      applyTranslations();
+    });
+  }
 
   document.querySelectorAll('.qr-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -482,4 +534,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
