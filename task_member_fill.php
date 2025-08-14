@@ -69,7 +69,7 @@ if($member_id){
 <body class="container py-5">
 <h2>团队</h2>
 <h2>工作量报备 - 与绩效挂钩！</h2>
-<h4><span style="color:black">您正在申报：<?= htmlspecialchars($taskTitle); ?>方面的工作</span></h4>
+<h4><span style="color:red">您正在申报：<?= htmlspecialchars($taskTitle); ?>方面的工作</span></h4>
 <br>
 <?php if(!$member_id): ?>
 <form method="post" class="mt-4">
