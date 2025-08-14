@@ -9,7 +9,8 @@ A simple responsive website for managing research team members, projects, small 
 - Manager login (multiple accounts defined in database)
 - Manage team members (create, edit, delete, import/export CSV/Excel) with detailed fields: name, email, identity number, campus ID number, year of join, current degree, degree pursuing, phone, WeChat, department, workplace and homeplace
 - Manage projects with member assignments and status filtering
-- Manage small tasks and their urgent affairs
+- Manage Research Directions assigned to each member
+- Manage tasks and their regular affairs
 - Generate workload reports for each member within a time range (exportable to CSV)
 
 ## Requirements
@@ -18,14 +19,15 @@ A simple responsive website for managing research team members, projects, small 
 - Apache with PHP support (LAMP stack)
 
 ## Installation
-1. Clone or download this repository to your web root.
-2. Import the database schema and sample data:
+1. Prepare LAMP stack on your Linux server.
+2. Clone or download this repository to your web root.
+3. Import the database schema and sample data:
    ```bash
    mysql -u root -p < database.sql
    ```
    (Change `root` to your DB user.)
-3. Edit `config.php` if your database credentials differ.
-4. Access the site via `http://your-server/login.php` and log in using one of the predefined accounts:
+4. Edit `config.php` if your database credentials differ.
+5. Access the site via `http://your-server/login.php` and log in using one of the predefined accounts:
    - Username: `manager1`, Password: `password`
    - Username: `manager2`, Password: `password`
 
