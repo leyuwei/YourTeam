@@ -2,6 +2,7 @@ const translations = {
   en: {
     'nav.home': 'Team Management',
     'nav.members': 'Members',
+    'nav.todolist': 'Todolist',
     'nav.projects': 'Projects',
     'nav.directions': 'Research',
     'nav.tasks': 'Tasks',
@@ -57,6 +58,7 @@ const translations = {
   zh: {
     'nav.home': '团队管理',
     'nav.members': '成员列表',
+    'nav.todolist': '待办事项',
     'nav.projects': '横纵项目',
     'nav.directions': '研究方向',
     'nav.tasks': '任务指派',

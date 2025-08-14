@@ -22,7 +22,7 @@
     <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item"><a class="nav-link" href="members.php" data-i18n="nav.members">Members</a></li>
-          <li class="nav-item"><a class="nav-link" href="todolist.php">Todolist</a></li>
+          <li class="nav-item"><a class="nav-link" href="todolist.php" data-i18n="nav.todolist">Todolist</a></li>
           <li class="nav-item"><a class="nav-link" href="projects.php" data-i18n="nav.projects">Projects</a></li>
           <li class="nav-item"><a class="nav-link" href="directions.php" data-i18n="nav.directions">Research</a></li>
           <?php if($_SESSION['role']==='manager'): ?>
