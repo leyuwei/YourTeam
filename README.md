@@ -1,8 +1,6 @@
 # Research Team Management Website
 ## 一款适用于国内牛马研究生体质的团队管理网站
 
-<img width="3801" height="1743" alt="2025-08-14_154403_704" src="https://github.com/user-attachments/assets/b6cbcc64-9a96-4660-afd1-9e969bdb02f9" />
-
 A simple responsive website for managing research team members, projects, small tasks and workload reports. Built with PHP, MySQL and Bootstrap 5.
 
 ## Features
