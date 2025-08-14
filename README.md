@@ -32,6 +32,7 @@ A simple responsive website for managing research team members, projects, small 
 - Import/export member lists and workload reports using CSV files (compatible with Excel).
 - Member CSV columns are: `CampusID,Name,Email,IdentityNumber,YearOfJoin,CurrentDegree,DegreePursuing,Phone,WeChat,Department,Workplace,Homeplace`.
 - When adding or removing members from projects, you will be asked to supply exact join/exit timestamps so that workload can be tracked accurately.
+- To customize the organization name shown before any “Team/团队” text, edit `team_name.js` and set `TEAM_NAME` with English and Chinese versions, e.g. `{ en: 'ACME ', zh: 'ACME ' }` (include a trailing space if desired).
 
 ## Notes
 This project uses Bootstrap from a CDN for styling and is responsive on both desktop and mobile browsers.

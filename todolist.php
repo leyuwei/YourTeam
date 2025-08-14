@@ -19,20 +19,33 @@ $items = [];
 foreach($stmt as $row){
     $items[$row['category']][$row['day']][] = $row;
 }
+$week_end = date('Y-m-d', strtotime($week_start . ' +6 days'));
 $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>'周五','sat'=>'周六','sun'=>'周日'];
 ?>
-<h2>待办事项</h2>
+<style>
+@media print {
+  @page { size: A4; margin: 10mm; }
+  body { font-size: 12pt; }
+  .navbar, form, .add-item, .delete-item, .btn { display: none !important; }
+  .row, .col-md-6 { display: block !important; width: 100% !important; }
+  .todolist { list-style: none; padding-left: 0; }
+  .todolist li { margin-left: 5mm; display: flex; align-items: flex-start; }
+  .todolist li .item-done { transform: scale(1.2); margin-right: 5mm; }
+  .todolist li .item-content { border: none; box-shadow: none; padding: 0; font-size: 12pt; }
+}
+</style>
+<h2 class="text-center"><span data-i18n="todolist.title">待办事项</span> <small>&copy; <?= date('Y.m.d', strtotime($week_start)) ?> - <?= date('Y.m.d', strtotime($week_end)) ?></small></h2>
 <form method="get" class="mb-3">
   <input type="week" name="week" value="<?= htmlspecialchars($week_param); ?>">
-  <button type="submit" class="btn btn-secondary btn-sm">切换周</button>
-  <a class="btn btn-success btn-sm" href="todolist_export.php?week=<?= urlencode($week_param); ?>">导出</a>
-  <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()">打印</button>
+  <button type="submit" class="btn btn-secondary btn-sm" data-i18n="todolist.switch_week">切换周</button>
+  <a class="btn btn-success btn-sm" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
+  <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()" data-i18n="todolist.print">打印</button>
 </form>
 <div class="row">
   <div class="col-md-6">
-    <h3><b>工作</b></h3>
+    <h3><b data-i18n="todolist.category.work">工作</b></h3>
     <?php foreach($days as $k=>$label): ?>
-    <h5><?= $label; ?> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="work" data-day="<?= $k; ?>">+</button></h5>
+    <h5><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="work" data-day="<?= $k; ?>">+</button></h5>
     <ul class="list-group mb-3 todolist" data-category="work" data-day="<?= $k; ?>">
       <?php if(!empty($items['work'][$k])): foreach($items['work'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center" data-id="<?= $it['id']; ?>">
@@ -45,9 +58,9 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
     <?php endforeach; ?>
   </div>
   <div class="col-md-6">
-    <h3><b>私人</b></h3>
+    <h3><b data-i18n="todolist.category.personal">私人</b></h3>
     <?php foreach($days as $k=>$label): ?>
-    <h5><?= $label; ?> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="personal" data-day="<?= $k; ?>">+</button></h5>
+    <h5><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="personal" data-day="<?= $k; ?>">+</button></h5>
     <ul class="list-group mb-3 todolist" data-category="personal" data-day="<?= $k; ?>">
       <?php if(!empty($items['personal'][$k])): foreach($items['personal'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center" data-id="<?= $it['id']; ?>">
@@ -58,7 +71,7 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
       <?php endforeach; endif; ?>
     </ul>
     <?php endforeach; ?>
-    <h3><b>长期</b> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="longterm" data-day="">+</button></h3>
+    <h3><b data-i18n="todolist.category.longterm">长期</b> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="longterm" data-day="">+</button></h3>
     <ul class="list-group mb-3 todolist" data-category="longterm" data-day="">
       <?php if(!empty($items['longterm'][''])): foreach($items['longterm'][''] as $it): ?>
       <li class="list-group-item d-flex align-items-center" data-id="<?= $it['id']; ?>">
