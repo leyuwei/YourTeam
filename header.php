@@ -20,14 +20,17 @@
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" href="members.php" data-i18n="nav.members">Members</a></li>
-        <li class="nav-item"><a class="nav-link" href="projects.php" data-i18n="nav.projects">Projects</a></li>
-        <li class="nav-item"><a class="nav-link" href="directions.php" data-i18n="nav.directions">Research</a></li>
-        <li class="nav-item"><a class="nav-link" href="tasks.php" data-i18n="nav.tasks">Tasks</a></li>
-        <li class="nav-item"><a class="nav-link" href="workload.php" data-i18n="nav.workload">Workload</a></li>
-        <li class="nav-item"><a class="nav-link" href="account.php" data-i18n="nav.account">Account</a></li>
-      </ul>
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="members.php" data-i18n="nav.members">Members</a></li>
+          <li class="nav-item"><a class="nav-link" href="todolist.php">Todolist</a></li>
+          <li class="nav-item"><a class="nav-link" href="projects.php" data-i18n="nav.projects">Projects</a></li>
+          <li class="nav-item"><a class="nav-link" href="directions.php" data-i18n="nav.directions">Research</a></li>
+          <?php if($_SESSION['role']==='manager'): ?>
+          <li class="nav-item"><a class="nav-link" href="tasks.php" data-i18n="nav.tasks">Tasks</a></li>
+          <li class="nav-item"><a class="nav-link" href="workload.php" data-i18n="nav.workload">Workload</a></li>
+          <li class="nav-item"><a class="nav-link" href="account.php" data-i18n="nav.account">Account</a></li>
+          <?php endif; ?>
+        </ul>
       <span class="navbar-text me-3"><span data-i18n="welcome">Welcome</span>, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
       <button id="langToggle" class="btn btn-outline-light me-2">中文</button>
       <button id="themeToggle" class="btn btn-outline-light me-2" data-i18n="theme.dark">Dark</button>

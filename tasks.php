@@ -1,4 +1,6 @@
-<?php include 'header.php';
+<?php
+include 'auth_manager.php';
+include 'header.php';
 $status = $_GET['status'] ?? '';
 if($status){
     $stmt = $pdo->prepare('SELECT * FROM tasks WHERE status=? ORDER BY id DESC');

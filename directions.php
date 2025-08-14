@@ -1,4 +1,16 @@
 <?php include 'header.php';
+if($_SESSION['role']==='member'){
+    $stmt = $pdo->prepare('SELECT d.* FROM research_directions d JOIN direction_members dm ON d.id=dm.direction_id WHERE dm.member_id=? ORDER BY dm.sort_order');
+    $stmt->execute([$_SESSION['member_id']]);
+    $directions = $stmt->fetchAll();
+?>
+<h2 data-i18n="directions.title">Research Directions</h2>
+<ul>
+<?php foreach($directions as $d): ?>
+  <li><?= htmlspecialchars($d['title']); ?></li>
+<?php endforeach; ?>
+</ul>
+<?php include 'footer.php'; exit; }
 // Fetch research directions along with their members' details
 $stmt = $pdo->query("SELECT d.*, GROUP_CONCAT(CONCAT(m.name, '(', COALESCE(m.degree_pursuing, ''), ',', COALESCE(m.year_of_join, ''), ')') ORDER BY dm.sort_order SEPARATOR ', ') AS member_names
                      FROM research_directions d

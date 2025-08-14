@@ -1,4 +1,5 @@
 <?php
+include 'auth_manager.php';
 include 'header.php';
 $task_id = $_GET['id'] ?? null;
 if(!$task_id){

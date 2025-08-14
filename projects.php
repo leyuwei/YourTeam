@@ -1,4 +1,22 @@
 <?php include 'header.php';
+if($_SESSION['role']==='member'){
+    $stmt = $pdo->prepare('SELECT p.* FROM projects p JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL WHERE l.member_id=? ORDER BY p.sort_order');
+    $stmt->execute([$_SESSION['member_id']]);
+    $projects = $stmt->fetchAll();
+?>
+<h2 data-i18n="projects.title">Projects</h2>
+<table class="table table-bordered">
+  <tr><th data-i18n="projects.table_title">Title</th><th data-i18n="projects.table_begin">Begin</th><th data-i18n="projects.table_end">End</th><th data-i18n="projects.table_status">Status</th></tr>
+  <?php foreach($projects as $p): ?>
+  <tr>
+    <td><?= htmlspecialchars($p['title']); ?></td>
+    <td><?= htmlspecialchars($p['begin_date']); ?></td>
+    <td><?= htmlspecialchars($p['end_date']); ?></td>
+    <td><?= htmlspecialchars($p['status']); ?></td>
+  </tr>
+  <?php endforeach; ?>
+</table>
+<?php include 'footer.php'; exit; }
 $status = $_GET['status'] ?? '';
 $dirMapStmt = $pdo->query("SELECT dm.member_id, GROUP_CONCAT(rd.title SEPARATOR ', ') AS dirs FROM direction_members dm JOIN research_directions rd ON dm.direction_id=rd.id GROUP BY dm.member_id");
 $memberDirections = [];

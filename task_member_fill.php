@@ -1,5 +1,5 @@
 <?php
-require 'config.php';
+require 'auth_manager.php';
 $task_id = $_GET['task_id'] ?? null;
 if(!$task_id){
     echo 'Invalid task id';

@@ -1,5 +1,5 @@
 <?php
-include 'auth.php';
+include 'auth_manager.php';
 $id = $_GET['id'] ?? null;
 $task_id = $_GET['task_id'] ?? null;
 if($id){

@@ -1,4 +1,5 @@
 <?php
+include 'auth_manager.php';
 include 'header.php';
 $id = $_GET['id'] ?? null;
 $task = ['title'=>'','description'=>'','start_date'=>'','status'=>'active'];

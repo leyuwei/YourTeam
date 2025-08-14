@@ -1,23 +1,42 @@
 <?php
 require_once 'config.php';
-if(isset($_SESSION['manager_id'])){
+if(isset($_SESSION['role'])){
     header('Location: index.php');
     exit();
 }
 $error = '';
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
-    $stmt = $pdo->prepare('SELECT * FROM managers WHERE username = ?');
-    $stmt->execute([$username]);
-    $user = $stmt->fetch();
-    if($user && password_verify($password, $user['password'])){
-        $_SESSION['manager_id'] = $user['id'];
-        $_SESSION['username'] = $user['username'];
-        header('Location: index.php');
-        exit();
+    $type = $_POST['login_type'] ?? 'manager';
+    if($type === 'manager'){
+        $username = $_POST['username'] ?? '';
+        $password = $_POST['password'] ?? '';
+        $stmt = $pdo->prepare('SELECT * FROM managers WHERE username = ?');
+        $stmt->execute([$username]);
+        $user = $stmt->fetch();
+        if($user && password_verify($password, $user['password'])){
+            $_SESSION['manager_id'] = $user['id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['role'] = 'manager';
+            header('Location: index.php');
+            exit();
+        } else {
+            $error = 'Invalid username or password';
+        }
     } else {
-        $error = 'Invalid username or password';
+        $name = $_POST['name'] ?? '';
+        $identity = $_POST['identity_number'] ?? '';
+        $stmt = $pdo->prepare('SELECT * FROM members WHERE name=? AND identity_number=?');
+        $stmt->execute([$name, $identity]);
+        $member = $stmt->fetch();
+        if($member){
+            $_SESSION['member_id'] = $member['id'];
+            $_SESSION['username'] = $member['name'];
+            $_SESSION['role'] = 'member';
+            header('Location: index.php');
+            exit();
+        } else {
+            $error = 'Invalid name or identity number';
+        }
     }
 }
 ?>
@@ -26,7 +45,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title data-i18n="login.title">Manager Login</title>
+<title data-i18n="login.title">Login</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
   .container { max-width: 80%; }
@@ -41,17 +60,39 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
   <div class="row justify-content-center">
     <div class="col-md-4">
       <div class="card">
-        <div class="card-header" data-i18n="login.title">Manager Login</div>
+        <div class="card-header" id="loginTitle" data-i18n="login.title">Login</div>
         <div class="card-body">
           <?php if($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
-          <form method="post">
+          <form method="post" id="loginForm">
             <div class="mb-3">
-              <label class="form-label" data-i18n="login.username">Username</label>
-              <input type="text" name="username" class="form-control" required>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="login_type" id="loginManager" value="manager" checked>
+                <label class="form-check-label" for="loginManager">管理员</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="login_type" id="loginMember" value="member">
+                <label class="form-check-label" for="loginMember">一般成员</label>
+              </div>
             </div>
-            <div class="mb-3">
-              <label class="form-label" data-i18n="login.password">Password</label>
-              <input type="password" name="password" class="form-control" required>
+            <div id="managerFields">
+              <div class="mb-3">
+                <label class="form-label" data-i18n="login.username">Username</label>
+                <input type="text" name="username" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" data-i18n="login.password">Password</label>
+                <input type="password" name="password" class="form-control">
+              </div>
+            </div>
+            <div id="memberFields" style="display:none">
+              <div class="mb-3">
+                <label class="form-label">姓名</label>
+                <input type="text" name="name" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">身份证号</label>
+                <input type="text" name="identity_number" class="form-control">
+              </div>
             </div>
             <button type="submit" class="btn btn-primary w-100" data-i18n="login.button">Login</button>
           </form>
@@ -61,6 +102,25 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const managerFields=document.getElementById('managerFields');
+  const memberFields=document.getElementById('memberFields');
+  document.querySelectorAll('input[name="login_type"]').forEach(r=>{
+    r.addEventListener('change',function(){
+      if(this.value==='manager'){
+        managerFields.style.display='block';
+        memberFields.style.display='none';
+        document.getElementById('loginTitle').textContent='Manager Login';
+      }else{
+        managerFields.style.display='none';
+        memberFields.style.display='block';
+        document.getElementById('loginTitle').textContent='Member Login';
+      }
+    });
+  });
+});
+</script>
 <script src="app.js"></script>
 </body>
 </html>
