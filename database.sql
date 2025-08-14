@@ -92,3 +92,15 @@ CREATE TABLE direction_members (
   FOREIGN KEY (direction_id) REFERENCES research_directions(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
+
+CREATE TABLE todolist_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  user_role ENUM('manager','member') NOT NULL,
+  week_start DATE NOT NULL,
+  category ENUM('work','personal','longterm') NOT NULL,
+  day ENUM('mon','tue','wed','thu','fri','sat','sun') NULL,
+  content VARCHAR(255) NOT NULL,
+  is_done TINYINT(1) DEFAULT 0,
+  sort_order INT DEFAULT 0
+);

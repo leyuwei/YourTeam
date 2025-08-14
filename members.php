@@ -1,6 +1,11 @@
 <?php
 include 'header.php';
 
+if($_SESSION['role']==='member'){
+    header('Location: member_self_update.php');
+    exit();
+}
+
 // Determine sorting column and direction from query parameters
 $columns = [
     'campus_id' => '一卡通号',

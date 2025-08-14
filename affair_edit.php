@@ -1,5 +1,5 @@
 <?php
-include 'auth.php';
+include 'auth_manager.php';
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $id = $_POST['id'];
     $task_id = $_POST['task_id'];

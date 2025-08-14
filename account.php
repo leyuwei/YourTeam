@@ -1,5 +1,5 @@
 <?php
-require_once 'auth.php';
+require_once 'auth_manager.php';
 
 $password_msg = '';
 $add_msg = '';

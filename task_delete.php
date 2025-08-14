@@ -1,5 +1,5 @@
 <?php
-include 'auth.php';
+include 'auth_manager.php';
 $id = $_GET['id'] ?? null;
 if($id){
     $pdo->prepare('DELETE FROM tasks WHERE id=?')->execute([$id]);
