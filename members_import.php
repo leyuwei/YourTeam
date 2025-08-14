@@ -185,12 +185,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 include 'header.php';
 ?>
-<h2>Import Members from Excel (CSV)</h2>
+<h2 data-i18n="members_import.title">Import Members from Excel (CSV)</h2>
 <form method="post" enctype="multipart/form-data">
   <div class="mb-3">
     <input type="file" name="file" accept=".csv" class="form-control" required>
   </div>
-  <button type="submit" class="btn btn-primary">Import</button>
-  <a href="members.php" class="btn btn-secondary">Cancel</a>
+  <button type="submit" class="btn btn-primary" data-i18n="members_import.import">Import</button>
+  <a href="members.php" class="btn btn-secondary" data-i18n="members_import.cancel">Cancel</a>
 </form>
 <?php include 'footer.php'; ?>

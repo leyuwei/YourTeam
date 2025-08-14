@@ -24,18 +24,20 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     exit();
 }
 ?>
-<h2><?= $id? 'Edit':'Add'; ?> 研究方向</h2>
+<h2 data-i18n="<?= $id ? 'direction_edit.title_edit' : 'direction_edit.title_add'; ?>">
+  <?= $id ? 'Edit Research Direction' : 'Add Research Direction'; ?>
+</h2>
 <form method="post">
   <div class="mb-3">
-    <label class="form-label">方向题目</label>
+    <label class="form-label" data-i18n="direction_edit.label_title">Direction Title</label>
     <input type="text" name="title" class="form-control" value="<?= htmlspecialchars($direction['title']); ?>" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">方向具体描述</label>
+    <label class="form-label" data-i18n="direction_edit.label_description">Description</label>
     <textarea name="description" class="form-control" rows="3"><?= htmlspecialchars($direction['description']); ?></textarea>
   </div>
   <div class="mb-3">
-    <label class="form-label">背景颜色</label>
+    <label class="form-label" data-i18n="direction_edit.label_bg">Background Color</label>
     <input type="color" name="bg_color" class="form-control form-control-color" value="<?= htmlspecialchars($direction['bg_color'] ?? '#ffffff'); ?>">
     <div class="mt-2">
       <?php
@@ -46,7 +48,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
       ?>
     </div>
   </div>
-  <button type="submit" class="btn btn-primary">保存</button>
-  <a href="directions.php" class="btn btn-secondary">取消</a>
+  <button type="submit" class="btn btn-primary" data-i18n="direction_edit.save">Save</button>
+  <a href="directions.php" class="btn btn-secondary" data-i18n="direction_edit.cancel">Cancel</a>
 </form>
 <?php include 'footer.php'; ?>
