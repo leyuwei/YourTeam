@@ -60,18 +60,18 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
   <div class="row justify-content-center">
     <div class="col-md-4">
       <div class="card">
-        <div class="card-header" id="loginTitle" data-i18n="login.title">Login</div>
+        <div class="card-header" id="loginTitle" data-i18n="login.title.manager">Login</div>
         <div class="card-body">
           <?php if($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
           <form method="post" id="loginForm">
             <div class="mb-3">
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="login_type" id="loginManager" value="manager" checked>
-                <label class="form-check-label" for="loginManager">管理员</label>
+                <label class="form-check-label" for="loginManager" data-i18n="login.radio.manager">Manager</label>
               </div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="login_type" id="loginMember" value="member">
-                <label class="form-check-label" for="loginMember">一般成员</label>
+                <label class="form-check-label" for="loginMember" data-i18n="login.radio.member">Member</label>
               </div>
             </div>
             <div id="managerFields">
@@ -86,11 +86,11 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             </div>
             <div id="memberFields" style="display:none">
               <div class="mb-3">
-                <label class="form-label">姓名</label>
+                <label class="form-label" data-i18n="login.name">Name</label>
                 <input type="text" name="name" class="form-control">
               </div>
               <div class="mb-3">
-                <label class="form-label">身份证号</label>
+                <label class="form-label" data-i18n="login.identity">Identity Number</label>
                 <input type="text" name="identity_number" class="form-control">
               </div>
             </div>
@@ -108,15 +108,17 @@ document.addEventListener('DOMContentLoaded',function(){
   const memberFields=document.getElementById('memberFields');
   document.querySelectorAll('input[name="login_type"]').forEach(r=>{
     r.addEventListener('change',function(){
+      const titleEl = document.getElementById('loginTitle');
       if(this.value==='manager'){
         managerFields.style.display='block';
         memberFields.style.display='none';
-        document.getElementById('loginTitle').textContent='Manager Login';
+        titleEl.setAttribute('data-i18n','login.title.manager');
       }else{
         managerFields.style.display='none';
         memberFields.style.display='block';
-        document.getElementById('loginTitle').textContent='Member Login';
+        titleEl.setAttribute('data-i18n','login.title.member');
       }
+      applyTranslations();
     });
   });
 });
