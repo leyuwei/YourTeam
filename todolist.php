@@ -116,7 +116,13 @@ document.querySelectorAll('.add-item').forEach(btn=>{
 
 function printTodoList(){
   const lang=document.documentElement.lang||'en';
-  let html='<html><head><title>'+document.title+'</title><style>body{font-family:sans-serif;padding:10mm;}h3{margin-top:10mm;}ul{list-style:none;padding-left:0;}li{margin:4px 0;}li.done{text-decoration:line-through;color:#888;}</style></head><body>';
+  let html='<html><head><title>'+document.title+'</title><style>'+
+            'body{font-family:sans-serif;padding:10mm;background:#f9f9f9;}' +
+            'h3{margin-top:10mm;}' +
+            'ul{list-style:none;padding-left:0;}' +
+            'li{margin:4px 0;padding:4px;border-radius:4px;background:#fff;}' +
+            'li.done{text-decoration:line-through;color:#888;background:#e9ecef;}' +
+            '</style></head><body>';
   html+="<h1>待办事项</h1>";
   document.querySelectorAll('.todolist').forEach(list=>{
     if(!list.children.length) return;

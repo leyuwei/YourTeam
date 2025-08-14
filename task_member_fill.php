@@ -56,7 +56,7 @@ if($member_id){
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -129,7 +129,7 @@ if($member_id){
    </div>
    <button type="submit" class="btn btn-primary">申报该工作量</button>
  </form>
- <script>
+<script>
  const startInput = document.getElementById('startTime');
  const endInput = document.getElementById('endTime');
  const warning = document.getElementById('timeWarning');
@@ -171,5 +171,6 @@ if($member_id){
  });
  </script>
 <?php endif; ?>
+<script src="team_name.js"></script>
 </body>
 </html>
