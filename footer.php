@@ -22,15 +22,14 @@ function applyTeamName() {
   const name = typeof TEAM_NAME === 'string' ? TEAM_NAME : (TEAM_NAME[lang] || '');
   if (!name) return;
   const regex = /(团队|Team)/g;
-  if (regex.test(document.title)) {
-    document.title = document.title.replace(regex, name + '$1');
-  }
+  const replacer = (match, p1, offset, str) => {
+    return str.slice(Math.max(0, offset - name.length), offset) === name ? match : name + match;
+  };
+  document.title = document.title.replace(regex, replacer);
   (function walk(node) {
     node.childNodes.forEach(child => {
       if (child.nodeType === Node.TEXT_NODE) {
-        if (regex.test(child.textContent)) {
-          child.textContent = child.textContent.replace(regex, name + '$1');
-        }
+        child.textContent = child.textContent.replace(regex, replacer);
       } else {
         walk(child);
       }

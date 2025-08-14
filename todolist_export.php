@@ -17,6 +17,7 @@ $stmt = $pdo->prepare('SELECT category, day, content, is_done FROM todolist_item
 $stmt->execute([$user_id,$role,$week_start]);
 header('Content-Type: text/csv; charset=UTF-8');
 header('Content-Disposition: attachment; filename="todolist.csv"');
+echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
 echo "category,day,content,is_done\n";
 while($row = $stmt->fetch(PDO::FETCH_ASSOC)){
     $content = str_replace('"','""',$row['content']);

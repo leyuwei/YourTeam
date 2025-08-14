@@ -39,7 +39,7 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
   <input type="week" name="week" value="<?= htmlspecialchars($week_param); ?>">
   <button type="submit" class="btn btn-secondary btn-sm" data-i18n="todolist.switch_week">切换周</button>
   <a class="btn btn-success btn-sm" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
-  <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.print()" data-i18n="todolist.print">打印</button>
+  <button type="button" class="btn btn-outline-primary btn-sm" onclick="printTodoList()" data-i18n="todolist.print">打印</button>
 </form>
 <div class="row">
   <div class="col-md-6">
@@ -113,5 +113,31 @@ document.querySelectorAll('.add-item').forEach(btn=>{
     saveItem(li);
   });
 });
+
+function printTodoList(){
+  const lang=document.documentElement.lang||'en';
+  let html='<html><head><title>'+document.title+'</title><style>body{font-family:sans-serif;padding:10mm;}h3{margin-top:10mm;}ul{list-style:none;padding-left:0;}li{margin:4px 0;}li.done{text-decoration:line-through;color:#888;}</style></head><body>';
+  document.querySelectorAll('.todolist').forEach(list=>{
+    if(!list.children.length) return;
+    const catKey='todolist.category.'+list.dataset.category;
+    const dayKey=list.dataset.day? 'todolist.days.'+list.dataset.day : '';
+    let header=translations[lang][catKey]||'';
+    if(dayKey) header+=' - '+translations[lang][dayKey];
+    html+='<h3>'+header+'</h3><ul>';
+    list.querySelectorAll('li').forEach(li=>{
+      const content=li.querySelector('.item-content').value;
+      const done=li.querySelector('.item-done').checked;
+      html+='<li class="'+(done?'done':'')+'">'+content+'</li>';
+    });
+    html+='</ul>';
+  });
+  html+='</body></html>';
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
+  w.close();
+}
 </script>
 <?php include 'footer.php'; ?>

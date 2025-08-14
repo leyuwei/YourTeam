@@ -53,7 +53,7 @@ if($status){
 </form>
 <div class="form-check form-switch mb-3">
   <input class="form-check-input" type="checkbox" id="detailToggle" checked>
-  <label class="form-check-label" for="detailToggle">显示成员详情</label>
+  <label class="form-check-label" for="detailToggle" data-i18n="projects.toggle_details">Show Member Details</label>
 </div>
 <table class="table table-bordered">
   <thead>
@@ -85,7 +85,7 @@ if($status){
     <td>
       <?php if($memberList): ?>
         <?php foreach($memberList as $idx=>$m): ?>
-          <span class="member-name" data-bs-toggle="tooltip" title="<?= htmlspecialchars($memberDirections[$m['id']] ?? '无研究方向'); ?>">
+          <span class="member-name" data-bs-toggle="tooltip" title="<?= htmlspecialchars($memberDirections[$m['id']] ?? '') ?>"<?php if(empty($memberDirections[$m['id']])) echo ' data-i18n-title="projects.no_direction"'; ?>>
             <?= htmlspecialchars($m['name']); ?>
             <span class="member-detail text-muted">(<?= htmlspecialchars($m['degree']); ?>,<?= htmlspecialchars($m['year']); ?>)</span>
           </span><?= $idx < count($memberList)-1 ? ', ' : ''; ?>
@@ -96,7 +96,7 @@ if($status){
     </td>
     <td><?= htmlspecialchars($p['begin_date']); ?></td>
     <td><?= htmlspecialchars($p['end_date']); ?></td>
-    <td><?= htmlspecialchars($p['status']); ?></td>
+    <td data-i18n="projects.status.<?= htmlspecialchars($p['status']); ?>"><?= htmlspecialchars($p['status']); ?></td>
     <td>
       <a class="btn btn-sm btn-primary" href="project_edit.php?id=<?= $p['id']; ?>" data-i18n="projects.action_edit">Edit</a>
       <a class="btn btn-sm btn-warning" href="project_members.php?id=<?= $p['id']; ?>" data-i18n="projects.action_members">Members</a>
@@ -106,15 +106,15 @@ if($status){
   <?php endforeach; ?>
   </tbody>
 </table>
-<h3 class="mt-4">项目参与人员情况</h3>
+<h3 class="mt-4" data-i18n="projects.participation_title">项目参与人员情况</h3>
 <table class="table table-bordered">
-  <tr><th>成员</th><th>参与项目</th></tr>
+  <tr><th data-i18n="projects.participation.member">成员</th><th data-i18n="projects.participation.projects">参与项目</th></tr>
   <?php
   $memberProjects = $pdo->query("SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(p.title ORDER BY l.sort_order SEPARATOR ', ') AS proj FROM members m LEFT JOIN project_member_log l ON m.id=l.member_id AND l.exit_time IS NULL LEFT JOIN projects p ON l.project_id=p.id WHERE m.status != 'exited' GROUP BY m.id ORDER BY m.sort_order")->fetchAll();
   foreach($memberProjects as $mp): ?>
   <tr>
     <td><?= htmlspecialchars($mp["name"]); ?><span class="member-detail text-muted">(<?= htmlspecialchars($mp["degree_pursuing"]); ?>,<?= htmlspecialchars($mp["year_of_join"]); ?>)</span></td>
-    <td><?= $mp['proj'] ? htmlspecialchars($mp['proj']) : '<span style="color:red"><em>暂无</em></span>'; ?></td>
+    <td><?= $mp['proj'] ? htmlspecialchars($mp['proj']) : '<span style="color:red"><em data-i18n="directions.none">None</em></span>'; ?></td>
   </tr>
   <?php endforeach; ?>
 </table>

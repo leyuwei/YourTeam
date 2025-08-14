@@ -11,36 +11,47 @@ if($status){
 }
 ?>
 <div class="d-flex justify-content-between mb-3">
-  <h2>任务指派</h2>
-  <a class="btn btn-success" href="task_edit.php">新建任务</a>
+  <h2 data-i18n="tasks.title">Tasks Assignment</h2>
+  <a class="btn btn-success" href="task_edit.php" data-i18n="tasks.add">New Task</a>
 </div>
 <form class="row g-3 mb-3" method="get">
   <div class="col-auto">
     <select name="status" class="form-select">
-      <option value="">所有状态</option>
-      <option value="active" <?= $status=='active'?'selected':''; ?>>进行中</option>
-      <option value="paused" <?= $status=='paused'?'selected':''; ?>>暂停</option>
-      <option value="finished" <?= $status=='finished'?'selected':''; ?>>已结束</option>
+      <option value="" data-i18n="tasks.filter_all">All Status</option>
+      <option value="active" <?= $status=='active'?'selected':''; ?> data-i18n="tasks.filter.active">Active</option>
+      <option value="paused" <?= $status=='paused'?'selected':''; ?> data-i18n="tasks.filter.paused">Paused</option>
+      <option value="finished" <?= $status=='finished'?'selected':''; ?> data-i18n="tasks.filter.finished">Finished</option>
     </select>
   </div>
   <div class="col-auto">
-    <button type="submit" class="btn btn-primary">筛选</button>
+    <button type="submit" class="btn btn-primary" data-i18n="tasks.filter.button">Filter</button>
   </div>
 </form>
 <table class="table table-bordered">
-<tr><th>任务标题</th><th>开始日期</th><th>状态</th><th>操作</th></tr>
+<tr><th data-i18n="tasks.table_title">Title</th><th data-i18n="tasks.table_start">Start</th><th data-i18n="tasks.table_status">Status</th><th data-i18n="tasks.table_actions">Actions</th></tr>
 <?php foreach($tasks as $t): ?>
 <tr>
   <td><?= htmlspecialchars($t['title']); ?></td>
   <td><?= htmlspecialchars($t['start_date']); ?></td>
-  <td><?= htmlspecialchars($t['status']); ?></td>
+  <td data-i18n="tasks.status.<?= htmlspecialchars($t['status']); ?>"><?= htmlspecialchars($t['status']); ?></td>
   <td>
-    <a class="btn btn-sm btn-primary" href="task_edit.php?id=<?= $t['id']; ?>">编辑信息</a>
-    <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>">下辖具体事务</a>
-    <button type="button" class="btn btn-sm btn-info qr-btn" data-url="task_member_fill.php?task_id=<?= $t['id']; ?>">请成员自己填</button>
-    <a class="btn btn-sm btn-danger" href="task_delete.php?id=<?= $t['id']; ?>" onclick="return doubleConfirm('Delete task?');">删除</a>
+    <a class="btn btn-sm btn-primary" href="task_edit.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_edit">Edit</a>
+    <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_affairs">Affairs</a>
+    <button type="button" class="btn btn-sm btn-info qr-btn" data-url="task_member_fill.php?task_id=<?= $t['id']; ?>" data-i18n="tasks.action_fill">Self Fill</button>
+    <a class="btn btn-sm btn-danger delete-task" href="task_delete.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_delete">Delete</a>
   </td>
 </tr>
 <?php endforeach; ?>
 </table>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.delete-task').forEach(link=>{
+    link.addEventListener('click',e=>{
+      const lang=document.documentElement.lang||'en';
+      const msg=translations[lang]['tasks.confirm.delete'];
+      if(!doubleConfirm(msg)) e.preventDefault();
+    });
+  });
+});
+</script>
 <?php include 'footer.php'; ?>
