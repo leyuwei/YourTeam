@@ -1,4 +1,4 @@
-<?php include_once 'auth.php'; ?>
+<?php include_once 'auth.php'; $current_page = basename($_SERVER['PHP_SELF']); ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,25 +10,29 @@
   .container { max-width: 80%; }
   .member-detail { color: #CCCCCC !important; }
   tr[style*="background-color"] > * { background-color: inherit !important; }
+  .navbar-nav .nav-link.active, .navbar-brand.active {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: 0.25rem;
+  }
 </style>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
   <div class="container-fluid">
-    <a class="navbar-brand" href="index.php" data-i18n="nav.home">Team Management</a>
+    <a class="navbar-brand <?php echo ($current_page === 'index.php' ? 'active' : ''); ?>" href="index.php" data-i18n="nav.home">Team Management</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="members.php" data-i18n="nav.members">Members</a></li>
-          <li class="nav-item"><a class="nav-link" href="todolist.php" data-i18n="nav.todolist">Todolist</a></li>
-          <li class="nav-item"><a class="nav-link" href="projects.php" data-i18n="nav.projects">Projects</a></li>
-          <li class="nav-item"><a class="nav-link" href="directions.php" data-i18n="nav.directions">Research</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'member') === 0 ? 'active' : ''); ?>" href="members.php" data-i18n="nav.members">Members</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'todolist') === 0 ? 'active' : ''); ?>" href="todolist.php" data-i18n="nav.todolist">Todolist</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'project') === 0 ? 'active' : ''); ?>" href="projects.php" data-i18n="nav.projects">Projects</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'direction') === 0 ? 'active' : ''); ?>" href="directions.php" data-i18n="nav.directions">Research</a></li>
           <?php if($_SESSION['role']==='manager'): ?>
-          <li class="nav-item"><a class="nav-link" href="tasks.php" data-i18n="nav.tasks">Tasks</a></li>
-          <li class="nav-item"><a class="nav-link" href="workload.php" data-i18n="nav.workload">Workload</a></li>
-          <li class="nav-item"><a class="nav-link" href="account.php" data-i18n="nav.account">Account</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'task') === 0 ? 'active' : ''); ?>" href="tasks.php" data-i18n="nav.tasks">Tasks</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'workload.php' ? 'active' : ''); ?>" href="workload.php" data-i18n="nav.workload">Workload</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'account.php' ? 'active' : ''); ?>" href="account.php" data-i18n="nav.account">Account</a></li>
           <?php endif; ?>
         </ul>
       <span class="navbar-text me-3"><span data-i18n="welcome">Welcome</span>, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
