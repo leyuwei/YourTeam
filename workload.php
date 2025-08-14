@@ -72,11 +72,11 @@ include 'header.php';
 <form method="get" class="row g-3 mb-3">
   <div class="col-auto">
     <label class="form-label">报表起始时间</label>
-    <input type="datetime-local" name="start" class="form-control" value="<?= htmlspecialchars($start); ?>" required>
+    <input type="date" name="start" class="form-control" value="<?= htmlspecialchars($start); ?>" required>
   </div>
   <div class="col-auto">
     <label class="form-label">报表截止时间</label>
-    <input type="datetime-local" name="end" class="form-control" value="<?= htmlspecialchars($end); ?>" required>
+    <input type="date" name="end" class="form-control" value="<?= htmlspecialchars($end); ?>" required>
   </div>
   <div class="col-auto align-self-end">
     <button type="submit" class="btn btn-primary">生成报表</button>
