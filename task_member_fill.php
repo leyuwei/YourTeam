@@ -1,5 +1,7 @@
 <?php
-require 'auth_manager.php';
+// Public endpoint for task members to report their work without login
+// Only basic configuration and DB connection are required
+require 'config.php';
 $task_id = $_GET['task_id'] ?? null;
 if(!$task_id){
     echo 'Invalid task id';

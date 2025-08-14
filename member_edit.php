@@ -34,64 +34,66 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     exit();
 }
 ?>
-<h2><?php echo $id? 'Edit':'Add'; ?> 团队成员</h2>
+<h2 data-i18n="<?php echo $id? 'member_edit.title_edit':'member_edit.title_add'; ?>">
+  <?php echo $id? 'Edit Member':'Add Member'; ?>
+</h2>
 <form method="post">
   <div class="mb-3">
-    <label class="form-label">一卡通号</label>
+    <label class="form-label" data-i18n="members.table.campus_id">Campus ID</label>
     <input type="text" name="campus_id" class="form-control" value="<?php echo htmlspecialchars($member['campus_id']); ?>" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">姓名</label>
+    <label class="form-label" data-i18n="members.table.name">Name</label>
     <input type="text" name="name" class="form-control" value="<?php echo htmlspecialchars($member['name']); ?>" required>
   </div>
   <div class="mb-3">
-    <label class="form-label">正式邮箱</label>
+    <label class="form-label" data-i18n="members.table.email">Email</label>
     <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($member['email']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">身份证号</label>
+    <label class="form-label" data-i18n="members.table.identity_number">Identity Number</label>
     <input type="text" name="identity_number" class="form-control" value="<?php echo htmlspecialchars($member['identity_number']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">入学年份</label>
+    <label class="form-label" data-i18n="members.table.year_of_join">Year of Join</label>
     <input type="number" name="year_of_join" class="form-control" value="<?php echo htmlspecialchars($member['year_of_join']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">已获学位</label>
+    <label class="form-label" data-i18n="members.table.current_degree">Current Degree</label>
     <input type="text" name="current_degree" class="form-control" value="<?php echo htmlspecialchars($member['current_degree']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">当前学历</label>
+    <label class="form-label" data-i18n="members.table.degree_pursuing">Degree Pursuing</label>
     <input type="text" name="degree_pursuing" class="form-control" value="<?php echo htmlspecialchars($member['degree_pursuing']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">手机号</label>
+    <label class="form-label" data-i18n="members.table.phone">Phone</label>
     <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($member['phone']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">微信号</label>
+    <label class="form-label" data-i18n="members.table.wechat">WeChat</label>
     <input type="text" name="wechat" class="form-control" value="<?php echo htmlspecialchars($member['wechat']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">所处学院/单位</label>
+    <label class="form-label" data-i18n="members.table.department">Department</label>
     <input type="text" name="department" class="form-control" value="<?php echo htmlspecialchars($member['department']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">工作地点</label>
+    <label class="form-label" data-i18n="members.table.workplace">Workplace</label>
     <input type="text" name="workplace" class="form-control" value="<?php echo htmlspecialchars($member['workplace']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">家庭地址</label>
+    <label class="form-label" data-i18n="members.table.homeplace">Homeplace</label>
     <input type="text" name="homeplace" class="form-control" value="<?php echo htmlspecialchars($member['homeplace']); ?>">
   </div>
   <div class="mb-3">
-    <label class="form-label">状态</label>
+    <label class="form-label" data-i18n="members.table.status">Status</label>
     <select name="status" class="form-select">
-      <option value="in_work" <?php echo $member['status']==='in_work'?'selected':''; ?>>在岗</option>
-      <option value="exited" <?php echo $member['status']==='exited'?'selected':''; ?>>已离退</option>
+      <option value="in_work" <?php echo $member['status']==='in_work'?'selected':''; ?> data-i18n="members.status.in_work">In Work</option>
+      <option value="exited" <?php echo $member['status']==='exited'?'selected':''; ?> data-i18n="members.status.exited">Exited</option>
     </select>
   </div>
-  <button type="submit" class="btn btn-primary">更新</button>
-  <a href="members.php" class="btn btn-secondary">取消</a>
+  <button type="submit" class="btn btn-primary" data-i18n="member_edit.save">Save</button>
+  <a href="members.php" class="btn btn-secondary" data-i18n="member_edit.cancel">Cancel</a>
 </form>
 <?php include 'footer.php'; ?>
