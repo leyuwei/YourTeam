@@ -34,7 +34,7 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
   .todolist li .item-content { border: none; box-shadow: none; padding: 0; font-size: 12pt; }
 }
 </style>
-<h2 class="text-center"><span data-i18n="todolist.title">待办事项</span> <small>&copy; <?= date('Y.m.d', strtotime($week_start)) ?> - <?= date('Y.m.d', strtotime($week_end)) ?></small></h2>
+<h2 class="text-center"><span data-i18n="todolist.title">待办事项</span> @ <?= date('Y.m.d', strtotime($week_start)) ?> - <?= date('Y.m.d', strtotime($week_end)) ?></small></h2>
 <form method="get" class="mb-3">
   <input type="week" name="week" value="<?= htmlspecialchars($week_param); ?>">
   <button type="submit" class="btn btn-secondary btn-sm" data-i18n="todolist.switch_week">切换周</button>
@@ -117,6 +117,7 @@ document.querySelectorAll('.add-item').forEach(btn=>{
 function printTodoList(){
   const lang=document.documentElement.lang||'en';
   let html='<html><head><title>'+document.title+'</title><style>body{font-family:sans-serif;padding:10mm;}h3{margin-top:10mm;}ul{list-style:none;padding-left:0;}li{margin:4px 0;}li.done{text-decoration:line-through;color:#888;}</style></head><body>';
+  html+="<h1>待办事项</h1>";
   document.querySelectorAll('.todolist').forEach(list=>{
     if(!list.children.length) return;
     const catKey='todolist.category.'+list.dataset.category;
