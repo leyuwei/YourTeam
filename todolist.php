@@ -30,7 +30,7 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
 </form>
 <div class="row">
   <div class="col-md-6">
-    <h3>工作</h3>
+    <h3><b>工作</b></h3>
     <?php foreach($days as $k=>$label): ?>
     <h5><?= $label; ?> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="work" data-day="<?= $k; ?>">+</button></h5>
     <ul class="list-group mb-3 todolist" data-category="work" data-day="<?= $k; ?>">
@@ -45,7 +45,7 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
     <?php endforeach; ?>
   </div>
   <div class="col-md-6">
-    <h3>私人</h3>
+    <h3><b>私人</b></h3>
     <?php foreach($days as $k=>$label): ?>
     <h5><?= $label; ?> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="personal" data-day="<?= $k; ?>">+</button></h5>
     <ul class="list-group mb-3 todolist" data-category="personal" data-day="<?= $k; ?>">
@@ -58,7 +58,7 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
       <?php endforeach; endif; ?>
     </ul>
     <?php endforeach; ?>
-    <h3>长期 <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="longterm" data-day="">+</button></h3>
+    <h3><b>长期</b> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="longterm" data-day="">+</button></h3>
     <ul class="list-group mb-3 todolist" data-category="longterm" data-day="">
       <?php if(!empty($items['longterm'][''])): foreach($items['longterm'][''] as $it): ?>
       <li class="list-group-item d-flex align-items-center" data-id="<?= $it['id']; ?>">
