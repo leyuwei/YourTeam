@@ -48,9 +48,18 @@ if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']
         $msg = '已提交';
     }
 }
+if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'join'){
+    $affair_id = $_POST['affair_id'];
+    $check = $pdo->prepare('SELECT 1 FROM task_affair_members WHERE affair_id=? AND member_id=?');
+    $check->execute([$affair_id,$member_id]);
+    if(!$check->fetch()){
+        $pdo->prepare('INSERT INTO task_affair_members(affair_id,member_id) VALUES (?,?)')->execute([$affair_id,$member_id]);
+        $msg = '已加入该事务';
+    }
+}
 $affairs = [];
 if($member_id){
-    $stmt = $pdo->prepare('SELECT a.description,a.start_time,a.end_time,GROUP_CONCAT(m.name SEPARATOR ", ") AS members FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
+    $stmt = $pdo->prepare('SELECT a.id,a.description,a.start_time,a.end_time,GROUP_CONCAT(m.name SEPARATOR ", ") AS members, GROUP_CONCAT(m.id) AS member_ids FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
     $stmt->execute([$task_id]);
     $affairs = $stmt->fetchAll();
 }
@@ -88,17 +97,31 @@ if($member_id){
 <?php else: ?>
 <?php if($msg): ?><div class="alert alert-success"><?php echo htmlspecialchars($msg); ?></div><?php endif; ?>
 <?php if($error && !$msg): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
+<div class="alert alert-info">
+  如需参与他人已申报的事务，请在下方列表中找到相应记录并点击“加入”按钮；仅在您实际参与该事务时使用此功能。
+</div>
 <h4><b>已填工作事务</b></h4>
 <table class="table table-bordered">
-<tr><th>描述</th><th>负责成员</th><th>起始日期</th><th>结束日期</th><th>天数</th></tr>
+<tr><th>描述</th><th>负责成员</th><th>起始日期</th><th>结束日期</th><th>天数</th><th>操作</th></tr>
 <?php foreach($affairs as $a): ?>
-<?php $days = (strtotime($a['end_time']) - strtotime($a['start_time'])) / 86400; ?>
+<?php $days = (strtotime($a['end_time']) - strtotime($a['start_time'])) / 86400; $joined = $a['member_ids'] ? in_array($member_id, explode(',', $a['member_ids'])) : false; ?>
 <tr>
   <td><?= htmlspecialchars($a['description']); ?></td>
   <td><?= htmlspecialchars($a['members']); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['start_time']))); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['end_time'] . ' -1 day'))); ?></td>
   <td><?= htmlspecialchars($days); ?></td>
+  <td>
+    <?php if(!$joined): ?>
+    <form method="post" style="display:inline;">
+      <input type="hidden" name="action" value="join">
+      <input type="hidden" name="affair_id" value="<?= $a['id']; ?>">
+      <button type="submit" class="btn btn-sm btn-success">加入</button>
+    </form>
+    <?php else: ?>
+    已加入
+    <?php endif; ?>
+  </td>
 </tr>
 <?php endforeach; ?>
 </table>
