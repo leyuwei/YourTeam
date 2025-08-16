@@ -9,14 +9,20 @@ if(!$task_id){
 $task = $pdo->prepare('SELECT * FROM tasks WHERE id=?');
 $task->execute([$task_id]);
 $task = $task->fetch();
-$affairs_stmt = $pdo->prepare('SELECT a.*, GROUP_CONCAT(CONCAT(m.name, " (", m.campus_id, ")") SEPARATOR ", ") AS members FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
+$affairs_stmt = $pdo->prepare('SELECT a.*, GROUP_CONCAT(CONCAT(m.name, " (", m.campus_id, ")") SEPARATOR ", ") AS members, GROUP_CONCAT(m.id) AS member_ids FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
 $affairs_stmt->execute([$task_id]);
 $affairs = $affairs_stmt->fetchAll();
 $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
 ?>
 <h2><span data-i18n="task_affairs.title_prefix">Task Affairs - </span><?php echo htmlspecialchars($task['title']); ?></h2>
+<form method="post" action="affair_merge.php" id="mergeForm">
+<input type="hidden" name="task_id" value="<?= $task_id; ?>">
+<div class="mb-2">
+  <button type="submit" class="btn btn-warning btn-sm" id="mergeBtn" disabled data-i18n="task_affairs.merge_selected">Merge Selected</button>
+</div>
 <table class="table table-bordered">
 <tr>
+  <th><input type="checkbox" id="selectAll"></th>
   <th data-i18n="task_affairs.table_description">Description</th>
   <th data-i18n="task_affairs.table_members">Members</th>
   <th data-i18n="task_affairs.table_start">Start Date</th>
@@ -27,6 +33,7 @@ $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 
 <?php foreach($affairs as $a): ?>
 <?php $days = (strtotime($a['end_time']) - strtotime($a['start_time']))/86400; ?>
 <tr>
+  <td><input type="checkbox" name="affair_ids[]" value="<?= $a['id']; ?>" class="affair-checkbox"></td>
   <td><?= htmlspecialchars($a['description']); ?></td>
   <td><?= htmlspecialchars($a['members']); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['start_time']))); ?></td>
@@ -39,8 +46,9 @@ $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 
 </tr>
 <?php endforeach; ?>
 </table>
+</form>
 
-<?php foreach($affairs as $a): ?>
+<?php foreach($affairs as $a): $selected = $a['member_ids'] ? explode(',', $a['member_ids']) : []; ?>
 <div class="modal fade" id="editModal<?= $a['id']; ?>" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -55,6 +63,14 @@ $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 
           <div class="mb-3">
             <label class="form-label" data-i18n="task_affairs.label_description">Description</label>
             <textarea name="description" class="form-control" rows="2" required><?= htmlspecialchars($a['description']); ?></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="task_affairs.label_members">Members (hold Ctrl to select multiple)</label>
+            <select name="member_ids[]" class="form-select" multiple required size="8">
+              <?php foreach($members as $m): ?>
+              <option value="<?= $m['id']; ?>" <?= in_array($m['id'], $selected) ? 'selected' : ''; ?>><?= htmlspecialchars($m['name']); ?> (<?= $m['campus_id']; ?>)</option>
+              <?php endforeach; ?>
+            </select>
           </div>
           <div class="mb-3">
             <label class="form-label" data-i18n="task_affairs.label_start">Start Date</label>
@@ -152,6 +168,29 @@ document.querySelectorAll('.delete-affair').forEach(link => {
     const msg = translations[getLang()]['task_affairs.confirm.delete'];
     if(!doubleConfirm(msg)) e.preventDefault();
   });
+});
+
+const checkboxes = document.querySelectorAll('.affair-checkbox');
+const mergeBtn = document.getElementById('mergeBtn');
+const selectAll = document.getElementById('selectAll');
+function updateMergeBtn(){
+  const checked = document.querySelectorAll('.affair-checkbox:checked').length;
+  mergeBtn.disabled = checked < 2;
+}
+checkboxes.forEach(cb => cb.addEventListener('change', updateMergeBtn));
+if(selectAll){
+  selectAll.addEventListener('change', () => {
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateMergeBtn();
+  });
+}
+document.getElementById('mergeForm').addEventListener('submit', e => {
+  if(document.querySelectorAll('.affair-checkbox:checked').length < 2){
+    e.preventDefault();
+  } else {
+    const msg = 'Merge selected affairs?';
+    if(!confirm(msg)) e.preventDefault();
+  }
 });
 </script>
 <?php include 'footer.php'; ?>
