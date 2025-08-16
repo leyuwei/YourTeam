@@ -15,7 +15,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         header('Location: task_affairs.php?id=' . $task_id);
         exit();
     }
-    $description = $affairs[0]['description'];
+    $descriptions = array_column($affairs, 'description');
+    $description = implode('; ', $descriptions);
     $start_time = min(array_column($affairs, 'start_time'));
     $end_time = max(array_column($affairs, 'end_time'));
     $memberStmt = $pdo->prepare("SELECT DISTINCT member_id FROM task_affair_members WHERE affair_id IN ($placeholders)");

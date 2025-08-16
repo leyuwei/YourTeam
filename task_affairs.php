@@ -188,8 +188,8 @@ document.getElementById('mergeForm').addEventListener('submit', e => {
   if(document.querySelectorAll('.affair-checkbox:checked').length < 2){
     e.preventDefault();
   } else {
-    const msg = 'Merge selected affairs?';
-    if(!confirm(msg)) e.preventDefault();
+    const msg = translations[getLang()]['task_affairs.confirm.merge'];
+    if(!doubleConfirm(msg)) e.preventDefault();
   }
 });
 </script>
