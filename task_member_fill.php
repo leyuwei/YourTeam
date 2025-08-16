@@ -57,6 +57,11 @@ if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']
         $msg = '已加入该事务';
     }
 }
+if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'leave'){
+    $affair_id = $_POST['affair_id'];
+    $pdo->prepare('DELETE FROM task_affair_members WHERE affair_id=? AND member_id=?')->execute([$affair_id,$member_id]);
+    $msg = '已撤回加入';
+}
 $affairs = [];
 if($member_id){
     $stmt = $pdo->prepare('SELECT a.id,a.description,a.start_time,a.end_time,GROUP_CONCAT(m.name SEPARATOR ", ") AS members, GROUP_CONCAT(m.id) AS member_ids FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
@@ -119,7 +124,11 @@ if($member_id){
       <button type="submit" class="btn btn-sm btn-success">加入</button>
     </form>
     <?php else: ?>
-    已加入
+    <form method="post" style="display:inline;">
+      <input type="hidden" name="action" value="leave">
+      <input type="hidden" name="affair_id" value="<?= $a['id']; ?>">
+      <button type="submit" class="btn btn-sm btn-warning">撤回</button>
+    </form>
     <?php endif; ?>
   </td>
 </tr>
