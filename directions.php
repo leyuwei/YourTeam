@@ -30,6 +30,10 @@ $directions = $stmt->fetchAll();
   <input class="form-check-input" type="checkbox" id="detailToggle" checked>
   <label class="form-check-label" for="detailToggle" data-i18n="directions.toggle_details">Show Member Details</label>
 </div>
+<div class="form-check form-switch mb-3">
+  <input class="form-check-input" type="checkbox" id="boldToggle">
+  <label class="form-check-label" for="boldToggle" data-i18n="bold_font">Bold font</label>
+</div>
 <table class="table table-bordered">
   <thead>
   <tr>
@@ -95,6 +99,10 @@ document.addEventListener('DOMContentLoaded', function(){
     document.querySelectorAll('.member-detail').forEach(span => {
       span.style.display = this.checked ? 'inline' : 'none';
     });
+  });
+
+  document.getElementById('boldToggle').addEventListener('change', function(){
+    document.body.classList.toggle('fw-bold', this.checked);
   });
 });
 </script>
