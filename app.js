@@ -12,6 +12,7 @@ const translations = {
     'logout': 'Logout',
     'header.title': 'Team Management Platform',
     'qr.scan': 'Scan to Enter',
+    'qr.copy': 'Copy Link',
     'login.title': 'Manager Login',
     'login.title.manager': 'Manager Login',
     'login.title.member': 'Member Login',
@@ -245,6 +246,7 @@ const translations = {
     'logout': '退出登录',
     'header.title': '团队管理平台',
     'qr.scan': '扫码进入',
+    'qr.copy': '复制链接',
     'login.title': '管理员登录',
     'login.title.manager': '管理员登录',
     'login.title.member': '成员登录',
@@ -537,9 +539,17 @@ function initApp() {
       const img = document.getElementById('qrImage');
       if (img) {
         img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(fullUrl);
-        const modal = new bootstrap.Modal(document.getElementById('qrModal'));
-        modal.show();
       }
+      const linkInput = document.getElementById('qrLinkInput');
+      if (linkInput) {
+        linkInput.value = fullUrl;
+      }
+      const copyBtn = document.getElementById('qrCopyBtn');
+      if (copyBtn) {
+        copyBtn.onclick = () => navigator.clipboard.writeText(fullUrl);
+      }
+      const modal = new bootstrap.Modal(document.getElementById('qrModal'));
+      modal.show();
     });
   });
 

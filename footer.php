@@ -8,6 +8,10 @@
       </div>
       <div class="modal-body text-center">
         <img id="qrImage" src="" alt="QR Code">
+        <div class="input-group mt-3">
+          <input id="qrLinkInput" type="text" class="form-control" readonly>
+          <button id="qrCopyBtn" class="btn btn-outline-secondary" data-i18n="qr.copy">复制链接</button>
+        </div>
       </div>
     </div>
   </div>
