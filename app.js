@@ -542,6 +542,34 @@ function initApp() {
       }
     });
   });
+
+  const nav = document.querySelector('.navbar-nav');
+  if(nav){
+    const indicator = document.createElement('span');
+    indicator.className = 'nav-indicator';
+    nav.appendChild(indicator);
+    const links = Array.from(nav.querySelectorAll('.nav-link'));
+    function moveIndicator(el){
+      if(!el) return;
+      const rect = el.getBoundingClientRect();
+      const navRect = nav.getBoundingClientRect();
+      indicator.style.width = rect.width + 'px';
+      indicator.style.transform = `translateX(${rect.left - navRect.left}px)`;
+    }
+    const active = nav.querySelector('.nav-link.active');
+    const prevIndex = parseInt(sessionStorage.getItem('navActiveIndex'), 10);
+    if(!isNaN(prevIndex) && links[prevIndex]){
+      moveIndicator(links[prevIndex]);
+      requestAnimationFrame(()=>moveIndicator(active || links[0]));
+    } else {
+      moveIndicator(active || links[0]);
+    }
+    links.forEach((link, idx)=>{
+      link.addEventListener('click', ()=>{
+        sessionStorage.setItem('navActiveIndex', idx);
+      });
+    });
+  }
 }
 
 if (document.readyState === 'loading') {
