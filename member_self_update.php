@@ -81,6 +81,7 @@ if($member_id){
   </div>
   <?php if($error): ?><div class="text-danger mb-3"><?= $error; ?></div><?php endif; ?>
   <button type="submit" class="btn btn-primary">验证身份</button>
+  <a href="member_self_register.php" class="btn btn-secondary ms-2">新成员注册</a>
 </form>
 <?php else: ?>
 <?php if($msg): ?><div class="alert alert-success mt-3"><?= $msg; ?></div><?php endif; ?>
