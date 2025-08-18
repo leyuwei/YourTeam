@@ -20,6 +20,7 @@ foreach($stmt as $row){
     $items[$row['category']][$row['day']][] = $row;
 }
 $week_end = date('Y-m-d', strtotime($week_start . ' +6 days'));
+$next_week_param = date('o-\\WW', strtotime($week_start . ' +7 days'));
 $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>'周五','sat'=>'周六','sun'=>'周日'];
 ?>
 <style>
@@ -39,6 +40,7 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
   <input type="week" name="week" value="<?= htmlspecialchars($week_param); ?>">
   <button type="submit" class="btn btn-secondary btn-sm" data-i18n="todolist.switch_week">切换周</button>
   <a class="btn btn-success btn-sm" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
+  <button type="button" class="btn btn-secondary btn-sm" id="copyNextWeek" data-i18n="todolist.copy_next">复制到下周</button>
   <button type="button" class="btn btn-outline-primary btn-sm" onclick="printTodoList()" data-i18n="todolist.print">打印</button>
 </form>
 <div class="row">
@@ -112,6 +114,11 @@ document.querySelectorAll('.add-item').forEach(btn=>{
     attach(li);
     saveItem(li);
   });
+});
+
+document.getElementById('copyNextWeek').addEventListener('click',()=>{
+  fetch('todolist_save.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'copy_next',week_start:'<?= $week_start; ?>'})})
+    .then(()=>{window.location='todolist.php?week=<?= $next_week_param; ?>';});
 });
 
 function printTodoList(){

@@ -27,6 +27,10 @@ if($status){
     <button type="submit" class="btn btn-primary" data-i18n="tasks.filter.button">Filter</button>
   </div>
 </form>
+<div class="form-check form-switch mb-3">
+  <input class="form-check-input" type="checkbox" id="boldToggle">
+  <label class="form-check-label" for="boldToggle" data-i18n="bold_font">Bold font</label>
+</div>
 <table class="table table-bordered">
 <tr><th data-i18n="tasks.table_title">Title</th><th data-i18n="tasks.table_start">Start</th><th data-i18n="tasks.table_status">Status</th><th data-i18n="tasks.table_actions">Actions</th></tr>
 <?php foreach($tasks as $t): ?>
@@ -51,6 +55,10 @@ document.addEventListener('DOMContentLoaded',()=>{
       const msg=translations[lang]['tasks.confirm.delete'];
       if(!doubleConfirm(msg)) e.preventDefault();
     });
+  });
+
+  document.getElementById('boldToggle').addEventListener('change', function(){
+    document.body.classList.toggle('fw-bold', this.checked);
   });
 });
 </script>
