@@ -23,12 +23,13 @@
   .member-detail { color: #CCCCCC !important; font-weight: normal !important; }
   .navbar {
     position: relative;
-    background: linear-gradient(90deg, #ff7e5f, #feb47b, #86A8E7, #91EAE4);
-    background-size: 300% 300%;
+    background: linear-gradient(90deg, #1f1f1f, #343a40, #212529);
+    background-size: 200% 200%;
     animation: navGradient 15s ease infinite;
   }
   .navbar-nav .nav-link {
     position: relative;
+    z-index: 1;
     color: #fff;
     transition: color 0.3s ease;
   }
@@ -38,11 +39,11 @@
     top: 0;
     left: 0;
     height: 100%;
-    background-color: rgba(255,255,255,0.25);
+    background-color: rgba(255, 255, 255, 0.15);
     border-radius: 0.25rem;
     transition: all 0.3s ease;
     pointer-events: none;
-    z-index: -1;
+    z-index: 0;
   }
   @keyframes navGradient {
     0% {background-position: 0% 50%;}
