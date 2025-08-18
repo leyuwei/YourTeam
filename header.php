@@ -20,12 +20,37 @@
     padding: 2rem;
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
   }
-  .member-detail { color: #CCCCCC !important; }
-  tr[style*="background-color"] > * { background-color: inherit !important; }
-  .navbar-nav .nav-link.active, .navbar-brand.active {
-    background-color: rgba(255, 255, 255, 0.25);
-    border-radius: 0.25rem;
+  .member-detail { color: #CCCCCC !important; font-weight: normal !important; }
+  .navbar {
+    position: relative;
+    background: linear-gradient(90deg, #ff7e5f, #feb47b, #86A8E7, #91EAE4);
+    background-size: 300% 300%;
+    animation: navGradient 15s ease infinite;
   }
+  .navbar-nav .nav-link {
+    position: relative;
+    color: #fff;
+    transition: color 0.3s ease;
+  }
+  .navbar-nav .nav-link:hover { color: #ffdd57; }
+  .nav-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background-color: rgba(255,255,255,0.25);
+    border-radius: 0.25rem;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+  @keyframes navGradient {
+    0% {background-position: 0% 50%;}
+    50% {background-position: 100% 50%;}
+    100% {background-position: 0% 50%;}
+  }
+  tr[style*="background-color"] > * { background-color: inherit !important; }
+  .navbar-nav { position: relative; }
   .hero-banner {
     background: rgba(0, 0, 0, 0.4);
     border-radius: 1rem;
@@ -46,7 +71,7 @@
 </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
   <div class="container-fluid">
     <a class="navbar-brand <?php echo ($current_page === 'index.php' ? 'active' : ''); ?>" href="index.php" data-i18n="nav.home">Team Management</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">

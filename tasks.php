@@ -11,7 +11,7 @@ if($status){
 }
 ?>
 <div class="d-flex justify-content-between mb-3">
-  <h2 data-i18n="tasks.title">Tasks Assignment</h2>
+  <h2 class="bold-target" data-i18n="tasks.title">Tasks Assignment</h2>
   <a class="btn btn-success" href="task_edit.php" data-i18n="tasks.add">New Task</a>
 </div>
 <form class="row g-3 mb-3" method="get">
@@ -35,7 +35,7 @@ if($status){
 <tr><th data-i18n="tasks.table_title">Title</th><th data-i18n="tasks.table_start">Start</th><th data-i18n="tasks.table_status">Status</th><th data-i18n="tasks.table_actions">Actions</th></tr>
 <?php foreach($tasks as $t): ?>
 <tr>
-  <td><?= htmlspecialchars($t['title']); ?></td>
+  <td class="bold-target"><?= htmlspecialchars($t['title']); ?></td>
   <td><?= htmlspecialchars($t['start_date']); ?></td>
   <td data-i18n="tasks.status.<?= htmlspecialchars($t['status']); ?>"><?= htmlspecialchars($t['status']); ?></td>
   <td>
@@ -58,7 +58,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   document.getElementById('boldToggle').addEventListener('change', function(){
-    document.body.classList.toggle('fw-bold', this.checked);
+    document.querySelectorAll('.bold-target').forEach(el => {
+      el.classList.toggle('fw-bold', this.checked);
+    });
   });
 });
 </script>

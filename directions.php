@@ -4,7 +4,7 @@ if($_SESSION['role']==='member'){
     $stmt->execute([$_SESSION['member_id']]);
     $directions = $stmt->fetchAll();
 ?>
-<h2 data-i18n="directions.title">Research Directions</h2>
+<h2 class="bold-target" data-i18n="directions.title">Research Directions</h2>
 <ul>
 <?php foreach($directions as $d): ?>
   <li><?= htmlspecialchars($d['title']); ?></li>
@@ -21,7 +21,7 @@ $stmt = $pdo->query("SELECT d.*, GROUP_CONCAT(CONCAT(m.name, '(', COALESCE(m.deg
 $directions = $stmt->fetchAll();
 ?>
 <div class="d-flex justify-content-between mb-3">
-  <h2 data-i18n="directions.title">Research Directions</h2>
+  <h2 class="bold-target" data-i18n="directions.title">Research Directions</h2>
   <div>
     <a class="btn btn-success" href="direction_edit.php" data-i18n="directions.add">Add Direction</a>
   </div>
@@ -47,12 +47,20 @@ $directions = $stmt->fetchAll();
   <?php foreach($directions as $d): ?>
   <tr data-id="<?= $d['id']; ?>"<?= $d['bg_color'] ? ' style="background-color:'.htmlspecialchars($d['bg_color']).';"' : ''; ?>>
     <td class="drag-handle">&#9776;</td>
-    <td><?= htmlspecialchars($d['title']); ?></td>
+    <td class="bold-target"><?= htmlspecialchars($d['title']); ?></td>
     <td>
       <?php
       if ($d['member_names']) {
-          $escaped = htmlspecialchars($d['member_names']);
-          echo preg_replace('/\(([^()]*)\)/', '<span class="member-detail text-muted">($1)</span>', $escaped);
+          $members = explode(', ', $d['member_names']);
+          foreach ($members as $idx => $mem) {
+              if (preg_match('/^([^()]+)(?:\(([^()]*)\))?$/', $mem, $m)) {
+                  echo '<span class="member-name bold-target">' . htmlspecialchars($m[1]) . '</span>';
+                  if (!empty($m[2])) {
+                      echo '<span class="member-detail text-muted">(' . htmlspecialchars($m[2]) . ')</span>';
+                  }
+                  if ($idx < count($members) - 1) echo ', ';
+              }
+          }
       } else {
           echo '<em data-i18n="directions.none">None</em>';
       }
@@ -67,15 +75,15 @@ $directions = $stmt->fetchAll();
   <?php endforeach; ?>
   </tbody>
 </table>
-<h3 class="mt-4" data-i18n="directions.assignment_title">Research Direction Assignments</h3>
+<h3 class="mt-4 bold-target" data-i18n="directions.assignment_title">Research Direction Assignments</h3>
 <table class="table table-bordered">
   <tr><th data-i18n="directions.assignment_member">Member</th><th data-i18n="directions.assignment_direction">Research Directions</th></tr>
   <?php
   $memberDirs = $pdo->query("SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(d.title ORDER BY dm.sort_order SEPARATOR ', ') AS dirs FROM members m LEFT JOIN direction_members dm ON m.id=dm.member_id LEFT JOIN research_directions d ON dm.direction_id=d.id WHERE m.status != 'exited' GROUP BY m.id ORDER BY m.sort_order")->fetchAll();
   foreach($memberDirs as $md): ?>
   <tr>
-    <td><?= htmlspecialchars($md["name"]); ?><span class="member-detail text-muted">(<?= htmlspecialchars($md["degree_pursuing"]); ?>,<?= htmlspecialchars($md["year_of_join"]); ?>)</span></td>
-    <td><?= $md['dirs'] ? htmlspecialchars($md['dirs']) : '<span style="color:red"><em data-i18n="directions.none">None</em></span>'; ?></td>
+    <td><span class="member-name bold-target"><?= htmlspecialchars($md["name"]); ?></span><span class="member-detail text-muted">(<?= htmlspecialchars($md["degree_pursuing"]); ?>,<?= htmlspecialchars($md["year_of_join"]); ?>)</span></td>
+    <td class="bold-target"><?= $md['dirs'] ? htmlspecialchars($md['dirs']) : '<span style="color:red"><em data-i18n="directions.none">None</em></span>'; ?></td>
   </tr>
   <?php endforeach; ?>
 </table>
@@ -102,7 +110,9 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 
   document.getElementById('boldToggle').addEventListener('change', function(){
-    document.body.classList.toggle('fw-bold', this.checked);
+    document.querySelectorAll('.bold-target').forEach(el => {
+      el.classList.toggle('fw-bold', this.checked);
+    });
   });
 });
 </script>

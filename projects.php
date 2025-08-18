@@ -4,7 +4,7 @@ if($_SESSION['role']==='member'){
     $stmt->execute([$_SESSION['member_id']]);
     $projects = $stmt->fetchAll();
 ?>
-<h2 data-i18n="projects.title">Projects</h2>
+<h2 class="bold-target" data-i18n="projects.title">Projects</h2>
 <table class="table table-bordered">
   <tr><th data-i18n="projects.table_title">Title</th><th data-i18n="projects.table_begin">Begin</th><th data-i18n="projects.table_end">End</th><th data-i18n="projects.table_status">Status</th></tr>
   <?php foreach($projects as $p): ?>
@@ -32,7 +32,7 @@ if($status){
 }
 ?>
 <div class="d-flex justify-content-between mb-3">
-  <h2 data-i18n="projects.title">Projects</h2>
+  <h2 class="bold-target" data-i18n="projects.title">Projects</h2>
   <div>
     <a class="btn btn-success" href="project_edit.php" data-i18n="projects.add">Add Project</a>
   </div>
@@ -85,11 +85,11 @@ if($status){
   ?>
   <tr data-id="<?= $p['id']; ?>"<?= $p['bg_color'] ? ' style="background-color:'.htmlspecialchars($p['bg_color']).';"' : ''; ?>>
     <td class="drag-handle">&#9776;</td>
-    <td><?= htmlspecialchars($p['title']); ?></td>
+    <td class="bold-target"><?= htmlspecialchars($p['title']); ?></td>
     <td>
       <?php if($memberList): ?>
         <?php foreach($memberList as $idx=>$m): ?>
-          <span class="member-name" data-bs-toggle="tooltip" title="<?= htmlspecialchars($memberDirections[$m['id']] ?? '') ?>"<?php if(empty($memberDirections[$m['id']])) echo ' data-i18n-title="projects.no_direction"'; ?>>
+          <span class="member-name bold-target" data-bs-toggle="tooltip" title="<?= htmlspecialchars($memberDirections[$m['id']] ?? '') ?>"<?php if(empty($memberDirections[$m['id']])) echo ' data-i18n-title="projects.no_direction"'; ?>>
             <?= htmlspecialchars($m['name']); ?>
             <span class="member-detail text-muted">(<?= htmlspecialchars($m['degree']); ?>,<?= htmlspecialchars($m['year']); ?>)</span>
           </span><?= $idx < count($memberList)-1 ? ', ' : ''; ?>
@@ -110,15 +110,15 @@ if($status){
   <?php endforeach; ?>
   </tbody>
 </table>
-<h3 class="mt-4" data-i18n="projects.participation_title">项目参与人员情况</h3>
+<h3 class="mt-4 bold-target" data-i18n="projects.participation_title">项目参与人员情况</h3>
 <table class="table table-bordered">
   <tr><th data-i18n="projects.participation.member">成员</th><th data-i18n="projects.participation.projects">参与项目</th></tr>
   <?php
   $memberProjects = $pdo->query("SELECT m.name, m.degree_pursuing, m.year_of_join, GROUP_CONCAT(p.title ORDER BY l.sort_order SEPARATOR ', ') AS proj FROM members m LEFT JOIN project_member_log l ON m.id=l.member_id AND l.exit_time IS NULL LEFT JOIN projects p ON l.project_id=p.id WHERE m.status != 'exited' GROUP BY m.id ORDER BY m.sort_order")->fetchAll();
   foreach($memberProjects as $mp): ?>
   <tr>
-    <td><?= htmlspecialchars($mp["name"]); ?><span class="member-detail text-muted">(<?= htmlspecialchars($mp["degree_pursuing"]); ?>,<?= htmlspecialchars($mp["year_of_join"]); ?>)</span></td>
-    <td><?= $mp['proj'] ? htmlspecialchars($mp['proj']) : '<span style="color:red"><em data-i18n="directions.none">None</em></span>'; ?></td>
+    <td><span class="member-name bold-target"><?= htmlspecialchars($mp["name"]); ?></span><span class="member-detail text-muted">(<?= htmlspecialchars($mp["degree_pursuing"]); ?>,<?= htmlspecialchars($mp["year_of_join"]); ?>)</span></td>
+    <td class="bold-target"><?= $mp['proj'] ? htmlspecialchars($mp['proj']) : '<span style="color:red"><em data-i18n="directions.none">None</em></span>'; ?></td>
   </tr>
   <?php endforeach; ?>
 </table>
@@ -145,7 +145,9 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 
   document.getElementById('boldToggle').addEventListener('change', function(){
-    document.body.classList.toggle('fw-bold', this.checked);
+    document.querySelectorAll('.bold-target').forEach(el => {
+      el.classList.toggle('fw-bold', this.checked);
+    });
   });
 
   const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
