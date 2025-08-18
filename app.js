@@ -561,7 +561,15 @@ function initApp() {
     const prevIndex = parseInt(sessionStorage.getItem('navActiveIndex'), 10);
 
     if(!isNaN(prevIndex) && links[prevIndex]){
-      moveIndicator(links[prevIndex]);
+      // Place indicator at the previous location without animation so it
+      // doesn't slide in from the left-most position on initial load.
+      const prev = links[prevIndex];
+      indicator.style.transition = 'none';
+      moveIndicator(prev);
+      // Force reflow to ensure the styles above are applied before restoring
+      // the transition for the animated move to the current page.
+      indicator.offsetWidth; // eslint-disable-line no-unused-expressions
+      indicator.style.transition = '';
       requestAnimationFrame(()=>moveIndicator(active || links[0]));
     } else {
       moveIndicator(active || links[0]);
