@@ -567,10 +567,13 @@ function initApp() {
       moveIndicator(active || links[0]);
     }
 
+    // Remember the currently active navigation index so the indicator can
+    // animate from the previous page's position on the next load. We store
+    // the index of the page being left rather than the destination page.
     sessionStorage.setItem('navActiveIndex', activeIdx);
-    links.forEach((link, idx)=>{
-      link.addEventListener('click', ()=>{
-        sessionStorage.setItem('navActiveIndex', idx);
+    links.forEach(link => {
+      link.addEventListener('click', () => {
+        sessionStorage.setItem('navActiveIndex', activeIdx);
       });
     });
   }
