@@ -12,6 +12,7 @@ A simple responsive website for managing research team members, projects, small 
 - Manage Research Directions assigned to each member
 - Manage tasks and their regular affairs
 - Generate workload reports for each member within a time range (exportable to CSV)
+- Animated navigation bar with sliding highlight
 
 ## Requirements
 - PHP 8+
@@ -19,15 +20,38 @@ A simple responsive website for managing research team members, projects, small 
 - Apache with PHP support (LAMP stack)
 
 ## Installation
-1. Prepare LAMP stack on your Linux server.
-2. Clone or download this repository to your web root.
-3. Import the database schema and sample data:
+### Preparing the LAMP stack (Ubuntu example)
+1. Update package index:
+   ```bash
+   sudo apt update
+   ```
+2. Install Apache:
+   ```bash
+   sudo apt install apache2
+   ```
+3. Install MySQL Server:
+   ```bash
+   sudo apt install mysql-server
+   sudo mysql_secure_installation
+   ```
+4. Install PHP and required extensions:
+   ```bash
+   sudo apt install php libapache2-mod-php php-mysql
+   ```
+5. Restart Apache so PHP is enabled:
+   ```bash
+   sudo systemctl restart apache2
+   ```
+
+### Deploying the application
+1. Clone or download this repository to your web root.
+2. Import the database schema and sample data:
    ```bash
    mysql -u root -p < database.sql
    ```
    (Change `root` to your DB user.)
-4. Edit `config.php` if your database credentials differ.
-5. Access the site via `http://your-server/login.php` and log in using one of the predefined accounts:
+3. Edit `config.php` if your database credentials differ.
+4. Access the site via `http://your-server/login.php` and log in using one of the predefined accounts:
    - Username: `manager1`, Password: `password`
    - Username: `manager2`, Password: `password`
 

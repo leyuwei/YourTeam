@@ -557,13 +557,17 @@ function initApp() {
       indicator.style.transform = `translateX(${rect.left - navRect.left}px)`;
     }
     const active = nav.querySelector('.nav-link.active');
+    const activeIdx = links.indexOf(active || links[0]);
     const prevIndex = parseInt(sessionStorage.getItem('navActiveIndex'), 10);
+
     if(!isNaN(prevIndex) && links[prevIndex]){
       moveIndicator(links[prevIndex]);
       requestAnimationFrame(()=>moveIndicator(active || links[0]));
     } else {
       moveIndicator(active || links[0]);
     }
+
+    sessionStorage.setItem('navActiveIndex', activeIdx);
     links.forEach((link, idx)=>{
       link.addEventListener('click', ()=>{
         sessionStorage.setItem('navActiveIndex', idx);
