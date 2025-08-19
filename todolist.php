@@ -188,13 +188,14 @@ function printTodoList(){
             'h1{text-align:center;margin:0 0 4mm 0;font-size:'+(fontSize+4)+'pt;}' +
             'h3{margin:2mm 0;font-size:'+(fontSize+2)+'pt;}' +
             'h4{margin:1mm 0;font-size:'+(fontSize+1)+'pt;}' +
-            'ul{list-style:none;padding-left:0;margin:0 0 2mm 0;}' +
-            'li{margin:0;padding:1mm 2mm;}' +
-            'ul.work{background:#e6f0ff;padding:1mm;border-radius:3px;}' +
-            'ul.personal{background:#e6ffe6;padding:1mm;border-radius:3px;}' +
-            'ul.longterm{background:#fff7e6;padding:1mm;border-radius:3px;}' +
-            'label{display:flex;align-items:flex-start;gap:2mm;}' +
-            'input[type=checkbox]{margin-top:0.2mm;}' +
+            'h3.work,h3.personal,h3.longterm{display:inline-block;padding:1mm;border-radius:3px;}' +
+            'h3.work{background:#e6f0ff;}' +
+            'h3.personal{background:#e6ffe6;}' +
+            'h3.longterm{background:#fff7e6;}' +
+            'ul{list-style:none;padding-left:0;margin:0 0 1mm 0;}' +
+            'li{margin:0;padding:0 1mm;}' +
+            'label{display:flex;align-items:flex-start;gap:1mm;}' +
+            'input[type=checkbox]{margin-top:0;}' +
             '</style></head><body>';
   html+='<h1>待办事项 <small>'+weekStart+' - '+weekEnd+'</small></h1>';
   const categories=['work','personal','longterm'];
@@ -202,7 +203,7 @@ function printTodoList(){
     const lists=document.querySelectorAll(`.todolist[data-category='${cat}']`);
     if(Array.from(lists).every(l=>!l.children.length)) return;
     const catKey='todolist.category.'+cat;
-    html+='<h3>'+(translations[lang][catKey]||'')+'</h3>';
+    html+='<h3 class="'+cat+'">'+(translations[lang][catKey]||'')+'</h3>';
     lists.forEach(list=>{
       if(!list.children.length) return;
       const day=list.dataset.day;
