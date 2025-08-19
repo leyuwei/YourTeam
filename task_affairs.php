@@ -1,53 +1,68 @@
 <?php
-include 'auth_manager.php';
+include 'auth.php';
 include 'header.php';
+
 $task_id = $_GET['id'] ?? null;
 if(!$task_id){
     header('Location: tasks.php');
     exit();
 }
+
 $task = $pdo->prepare('SELECT * FROM tasks WHERE id=?');
 $task->execute([$task_id]);
 $task = $task->fetch();
+
 $affairs_stmt = $pdo->prepare('SELECT a.*, GROUP_CONCAT(CONCAT(m.name, " (", m.campus_id, ")") SEPARATOR ", ") AS members, GROUP_CONCAT(m.id) AS member_ids FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
 $affairs_stmt->execute([$task_id]);
 $affairs = $affairs_stmt->fetchAll();
-$members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
+
+$is_manager = ($_SESSION['role'] === 'manager');
+if($is_manager){
+    $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
+}
 ?>
 <h2><span data-i18n="task_affairs.title_prefix">Task Affairs - </span><?php echo htmlspecialchars($task['title']); ?></h2>
+<?php if($is_manager): ?>
 <form method="post" action="affair_merge.php" id="mergeForm">
 <input type="hidden" name="task_id" value="<?= $task_id; ?>">
 <div class="mb-2">
   <button type="submit" class="btn btn-warning btn-sm" id="mergeBtn" disabled data-i18n="task_affairs.merge_selected">Merge Selected</button>
 </div>
+<?php endif; ?>
 <table class="table table-bordered">
 <tr>
-  <th><input type="checkbox" id="selectAll"></th>
+  <?php if($is_manager): ?><th><input type="checkbox" id="selectAll"></th><?php endif; ?>
   <th data-i18n="task_affairs.table_description">Description</th>
   <th data-i18n="task_affairs.table_members">Members</th>
   <th data-i18n="task_affairs.table_start">Start Date</th>
   <th data-i18n="task_affairs.table_end">End Date</th>
   <th data-i18n="task_affairs.table_days">Days</th>
-  <th data-i18n="task_affairs.table_actions">Actions</th>
+  <?php if($is_manager): ?><th data-i18n="task_affairs.table_actions">Actions</th><?php endif; ?>
 </tr>
 <?php foreach($affairs as $a): ?>
 <?php $days = (strtotime($a['end_time']) - strtotime($a['start_time']))/86400; ?>
 <tr>
-  <td><input type="checkbox" name="affair_ids[]" value="<?= $a['id']; ?>" class="affair-checkbox"></td>
+  <?php if($is_manager): ?><td><input type="checkbox" name="affair_ids[]" value="<?= $a['id']; ?>" class="affair-checkbox"></td><?php endif; ?>
   <td><?= htmlspecialchars($a['description']); ?></td>
   <td><?= htmlspecialchars($a['members']); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['start_time']))); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['end_time'] . ' -1 day'))); ?></td>
   <td><?= htmlspecialchars($days); ?></td>
+  <?php if($is_manager): ?>
   <td>
     <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#editModal<?= $a['id']; ?>" data-i18n="task_affairs.action_edit">Edit</button>
     <a class="btn btn-sm btn-danger delete-affair" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" data-i18n="task_affairs.action_delete">Delete</a>
   </td>
+  <?php endif; ?>
 </tr>
 <?php endforeach; ?>
 </table>
+<?php if($is_manager): ?>
 </form>
-
+<?php else: ?>
+<a class="btn btn-primary" href="task_member_fill.php?task_id=<?= $task_id; ?>" data-i18n="tasks.action_fill">Self Fill</a>
+<?php endif; ?>
+<?php if($is_manager): ?>
 <?php foreach($affairs as $a): $selected = $a['member_ids'] ? explode(',', $a['member_ids']) : []; ?>
 <div class="modal fade" id="editModal<?= $a['id']; ?>" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
@@ -163,34 +178,16 @@ document.querySelectorAll('.edit-affair-form').forEach(function(form){
   });
 });
 
-document.querySelectorAll('.delete-affair').forEach(link => {
-  link.addEventListener('click', e => {
-    const msg = translations[getLang()]['task_affairs.confirm.delete'];
-    if(!doubleConfirm(msg)) e.preventDefault();
-  });
+document.getElementById('selectAll').addEventListener('change', function(){
+  document.querySelectorAll('.affair-checkbox').forEach(cb => cb.checked = this.checked);
+  document.getElementById('mergeBtn').disabled = !this.checked;
 });
-
-const checkboxes = document.querySelectorAll('.affair-checkbox');
-const mergeBtn = document.getElementById('mergeBtn');
-const selectAll = document.getElementById('selectAll');
-function updateMergeBtn(){
-  const checked = document.querySelectorAll('.affair-checkbox:checked').length;
-  mergeBtn.disabled = checked < 2;
-}
-checkboxes.forEach(cb => cb.addEventListener('change', updateMergeBtn));
-if(selectAll){
-  selectAll.addEventListener('change', () => {
-    checkboxes.forEach(cb => cb.checked = selectAll.checked);
-    updateMergeBtn();
+document.querySelectorAll('.affair-checkbox').forEach(cb => {
+  cb.addEventListener('change', () => {
+    const anyChecked = Array.from(document.querySelectorAll('.affair-checkbox')).some(c=>c.checked);
+    document.getElementById('mergeBtn').disabled = !anyChecked;
   });
-}
-document.getElementById('mergeForm').addEventListener('submit', e => {
-  if(document.querySelectorAll('.affair-checkbox:checked').length < 2){
-    e.preventDefault();
-  } else {
-    const msg = translations[getLang()]['task_affairs.confirm.merge'];
-    if(!doubleConfirm(msg)) e.preventDefault();
-  }
 });
 </script>
+<?php endif; ?>
 <?php include 'footer.php'; ?>
