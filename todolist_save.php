@@ -37,5 +37,12 @@ if($action === 'update'){
     $stmt = $pdo->prepare('INSERT INTO todolist_items (user_id,user_role,week_start,category,day,content,is_done,sort_order) SELECT user_id,user_role,?,category,day,content,0,sort_order FROM todolist_items WHERE user_id=? AND user_role=? AND week_start=? AND is_done=0');
     $stmt->execute([$next_week_start,$user_id,$role,$week_start]);
     echo json_encode(['status'=>'ok']);
+} elseif($action === 'copy_item_next'){
+    $id = $data['id'];
+    $week_start = $data['week_start'];
+    $next_week_start = date('Y-m-d', strtotime($week_start.' +7 days'));
+    $stmt = $pdo->prepare('INSERT INTO todolist_items (user_id,user_role,week_start,category,day,content,is_done,sort_order) SELECT user_id,user_role,?,category,day,content,0,sort_order FROM todolist_items WHERE id=? AND user_id=? AND user_role=?');
+    $stmt->execute([$next_week_start,$id,$user_id,$role]);
+    echo json_encode(['status'=>'ok']);
 }
 ?>
