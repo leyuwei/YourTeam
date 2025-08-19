@@ -178,14 +178,24 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 function printTodoList(){
   const lang=document.documentElement.lang||'en';
+  const totalItems=document.querySelectorAll('.todolist li').length;
+  const fontSize=Math.max(8,14-totalItems*0.2); // shrink font when there are many items
+  const weekStart='<?= date('Y.m.d', strtotime($week_start)); ?>';
+  const weekEnd='<?= date('Y.m.d', strtotime($week_end)); ?>';
   let html='<html><head><title>'+document.title+'</title><style>'+
-            'body{font-family:sans-serif;padding:10mm;background:#f9f9f9;}' +
-            'h3{margin-top:10mm;}' +
-            'ul{list-style:none;padding-left:0;}' +
-            'li{margin:4px 0;padding:4px;border-radius:4px;background:#fff;}' +
-            'li.done{text-decoration:line-through;color:#888;background:#e9ecef;}' +
+            '@page{size:A4;margin:10mm;}' +
+            'body{font-family:sans-serif;margin:0;padding:0 5mm;background:#fff;font-size:'+fontSize+'pt;}' +
+            'h1{text-align:center;margin:0 0 4mm 0;font-size:'+(fontSize+4)+'pt;}' +
+            'h3{margin:2mm 0;font-size:'+(fontSize+2)+'pt;}' +
+            'ul{list-style:none;padding-left:0;margin:0;}' +
+            'li{margin:1mm 0;padding:1mm 2mm;border-radius:3px;}' +
+            'li.work{background:#e6f0ff;}' +
+            'li.personal{background:#e6ffe6;}' +
+            'li.longterm{background:#fff7e6;}' +
+            'label{display:flex;align-items:flex-start;gap:2mm;}' +
+            'input[type=checkbox]{margin-top:0.2mm;}' +
             '</style></head><body>';
-  html+="<h1>待办事项</h1>";
+  html+='<h1>待办事项 <small>'+weekStart+' - '+weekEnd+'</small></h1>';
   document.querySelectorAll('.todolist').forEach(list=>{
     if(!list.children.length) return;
     const catKey='todolist.category.'+list.dataset.category;
@@ -196,7 +206,8 @@ function printTodoList(){
     list.querySelectorAll('li').forEach(li=>{
       const content=li.querySelector('.item-content').value;
       const done=li.querySelector('.item-done').checked;
-      html+='<li class="'+(done?'done':'')+'">'+content+'</li>';
+      const catClass=list.dataset.category;
+      html+='<li class="'+catClass+'"><label><input type="checkbox"'+(done?' checked':'')+' disabled><span>'+content+'</span></label></li>';
     });
     html+='</ul>';
   });
