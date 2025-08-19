@@ -570,7 +570,10 @@ function initApp() {
       }
       const copyBtn = document.getElementById('qrCopyBtn');
       if (copyBtn) {
-        copyBtn.onclick = () => copyText(fullUrl);
+        copyBtn.addEventListener('click', e => {
+          e.preventDefault();
+          copyText(fullUrl);
+        });
       }
       const modal = new bootstrap.Modal(document.getElementById('qrModal'));
       modal.show();
