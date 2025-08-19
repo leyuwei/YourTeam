@@ -1,6 +1,7 @@
 <?php
-include 'auth_manager.php';
+include 'auth.php';
 include 'header.php';
+$is_manager = ($_SESSION['role'] === 'manager');
 $status = $_GET['status'] ?? '';
 if($status){
     $stmt = $pdo->prepare('SELECT * FROM tasks WHERE status=? ORDER BY id DESC');
@@ -12,7 +13,9 @@ if($status){
 ?>
 <div class="d-flex justify-content-between mb-3">
   <h2 class="bold-target" data-i18n="tasks.title">Tasks Assignment</h2>
+  <?php if($is_manager): ?>
   <a class="btn btn-success" href="task_edit.php" data-i18n="tasks.add">New Task</a>
+  <?php endif; ?>
 </div>
 <form class="row g-3 mb-3" method="get">
   <div class="col-auto">
@@ -39,10 +42,14 @@ if($status){
   <td><?= htmlspecialchars($t['start_date']); ?></td>
   <td data-i18n="tasks.status.<?= htmlspecialchars($t['status']); ?>"><?= htmlspecialchars($t['status']); ?></td>
   <td>
+    <?php if($is_manager): ?>
     <a class="btn btn-sm btn-primary" href="task_edit.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_edit">Edit</a>
+    <?php endif; ?>
     <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_affairs">Affairs</a>
     <button type="button" class="btn btn-sm btn-info qr-btn" data-url="task_member_fill.php?task_id=<?= $t['id']; ?>" data-i18n="tasks.action_fill">Self Fill</button>
+    <?php if($is_manager): ?>
     <a class="btn btn-sm btn-danger delete-task" href="task_delete.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_delete">Delete</a>
+    <?php endif; ?>
   </td>
 </tr>
 <?php endforeach; ?>

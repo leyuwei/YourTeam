@@ -84,8 +84,8 @@
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'todolist') === 0 ? 'active' : ''); ?>" href="todolist.php" data-i18n="nav.todolist">Todolist</a></li>
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'project') === 0 ? 'active' : ''); ?>" href="projects.php" data-i18n="nav.projects">Projects</a></li>
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'direction') === 0 ? 'active' : ''); ?>" href="directions.php" data-i18n="nav.directions">Research</a></li>
-          <?php if($_SESSION['role']==='manager'): ?>
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'task') === 0 ? 'active' : ''); ?>" href="tasks.php" data-i18n="nav.tasks">Tasks</a></li>
+          <?php if($_SESSION['role']==='manager'): ?>
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'workload.php' ? 'active' : ''); ?>" href="workload.php" data-i18n="nav.workload">Workload</a></li>
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'account.php' ? 'active' : ''); ?>" href="account.php" data-i18n="nav.account">Account</a></li>
           <?php endif; ?>
