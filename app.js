@@ -162,6 +162,10 @@ const translations = {
     'todolist.export': 'Export',
     'todolist.print': 'Print',
     'todolist.copy_next': 'Continue to Next Week',
+    'todolist.copy_item': 'Copy',
+    'todolist.week.current': 'Current Week',
+    'todolist.week.last': 'Last Week',
+    'todolist.week.next': 'Next Week',
     'todolist.category.work': 'Work',
     'todolist.category.personal': 'Personal',
     'todolist.category.longterm': 'Long Term',
@@ -396,6 +400,10 @@ const translations = {
     'todolist.export': '导出',
     'todolist.print': '打印',
     'todolist.copy_next': '复制到下周',
+    'todolist.copy_item': '复制',
+    'todolist.week.current': '本周',
+    'todolist.week.last': '上周',
+    'todolist.week.next': '下周',
     'todolist.category.work': '工作',
     'todolist.category.personal': '私人',
     'todolist.category.longterm': '长期',
@@ -473,6 +481,22 @@ function doubleConfirm(message) {
   return confirm(message) && confirm('Please confirm again to proceed.');
 }
 
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(fallback);
+  }
+  fallback();
+  function fallback() {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try { document.execCommand('copy'); } finally { textarea.remove(); }
+  }
+}
+
 function applyTranslations() {
   const lang = localStorage.getItem('lang') || 'en';
   document.documentElement.lang = lang;
@@ -546,7 +570,7 @@ function initApp() {
       }
       const copyBtn = document.getElementById('qrCopyBtn');
       if (copyBtn) {
-        copyBtn.onclick = () => navigator.clipboard.writeText(fullUrl);
+        copyBtn.onclick = () => copyText(fullUrl);
       }
       const modal = new bootstrap.Modal(document.getElementById('qrModal'));
       modal.show();
