@@ -36,7 +36,9 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
 ?>
 <style>
 .todolist li{flex-wrap:nowrap;}
-.todolist li .item-content{flex:1 1 auto;min-width:0;}
+.todolist li .item-content{flex:1 1 auto;min-width:0;max-width:60%;}
+.todolist li .copy-item,
+.todolist li .next-week-item{flex:0 0 auto;white-space:nowrap;min-width:5.5rem;}
 @media print {
   @page { size: A4; margin: 10mm; }
   body { font-size: 12pt; }
