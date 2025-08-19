@@ -482,10 +482,11 @@ function doubleConfirm(message) {
 }
 
 function copyText(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(text).catch(fallback);
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).catch(fallback);
+  } else {
+    fallback();
   }
-  fallback();
   function fallback() {
     const textarea = document.createElement('textarea');
     textarea.value = text;
@@ -493,7 +494,11 @@ function copyText(text) {
     document.body.appendChild(textarea);
     textarea.focus();
     textarea.select();
-    try { document.execCommand('copy'); } finally { textarea.remove(); }
+    try {
+      document.execCommand('copy');
+    } finally {
+      textarea.remove();
+    }
   }
 }
 
@@ -560,8 +565,8 @@ function initApp() {
   const qrCopyBtn = document.getElementById('qrCopyBtn');
   const qrButtons = document.querySelectorAll('.qr-btn');
   if (qrCopyBtn && qrLinkInput) {
-    qrCopyBtn.addEventListener('click', e => {
-      e.preventDefault();
+    qrCopyBtn.addEventListener('click', () => {
+      qrLinkInput.select();
       copyText(qrLinkInput.value);
     });
   }
