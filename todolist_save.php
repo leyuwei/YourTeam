@@ -12,8 +12,8 @@ if($action === 'update'){
     $day = $data['day'] ?: null;
     $week_start = $data['week_start'];
     if($id){
-        $stmt = $pdo->prepare('UPDATE todolist_items SET content=?, is_done=? WHERE id=? AND user_id=? AND user_role=?');
-        $stmt->execute([$content,$is_done,$id,$user_id,$role]);
+        $stmt = $pdo->prepare('UPDATE todolist_items SET content=?, is_done=?, category=?, day=? WHERE id=? AND user_id=? AND user_role=?');
+        $stmt->execute([$content,$is_done,$category,$day,$id,$user_id,$role]);
         echo json_encode(['id'=>$id]);
     } else {
         $stmt = $pdo->prepare('INSERT INTO todolist_items (user_id,user_role,week_start,category,day,content,is_done,sort_order) VALUES (?,?,?,?,?,?,?,0)');

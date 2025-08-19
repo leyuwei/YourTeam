@@ -556,24 +556,27 @@ function initApp() {
     });
   }
 
-  document.querySelectorAll('.qr-btn').forEach(btn => {
+  const qrLinkInput = document.getElementById('qrLinkInput');
+  const qrCopyBtn = document.getElementById('qrCopyBtn');
+  const qrButtons = document.querySelectorAll('.qr-btn');
+  if (qrCopyBtn && qrLinkInput) {
+    qrCopyBtn.addEventListener('click', e => {
+      e.preventDefault();
+      copyText(qrLinkInput.value);
+    });
+  }
+  qrButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const url = btn.dataset.url;
       const fullUrl = new URL(url, window.location.href).href;
       const img = document.getElementById('qrImage');
       if (img) {
-        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(fullUrl);
+        img.src =
+          'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' +
+          encodeURIComponent(fullUrl);
       }
-      const linkInput = document.getElementById('qrLinkInput');
-      if (linkInput) {
-        linkInput.value = fullUrl;
-      }
-      const copyBtn = document.getElementById('qrCopyBtn');
-      if (copyBtn) {
-        copyBtn.addEventListener('click', e => {
-          e.preventDefault();
-          copyText(fullUrl);
-        });
+      if (qrLinkInput) {
+        qrLinkInput.value = fullUrl;
       }
       const modal = new bootstrap.Modal(document.getElementById('qrModal'));
       modal.show();
