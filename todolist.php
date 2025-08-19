@@ -33,6 +33,8 @@ if($week_param === $current_week_param){
     $week_hint = '<div class="week-hint text-center mb-2 fs-4"><span class="badge bg-secondary" data-i18n="todolist.week.next">下周</span></div>';
 }
 $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>'周五','sat'=>'周六','sun'=>'周日'];
+$is_current_week = ($week_param === $current_week_param);
+$today_key = strtolower(date('D'));
 ?>
 <style>
 .todolist li{flex-wrap:nowrap;}
@@ -40,6 +42,8 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
 .todolist li .copy-item{margin-left:auto;}
 .todolist li .copy-item,
 .todolist li .next-week-item{white-space:nowrap;}
+.today-heading{background:#fff3cd;padding:2px 4px;border-radius:4px;}
+.todolist.today{border-left:4px solid #ffc107;padding-left:4px;background:#fffdf3;}
 @media print {
   @page { size: A4; margin: 10mm; }
   body { font-size: 12pt; }
@@ -63,8 +67,9 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
   <div class="col-md-6">
     <h3><b data-i18n="todolist.category.work">工作</b></h3>
     <?php foreach($days as $k=>$label): ?>
-    <h5><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="work" data-day="<?= $k; ?>">+</button></h5>
-    <ul class="list-group mb-3 todolist" data-category="work" data-day="<?= $k; ?>">
+    <?php $is_today = $is_current_week && $k === $today_key; ?>
+    <h5 class="<?= $is_today ? 'today-heading' : '' ?>"><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="work" data-day="<?= $k; ?>">+</button></h5>
+    <ul class="list-group mb-3 todolist<?= $is_today ? ' today' : '' ?>" data-category="work" data-day="<?= $k; ?>">
       <?php if(!empty($items['work'][$k])): foreach($items['work'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
@@ -80,8 +85,9 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
   <div class="col-md-6">
     <h3><b data-i18n="todolist.category.personal">私人</b></h3>
     <?php foreach($days as $k=>$label): ?>
-    <h5><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="personal" data-day="<?= $k; ?>">+</button></h5>
-    <ul class="list-group mb-3 todolist" data-category="personal" data-day="<?= $k; ?>">
+    <?php $is_today = $is_current_week && $k === $today_key; ?>
+    <h5 class="<?= $is_today ? 'today-heading' : '' ?>"><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="personal" data-day="<?= $k; ?>">+</button></h5>
+    <ul class="list-group mb-3 todolist<?= $is_today ? ' today' : '' ?>" data-category="personal" data-day="<?= $k; ?>">
       <?php if(!empty($items['personal'][$k])): foreach($items['personal'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
@@ -196,30 +202,37 @@ function printTodoList(){
             'li{margin:0;padding:0 1mm;}' +
             'label{display:flex;align-items:flex-start;gap:1mm;}' +
             'input[type=checkbox]{margin-top:0;}' +
+            'div.columns{display:flex;}' +
+            'div.columns>.left,div.columns>.right{width:50%;box-sizing:border-box;}' +
+            'div.columns>.left{padding-right:3mm;}' +
+            'div.columns>.right{padding-left:3mm;}' +
             '</style></head><body>';
   html+='<h1>待办事项 <small>'+weekStart+' - '+weekEnd+'</small></h1>';
-  const categories=['work','personal','longterm'];
-  categories.forEach(cat=>{
+  function renderCategory(cat){
     const lists=document.querySelectorAll(`.todolist[data-category='${cat}']`);
-    if(Array.from(lists).every(l=>!l.children.length)) return;
+    if(Array.from(lists).every(l=>!l.children.length)) return '';
     const catKey='todolist.category.'+cat;
-    html+='<h3 class="'+cat+'">'+(translations[lang][catKey]||'')+'</h3>';
+    let catHtml='<h3 class="'+cat+'">'+(translations[lang][catKey]||'')+'</h3>';
     lists.forEach(list=>{
       if(!list.children.length) return;
       const day=list.dataset.day;
       if(day){
         const dayKey='todolist.days.'+day;
-        html+='<h4>'+(translations[lang][dayKey]||'')+'</h4>';
+        catHtml+='<h4>'+(translations[lang][dayKey]||'')+'</h4>';
       }
-      html+='<ul class="'+cat+'">';
+      catHtml+='<ul class="'+cat+'">';
       list.querySelectorAll('li').forEach(li=>{
         const content=li.querySelector('.item-content').value;
         const done=li.querySelector('.item-done').checked;
-        html+='<li><label><input type="checkbox"'+(done?' checked':'')+' disabled><span>'+content+'</span></label></li>';
+        catHtml+='<li><label><input type="checkbox"'+(done?' checked':'')+' disabled><span>'+content+'</span></label></li>';
       });
-      html+='</ul>';
+      catHtml+='</ul>';
     });
-  });
+    return catHtml;
+  }
+  const leftCol=renderCategory('work');
+  const rightCol=renderCategory('personal')+renderCategory('longterm');
+  html+='<div class="columns"><div class="left">'+leftCol+'</div><div class="right">'+rightCol+'</div></div>';
   html+='</body></html>';
   const w=window.open('','_blank');
   w.document.write(html);
