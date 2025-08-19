@@ -60,7 +60,7 @@ $today_key = strtolower(date('D'));
 <form method="get" class="mb-3 d-flex flex-wrap align-items-center gap-2">
   <input type="week" name="week" class="form-control form-control-lg w-auto" value="<?= htmlspecialchars($week_param); ?>">
   <a class="btn btn-success" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
-  <button type="button" class="btn btn-secondary" id="copyNextWeek" data-i18n="todolist.copy_next">复制到下周</button>
+  <button type="button" class="btn btn-secondary" id="copyNextWeek" data-i18n="todolist.copy_next">下周继续</button>
   <button type="button" class="btn btn-outline-primary" onclick="printTodoList()" data-i18n="todolist.print">打印</button>
 </form>
 <div class="row">
@@ -75,7 +75,7 @@ $today_key = strtolower(date('D'));
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
-        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>
+        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">下周继续</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
@@ -185,27 +185,27 @@ window.addEventListener('DOMContentLoaded',()=>{
 function printTodoList(){
   const lang=document.documentElement.lang||'en';
   const totalItems=document.querySelectorAll('.todolist li').length;
-  const fontSize=Math.max(8,14-totalItems*0.2); // shrink font when there are many items
+  const fontSize=Math.max(8,14-totalItems*0.1); // shrink font when there are many items
   const weekStart='<?= date('Y.m.d', strtotime($week_start)); ?>';
   const weekEnd='<?= date('Y.m.d', strtotime($week_end)); ?>';
   let html='<html><head><title>'+document.title+'</title><style>'+
             '@page{size:A4;margin:10mm;}' +
             'body{font-family:sans-serif;margin:0;padding:0 5mm;background:#fff;font-size:'+fontSize+'pt;}' +
-            'h1{text-align:center;margin:0 0 4mm 0;font-size:'+(fontSize+4)+'pt;}' +
-            'h3{margin:2mm 0;font-size:'+(fontSize+2)+'pt;}' +
-            'h4{margin:1mm 0;font-size:'+(fontSize+1)+'pt;}' +
-            'h3.work,h3.personal,h3.longterm{display:inline-block;padding:1mm;border-radius:3px;}' +
+            'h1{text-align:center;margin:0 0 4mm 0;font-size:'+(fontSize+6)+'pt;}' +
+            'h3{margin:2mm 0;font-size:'+(fontSize+3)+'pt;}' +
+            'h4{margin:1mm 0;font-size:'+(fontSize+2)+'pt;}' +
+            'h3.work,h3.personal,h3.longterm{display:inline-block;padding:2mm;border-radius:3px;}' +
             'h3.work{background:#e6f0ff;}' +
             'h3.personal{background:#e6ffe6;}' +
             'h3.longterm{background:#fff7e6;}' +
-            'ul{list-style:none;padding-left:0;margin:0 0 1mm 0;}' +
-            'li{margin:0;padding:0 1mm;}' +
-            'label{display:flex;align-items:flex-start;gap:1mm;}' +
+            'ul{list-style:none;padding-left:0;margin:0 0 2mm 0;}' +
+            'li{margin:0;padding:0.2mm 1mm;font-size:'+(fontSize+1.5)+'pt;}' +
+            'label{display:flex;align-items:center;gap:2mm;font-size:'+(fontSize+1.5)+'pt;}' +
             'input[type=checkbox]{margin-top:0;}' +
             'div.columns{display:flex;}' +
             'div.columns>.left,div.columns>.right{width:50%;box-sizing:border-box;}' +
-            'div.columns>.left{padding-right:3mm;}' +
-            'div.columns>.right{padding-left:3mm;}' +
+            'div.columns>.left{padding-right:1mm;}' +
+            'div.columns>.right{padding-left:1mm;}' +
             '</style></head><body>';
   html+='<h1>待办事项 <small>'+weekStart+' - '+weekEnd+'</small></h1>';
   function renderCategory(cat){
