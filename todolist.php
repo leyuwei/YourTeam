@@ -36,9 +36,10 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
 ?>
 <style>
 .todolist li{flex-wrap:nowrap;}
-.todolist li .item-content{flex:1 1 auto;min-width:0;max-width:60%;}
+.todolist li .item-content{flex:1 1 auto;min-width:0;margin-right:0.5rem;}
+.todolist li .copy-item{margin-left:auto;}
 .todolist li .copy-item,
-.todolist li .next-week-item{flex:0 0 auto;white-space:nowrap;min-width:5.5rem;}
+.todolist li .next-week-item{white-space:nowrap;}
 @media print {
   @page { size: A4; margin: 10mm; }
   body { font-size: 12pt; }
@@ -67,8 +68,8 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
       <?php if(!empty($items['work'][$k])): foreach($items['work'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
-        <input type="text" class="form-control item-content flex-grow-1" value="<?= htmlspecialchars($it['content']); ?>">
-        <button class="btn btn-sm btn-outline-secondary ms-2 copy-item" data-i18n="todolist.copy_item">复制</button>
+        <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
+        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
         <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
@@ -84,8 +85,8 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
       <?php if(!empty($items['personal'][$k])): foreach($items['personal'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
-        <input type="text" class="form-control item-content flex-grow-1" value="<?= htmlspecialchars($it['content']); ?>">
-        <button class="btn btn-sm btn-outline-secondary ms-2 copy-item" data-i18n="todolist.copy_item">复制</button>
+        <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
+        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
         <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
@@ -97,8 +98,8 @@ $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>
       <?php if(!empty($items['longterm'][''])): foreach($items['longterm'][''] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
-        <input type="text" class="form-control item-content flex-grow-1" value="<?= htmlspecialchars($it['content']); ?>">
-        <button class="btn btn-sm btn-outline-secondary ms-2 copy-item" data-i18n="todolist.copy_item">复制</button>
+        <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
+        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
         <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
@@ -161,7 +162,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       const list=document.querySelector(`.todolist[data-category='${btn.dataset.category}'][data-day='${btn.dataset.day}']`);
       const li=document.createElement('li');
       li.className='list-group-item d-flex align-items-center flex-nowrap';
-      li.innerHTML=`<input type="checkbox" class="form-check-input me-2 item-done"><input type="text" class="form-control item-content flex-grow-1"><button class="btn btn-sm btn-outline-secondary ms-2 copy-item" data-i18n="todolist.copy_item">复制</button><button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button><button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>`;
+      li.innerHTML=`<input type="checkbox" class="form-check-input me-2 item-done"><input type="text" class="form-control item-content flex-grow-1 me-2"><button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button><button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button><button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>`;
       list.appendChild(li);
       applyTranslations();
       attach(li);
