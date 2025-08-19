@@ -187,29 +187,37 @@ function printTodoList(){
             'body{font-family:sans-serif;margin:0;padding:0 5mm;background:#fff;font-size:'+fontSize+'pt;}' +
             'h1{text-align:center;margin:0 0 4mm 0;font-size:'+(fontSize+4)+'pt;}' +
             'h3{margin:2mm 0;font-size:'+(fontSize+2)+'pt;}' +
-            'ul{list-style:none;padding-left:0;margin:0;}' +
-            'li{margin:1mm 0;padding:1mm 2mm;border-radius:3px;}' +
-            'li.work{background:#e6f0ff;}' +
-            'li.personal{background:#e6ffe6;}' +
-            'li.longterm{background:#fff7e6;}' +
+            'h4{margin:1mm 0;font-size:'+(fontSize+1)+'pt;}' +
+            'ul{list-style:none;padding-left:0;margin:0 0 2mm 0;}' +
+            'li{margin:0;padding:1mm 2mm;}' +
+            'ul.work{background:#e6f0ff;padding:1mm;border-radius:3px;}' +
+            'ul.personal{background:#e6ffe6;padding:1mm;border-radius:3px;}' +
+            'ul.longterm{background:#fff7e6;padding:1mm;border-radius:3px;}' +
             'label{display:flex;align-items:flex-start;gap:2mm;}' +
             'input[type=checkbox]{margin-top:0.2mm;}' +
             '</style></head><body>';
   html+='<h1>待办事项 <small>'+weekStart+' - '+weekEnd+'</small></h1>';
-  document.querySelectorAll('.todolist').forEach(list=>{
-    if(!list.children.length) return;
-    const catKey='todolist.category.'+list.dataset.category;
-    const dayKey=list.dataset.day? 'todolist.days.'+list.dataset.day : '';
-    let header=translations[lang][catKey]||'';
-    if(dayKey) header+=' - '+translations[lang][dayKey];
-    html+='<h3>'+header+'</h3><ul>';
-    list.querySelectorAll('li').forEach(li=>{
-      const content=li.querySelector('.item-content').value;
-      const done=li.querySelector('.item-done').checked;
-      const catClass=list.dataset.category;
-      html+='<li class="'+catClass+'"><label><input type="checkbox"'+(done?' checked':'')+' disabled><span>'+content+'</span></label></li>';
+  const categories=['work','personal','longterm'];
+  categories.forEach(cat=>{
+    const lists=document.querySelectorAll(`.todolist[data-category='${cat}']`);
+    if(Array.from(lists).every(l=>!l.children.length)) return;
+    const catKey='todolist.category.'+cat;
+    html+='<h3>'+(translations[lang][catKey]||'')+'</h3>';
+    lists.forEach(list=>{
+      if(!list.children.length) return;
+      const day=list.dataset.day;
+      if(day){
+        const dayKey='todolist.days.'+day;
+        html+='<h4>'+(translations[lang][dayKey]||'')+'</h4>';
+      }
+      html+='<ul class="'+cat+'">';
+      list.querySelectorAll('li').forEach(li=>{
+        const content=li.querySelector('.item-content').value;
+        const done=li.querySelector('.item-done').checked;
+        html+='<li><label><input type="checkbox"'+(done?' checked':'')+' disabled><span>'+content+'</span></label></li>';
+      });
+      html+='</ul>';
     });
-    html+='</ul>';
   });
   html+='</body></html>';
   const w=window.open('','_blank');
