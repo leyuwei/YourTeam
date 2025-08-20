@@ -4,7 +4,7 @@ include 'header.php';
 $is_manager = ($_SESSION['role'] === 'manager');
 $member_id = $_SESSION['member_id'] ?? null;
 
-if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST'){
+if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title'])){
     $id = $_POST['id'] ?? '';
     $title = trim($_POST['title']);
     $incharge = $_POST['in_charge'] ?: null;
@@ -21,7 +21,18 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST'){
 
 $batches = $pdo->query("SELECT b.*, m.name AS in_charge_name, (SELECT COUNT(*) FROM reimbursement_receipts r WHERE r.batch_id=b.id) AS receipt_count FROM reimbursement_batches b LEFT JOIN members m ON b.in_charge_member_id=m.id ORDER BY (b.status='completed'), b.deadline ASC")->fetchAll();
 $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll();
+$announcement = $pdo->query("SELECT content FROM reimbursement_announcement WHERE id=1")->fetchColumn();
 ?>
+<?php if($announcement || $is_manager): ?>
+<div class="alert alert-warning">
+  <?php if($announcement): ?>
+  <?= nl2br($announcement); ?>
+  <?php endif; ?>
+  <?php if($is_manager): ?>
+  <a href="reimbursement_announcement_edit.php" class="btn btn-sm btn-light ms-3">Edit Announcement</a>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="reimburse.title">Reimbursement Batches</h2>
   <div>
