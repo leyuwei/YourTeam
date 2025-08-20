@@ -149,6 +149,7 @@ CREATE TABLE reimbursement_receipts (
 
 CREATE TABLE reimbursement_announcement (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  content TEXT NOT NULL
+  content_en TEXT NOT NULL,
+  content_zh TEXT NOT NULL
 );
-INSERT INTO reimbursement_announcement (id, content) VALUES (1, '');
+INSERT INTO reimbursement_announcement (id, content_en, content_zh) VALUES (1, '', '');
