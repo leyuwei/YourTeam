@@ -51,7 +51,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                 $orig = $rec['original_filename'];
                 $stored = $rec['stored_filename'];
                 if($rec['status']=='refused'){
-                    if(!isset($_FILES['receipt']) || $_FILES['receipt']['error']!==UPLOAD_ERR_OK){
+                    if($is_manager){
+                        $error='manager';
+                    } elseif(!isset($_FILES['receipt']) || $_FILES['receipt']['error']!==UPLOAD_ERR_OK){
                         $error='file';
                     } else {
                         $orig = $_FILES['receipt']['name'];
@@ -87,7 +89,7 @@ include 'header.php';
 ?>
 <h2 data-i18n="reimburse.batch.edit">Edit Receipt</h2>
 <form method="post" enctype="multipart/form-data">
-  <?php if($rec['status']=='refused'): ?>
+  <?php if($rec['status']=='refused' && !$is_manager): ?>
   <div class="mb-3">
     <label class="form-label" data-i18n="reimburse.batch.file">Receipt File</label>
     <input type="file" name="receipt" class="form-control" required>
@@ -122,6 +124,7 @@ include 'header.php';
   <?php if($error=='exceed'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.limit_exceed">Price exceeds limit</div><?php endif; ?>
   <?php if($error=='desc'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.description_required">Description required</div><?php endif; ?>
   <?php if($error=='file'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.file_required">File required</div><?php endif; ?>
+  <?php if($error=='manager'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.manager_no_upload">Managers cannot upload receipts</div><?php endif; ?>
   <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.save">Save</button>
   <?php if($rec['status']=='refused'): ?>
   <a href="reimbursements.php" class="btn btn-secondary" data-i18n="reimburse.batch.cancel">Cancel</a>
