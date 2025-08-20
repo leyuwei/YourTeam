@@ -141,7 +141,7 @@ CREATE TABLE reimbursement_receipts (
   category ENUM('office','electronic','membership','book','trip') NOT NULL,
   description VARCHAR(255) DEFAULT NULL,
   price DECIMAL(10,2) NOT NULL,
-  status ENUM('submitted','locked','complete') DEFAULT 'submitted',
+  status ENUM('submitted','locked','complete','refused') DEFAULT 'submitted',
   uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (batch_id) REFERENCES reimbursement_batches(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
