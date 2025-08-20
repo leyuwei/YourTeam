@@ -19,22 +19,22 @@ $error = '';
 if($_SERVER['REQUEST_METHOD']==='POST'){
     if(isset($_POST['lock']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
         $pdo->prepare("UPDATE reimbursement_batches SET status='locked' WHERE id=?")->execute([$id]);
-        $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=?")->execute([$id]);
+        $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='locked';
         $batch_locked = true;
     } elseif(isset($_POST['complete']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
         $pdo->prepare("UPDATE reimbursement_batches SET status='completed' WHERE id=?")->execute([$id]);
-        $pdo->prepare("UPDATE reimbursement_receipts SET status='complete' WHERE batch_id=?")->execute([$id]);
+        $pdo->prepare("UPDATE reimbursement_receipts SET status='complete' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='completed';
         $batch_locked = true;
     } elseif(isset($_POST['unlock']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
         $pdo->prepare("UPDATE reimbursement_batches SET status='open' WHERE id=?")->execute([$id]);
-        $pdo->prepare("UPDATE reimbursement_receipts SET status='submitted' WHERE batch_id=?")->execute([$id]);
+        $pdo->prepare("UPDATE reimbursement_receipts SET status='submitted' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='open';
         $batch_locked = false;
     } elseif(isset($_POST['reopen']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
         $pdo->prepare("UPDATE reimbursement_batches SET status='locked' WHERE id=?")->execute([$id]);
-        $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=?")->execute([$id]);
+        $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='locked';
         $batch_locked = true;
     } elseif(isset($_FILES['receipt']) && $_FILES['receipt']['error']===UPLOAD_ERR_OK && !$batch_locked && (!$deadline_passed || $is_manager)){
@@ -43,7 +43,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         if($description===''){
             $error = 'desc';
         } else {
-            $totalStmt = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM reimbursement_receipts WHERE batch_id=? AND member_id=?");
+            $totalStmt = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND status<>'refused'");
             $totalStmt->execute([$id,$member_id]);
             $currentTotal = (float)$totalStmt->fetchColumn();
             if(!$is_manager && $batch['price_limit'] !== null && $currentTotal + $price > $batch['price_limit']){
@@ -52,7 +52,14 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                 $category = $_POST['category'];
                 $orig = $_FILES['receipt']['name'];
                 $ext = pathinfo($orig, PATHINFO_EXTENSION);
-                $newname = uniqid().'.'.$ext;
+                $memberInfo = $pdo->prepare("SELECT name,campus_id FROM members WHERE id=?");
+                $memberInfo->execute([$member_id]);
+                $mi = $memberInfo->fetch();
+                $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND status<>'refused'");
+                $countStmt->execute([$id,$member_id]);
+                $index = $countStmt->fetchColumn()+1;
+                $base = $mi['name'].'-'.$mi['campus_id'].'-'.$batch['title'].'-'.$index;
+                $newname = $base.'.'.$ext;
                 $dir = __DIR__.'/reimburse_uploads/'.$id;
                 if(!is_dir($dir)) mkdir($dir,0777,true);
                 move_uploaded_file($_FILES['receipt']['tmp_name'], $dir.'/'.$newname);
@@ -64,16 +71,16 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 }
 
 if($is_manager || $batch['in_charge_member_id']==$member_id){
-    $stmt = $pdo->prepare("SELECT r.*, m.name FROM reimbursement_receipts r JOIN members m ON r.member_id=m.id WHERE r.batch_id=? ORDER BY r.id DESC");
+    $stmt = $pdo->prepare("SELECT r.*, m.name FROM reimbursement_receipts r JOIN members m ON r.member_id=m.id WHERE r.batch_id=? AND r.status<>'refused' ORDER BY r.id DESC");
     $stmt->execute([$id]);
-    $sumMembers = $pdo->prepare("SELECT m.campus_id, m.name, SUM(r.price) AS total FROM reimbursement_receipts r JOIN members m ON r.member_id=m.id WHERE r.batch_id=? GROUP BY r.member_id");
+    $sumMembers = $pdo->prepare("SELECT m.campus_id, m.name, SUM(r.price) AS total FROM reimbursement_receipts r JOIN members m ON r.member_id=m.id WHERE r.batch_id=? AND r.status<>'refused' GROUP BY r.member_id");
     $sumMembers->execute([$id]);
     $member_totals = $sumMembers->fetchAll();
-    $sumCats = $pdo->prepare("SELECT category, SUM(price) AS total FROM reimbursement_receipts WHERE batch_id=? GROUP BY category");
+    $sumCats = $pdo->prepare("SELECT category, SUM(price) AS total FROM reimbursement_receipts WHERE batch_id=? AND status<>'refused' GROUP BY category");
     $sumCats->execute([$id]);
     $category_totals = $sumCats->fetchAll();
 } else {
-    $stmt = $pdo->prepare("SELECT r.*, m.name FROM reimbursement_receipts r JOIN members m ON r.member_id=m.id WHERE r.batch_id=? AND r.member_id=? ORDER BY r.id DESC");
+    $stmt = $pdo->prepare("SELECT r.*, m.name FROM reimbursement_receipts r JOIN members m ON r.member_id=m.id WHERE r.batch_id=? AND r.member_id=? AND r.status<>'refused' ORDER BY r.id DESC");
     $stmt->execute([$id,$member_id]);
 }
 $receipts = $stmt->fetchAll();
@@ -127,6 +134,9 @@ $receipts = $stmt->fetchAll();
   <td><span data-i18n="reimburse.status.<?= $r['status']; ?>"><?= htmlspecialchars($r['status']); ?></span></td>
   <td><?= htmlspecialchars($r['name']); ?></td>
   <td>
+    <?php if($is_manager || $batch['in_charge_member_id']==$member_id): ?>
+    <a class="btn btn-sm btn-warning" href="reimbursement_receipt_refuse.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.refuse" onclick="return doubleConfirm(translations[document.documentElement.lang||'en']['reimburse.batch.confirm_refuse']);">Refuse</a>
+    <?php endif; ?>
     <?php if($is_manager || ($r['member_id']==$member_id && $r['status']=='submitted' && !$batch_locked)): ?>
     <a class="btn btn-sm btn-secondary" href="reimbursement_receipt_edit.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.edit">Edit</a>
     <?php endif; ?>

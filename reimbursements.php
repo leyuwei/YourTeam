@@ -19,14 +19,19 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST'){
     }
 }
 
-$batches = $pdo->query("SELECT b.*, m.name AS in_charge_name, (SELECT COUNT(*) FROM reimbursement_receipts r WHERE r.batch_id=b.id) AS receipt_count FROM reimbursement_batches b LEFT JOIN members m ON b.in_charge_member_id=m.id ORDER BY b.id DESC")->fetchAll();
+$batches = $pdo->query("SELECT b.*, m.name AS in_charge_name, (SELECT COUNT(*) FROM reimbursement_receipts r WHERE r.batch_id=b.id) AS receipt_count FROM reimbursement_batches b LEFT JOIN members m ON b.in_charge_member_id=m.id ORDER BY (b.status='completed'), b.deadline ASC")->fetchAll();
 $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll();
 ?>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="reimburse.title">Reimbursement Batches</h2>
-  <?php if($is_manager): ?>
-  <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#batchModal" data-i18n="reimburse.add_batch">Add Batch</button>
-  <?php endif; ?>
+  <div>
+    <?php if(!$is_manager): ?>
+    <a class="btn btn-secondary me-2" href="refused_receipts.php" data-i18n="reimburse.refused.list">Refused Receipts</a>
+    <?php endif; ?>
+    <?php if($is_manager): ?>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#batchModal" data-i18n="reimburse.add_batch">Add Batch</button>
+    <?php endif; ?>
+  </div>
 </div>
 <table class="table table-bordered">
 <tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.limit">Limit</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
@@ -40,13 +45,13 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
   <?php if(!$is_manager): ?>
   <td>
     <?php
-      $stmt = $pdo->prepare("SELECT * FROM reimbursement_receipts WHERE batch_id=? AND member_id=? ORDER BY id DESC");
+      $stmt = $pdo->prepare("SELECT * FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND status<>'refused' ORDER BY id DESC");
       $stmt->execute([$b['id'],$member_id]);
       $urs = $stmt->fetchAll();
       if($urs){
         echo '<ul class="mb-0">';
         foreach($urs as $r){
-          echo '<li><a href="reimburse_uploads/'.$b['id'].'/'.urlencode($r['stored_filename']).'" target="_blank">'.htmlspecialchars($r['original_filename']).'</a> - '.htmlspecialchars($r['price']).'</li>';
+          echo '<li><a href="reimburse_uploads/'.$b['id'].'/'.urlencode($r['stored_filename']).'" target="_blank">'.htmlspecialchars($r['stored_filename']).'</a><br><small>'.htmlspecialchars($r['description']).' - <span data-i18n="reimburse.category.'.$r['category'].'">'.htmlspecialchars($r['category']).'</span> - '.htmlspecialchars($r['price']).'</small></li>';
         }
         echo '</ul>';
       } else {
