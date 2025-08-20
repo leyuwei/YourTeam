@@ -37,7 +37,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     exit();
 }
 
-$members = $pdo->query('SELECT id,name FROM members ORDER BY name')->fetchAll();
+$members = $pdo->query("SELECT id,name FROM members WHERE status='in_work' ORDER BY name")->fetchAll();
 
 include 'header.php';
 ?>
@@ -57,14 +57,28 @@ include 'header.php';
   </div>
   <div class="mb-3">
     <label class="form-label" data-i18n="notification_edit.label_members">Target Members</label>
-    <?php foreach($members as $m): ?>
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" name="members[]" value="<?= $m['id']; ?>" <?= in_array($m['id'],$selected)?'checked':''; ?>>
-      <label class="form-check-label"><?= htmlspecialchars($m['name']); ?></label>
+    <div class="mb-2">
+      <button type="button" id="select-all" class="btn btn-sm btn-secondary" data-i18n="notification_edit.select_all">Select All</button>
     </div>
+    <div id="member-list" class="row row-cols-1 row-cols-sm-2 row-cols-md-3">
+    <?php foreach($members as $m): ?>
+      <div class="col">
+        <div class="form-check">
+          <input class="form-check-input member-checkbox" type="checkbox" name="members[]" value="<?= $m['id']; ?>" <?= in_array($m['id'],$selected)?'checked':''; ?>>
+          <label class="form-check-label"><?= htmlspecialchars($m['name']); ?></label>
+        </div>
+      </div>
     <?php endforeach; ?>
+    </div>
   </div>
   <button type="submit" class="btn btn-primary" data-i18n="notification_edit.save">Save</button>
   <a href="notifications.php" class="btn btn-secondary" data-i18n="notification_edit.cancel">Cancel</a>
 </form>
+<script>
+document.getElementById('select-all').addEventListener('click', () => {
+  const checkboxes = document.querySelectorAll('.member-checkbox');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  checkboxes.forEach(cb => { cb.checked = !allChecked; });
+});
+</script>
 <?php include 'footer.php'; ?>
