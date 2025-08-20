@@ -1,0 +1,1690 @@
+<html>
+
+<head>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>发票报销中心</title>
+
+    <link rel="stylesheet" href="css/bootstrap.css">
+    <link rel="stylesheet" href="css/buttons.css">
+    <link rel="stylesheet" href="css/gijgo.css">
+
+    <script src="js/jq-3.5.1.js"> </script>
+    <script src="js/popper.js"> </script>
+    <script src="js/bootstrap.js"> </script>
+    <script src="js/gijgo.js"> </script>
+    <script src="js/messages/messages.zh-cn.js"> </script>
+
+</head>
+
+<body>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb"  style="background-image: url('css/banner3.png'); background-size: 100%; background-repeat: no-repeat;">
+        <li class="breadcrumb-item active" aria-current="page"><b style="color: black"> 王家恒教授课题组 发票报销平台 </b>&nbsp;<a><span class="badge badge-pill badge-info">202504版本</span></a>&nbsp;<a id="bgbtn"><span class="badge bg-primary" style="color: white">控制台</span></a></li>
+    </ol>
+</nav>
+
+<div class="modal fade" id="uploadModal" data-backdrop="static" data-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background-image: url('css/banner1.jpg'); background-size: 100%; background-repeat: no-repeat">
+                <h5 class="modal-title" id="staticBackdropLabel"><b>温馨提示</b></h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="taginfo">
+                test
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="btn_upload_check" data-dismiss="modal" name="btn_upload_check" style="display: none">OK</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" id="btn_norm_check" name="btn_norm_check">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="bgModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">发票中心控制台</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div id="personlist">
+
+                    </div>
+
+                    <div id="limitcontrol" class="input-group mb-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon9">限制额度(含50%上浮)：</span>
+                        </div>
+                        <input type="number" class="form-control" id="limitcontrolinput" onchange="change_pricelimit(document.getElementById('limitcontrolinput').value)" name="limitcontrolinput" aria-describedby="basic-addon9" required>
+                    </div>
+
+                    <div class="input-group mb-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon10">本轮报销截止时间设置：</span>
+                        </div>
+                        <input id="datepicker" class="form-control" aria-describedby="basic-addon10">
+                    </div>
+
+                    <div id="div_pendingbatch" class="input-group mb-3">
+
+                    </div>
+
+                    <div class="input-group mb-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="basic-addon14">本轮处理报销序号：</span>
+                        </div>
+                        <select class="custom-select" id="batchassigner" aria-describedby="basic-addon14">
+
+                        </select>
+                    </div>
+
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="inlineCheckbox1" value="图书" checked>
+                        <label class="form-check-label" for="inlineCheckbox1">图书</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="inlineCheckbox2" value="电子材料" checked>
+                        <label class="form-check-label" for="inlineCheckbox2">电子材料</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="inlineCheckbox3" value="办公用品">
+                        <label class="form-check-label" for="inlineCheckbox3">办公用品</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="inlineCheckbox4" value="IEEE会员">
+                        <label class="form-check-label" for="inlineCheckbox4">IEEE会员</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="inlineCheckbox5" value="差旅">
+                        <label class="form-check-label" for="inlineCheckbox5">差旅</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭窗口</button>
+                <!-- <button type="button" id="bgbtn-bg" class="btn btn-primary" data-dismiss="modal">文件</button> -->
+                <button type="button" id="bgbtn-dl" class="btn btn-outline-primary">高级管理</button>
+                <!--<button type="button" id="bgbtn-rm" class="btn btn-danger">清库</button>-->
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-danger" role="alert" id="banner_analysis" hidden>
+
+</div>
+
+<div class="alert alert-info" role="alert" id="banner_userinfo" hidden>
+
+</div>
+
+<a id="field_dl" download="" href="" target="_blank" hidden>dl</a>
+
+<script>
+    var permission = 0;
+    var dl_id_list = [];
+    var tag_id_list = [];
+
+    function change_filetype(id, filetype) {
+        var form_data = new FormData();
+        form_data.append('id', id);
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        form_data.append('filetype', filetype);
+        $.ajax({
+            url: 'php/mgrfilechangetype.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("taginfo").innerHTML = "发票类型更改失败！后台返回错误结果：" + ret.content;
+                    $('#uploadModal').modal({
+                        keyboard: false
+                    });
+                    return;
+                }
+                $('#bgbtn-dl').click();
+            },
+            error: function(){
+                document.getElementById("taginfo").innerHTML = "发票类型更改时发生错误，请检查网络连接和服务器状态！";
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+            }
+        });
+    }
+
+    function get_filetype_dropdown(id, def_filetype) {
+        const list_filetype = ['电子材料', '图书', '办公用品', 'IEEE会员', '差旅'];
+        const index = list_filetype.indexOf(def_filetype);
+        if (index > -1) {
+            list_filetype.splice(index, 1);
+        }
+        return "<div class=\"dropdown d-inline-block\">\n" +
+            "  <a class=\"btn btn-outline-dark btn-sm dropdown-toggle\" href=\"#\" role=\"button\" id=\"dropdownMenuLink\" data-toggle=\"dropdown\" aria-haspopup=\"true\" aria-expanded=\"false\">" + def_filetype + "</a>\n" +
+            "  <div class=\"dropdown-menu\" aria-labelledby=\"dropdownMenuLink\">\n" +
+            "    <a class=\"dropdown-item\" href=\"javascript:change_filetype(" + id + ", '" + list_filetype[0] + "')\">" + list_filetype[0] + "</a>\n" +
+            "    <a class=\"dropdown-item\" href=\"javascript:change_filetype(" + id + ", '" + list_filetype[1] + "')\">" + list_filetype[1] + "</a>\n" +
+            "    <a class=\"dropdown-item\" href=\"javascript:change_filetype(" + id + ", '" + list_filetype[2] + "')\">" + list_filetype[2] + "</a>\n" +
+            "    <a class=\"dropdown-item\" href=\"javascript:change_filetype(" + id + ", '" + list_filetype[3] + "')\">" + list_filetype[3] + "</a>\n" +
+            "  </div>\n" +
+            "</div>";
+    }
+
+    function change_filetype_normal(id, filetype) {
+        var form_data = new FormData();
+        form_data.append('id', id);
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        form_data.append('filetype', filetype);
+        $.ajax({
+            url: 'php/mgrfilechangetype.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("taginfo").innerHTML = "发票类型更改失败！后台返回错误结果：" + ret.content;
+                    $('#uploadModal').modal({
+                        keyboard: false
+                    });
+                    return;
+                }
+                $('#search').click();
+            },
+            error: function(){
+                document.getElementById("taginfo").innerHTML = "发票类型更改时发生错误，请检查网络连接和服务器状态！";
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+            }
+        });
+    }
+
+    function get_filetype_dropdown_normal(id, def_filetype) {
+        const list_filetype = ['电子材料', '图书', '办公用品', 'IEEE会员', '差旅'];
+        const index = list_filetype.indexOf(def_filetype);
+        if (index > -1) {
+            list_filetype.splice(index, 1);
+        }
+        return "<div class=\"dropdown d-inline-block\">\n" +
+            "  <a class=\"btn btn-outline-dark btn-sm dropdown-toggle\" href=\"#\" role=\"button\" id=\"dropdownMenuLink\" data-toggle=\"dropdown\" aria-haspopup=\"true\" aria-expanded=\"false\">" + def_filetype + "</a>\n" +
+            "  <div class=\"dropdown-menu\" aria-labelledby=\"dropdownMenuLink\">\n" +
+            "    <a class=\"dropdown-item\" href=\"javascript:change_filetype_normal(" + id + ", '" + list_filetype[0] + "')\">" + list_filetype[0] + "</a>\n" +
+            "    <a class=\"dropdown-item\" href=\"javascript:change_filetype_normal(" + id + ", '" + list_filetype[1] + "')\">" + list_filetype[1] + "</a>\n" +
+            "    <a class=\"dropdown-item\" href=\"javascript:change_filetype_normal(" + id + ", '" + list_filetype[2] + "')\">" + list_filetype[2] + "</a>\n" +
+            "    <a class=\"dropdown-item\" href=\"javascript:change_filetype_normal(" + id + ", '" + list_filetype[3] + "')\">" + list_filetype[3] + "</a>\n" +
+            "  </div>\n" +
+            "</div>";
+    }
+
+    function change_permission(id) {
+        var form_data = new FormData();
+        form_data.append('id', id);
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        $.ajax({
+            url: 'php/mgrpermchange.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    alert("报销负责人指派失败！后台返回错误结果：" + ret.content);
+                    get_personmgr_dropdown();
+                    return;
+                }
+                alert("报销负责人已更改！");
+                get_personmgr_dropdown();
+            },
+            error: function(){
+                alert("报销负责人指派发生错误，请检查网络连接和服务器状态！");
+                get_personmgr_dropdown();
+            }
+        });
+    }
+
+    function get_personmgr_dropdown() {
+        var form_data = new FormData();
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        $.ajax({
+            url: 'php/mgrpermget.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    alert("报销名录获取失败！后台返回错误结果：" + ret.content);
+                    document.getElementById("personlist").innerHTML = "";
+                    return;
+                }
+                var dropdown_items = "<div class=\"dropdown\">\n" +
+                    "  <a class=\"btn btn-outline-dark btn-sm dropdown-toggle\" href=\"#\" role=\"button\" id=\"dropdownMenuLink\" data-toggle=\"dropdown\" aria-haspopup=\"true\" aria-expanded=\"false\">" + ret.content[0].username + " (" + ret.content[0].userid + ")" + "</a>\n" +
+                    "  <div class=\"dropdown-menu\" aria-labelledby=\"dropdownMenuLink\">\n";
+                for (var i = 1; i < ret.content.length; i++) {
+                    dropdown_items += "<a class=\"dropdown-item\" href=\"javascript:change_permission(" + ret.content[i].id + ")\">" + ret.content[i].username + " (" + ret.content[i].userid + ")" + "</a>\n";
+                }
+                dropdown_items += "</div></div>";
+                document.getElementById("personlist").innerHTML = dropdown_items;
+            },
+            error: function(){
+                alert("报销名录获取失败！");
+                document.getElementById("personlist").innerHTML = "";
+            }
+        });
+    }
+    
+    function set_pricelimit() {
+        var form_data = new FormData();
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        $.ajax({
+            url: 'php/mgrsetpricelimit.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    alert("报销限额获取失败！后台返回错误结果：" + ret.content);
+                    document.getElementById("limitcontrol").text = "";
+                    return;
+                }
+                document.getElementById("limitcontrol").text = ret.content;
+            },
+            error: function(){
+                alert("报销限额获取失败！");
+                document.getElementById("limitcontrol").innerHTML = "";
+            }
+        });
+    }
+
+    function reject_receipt(id, filename) {
+        var form_data = new FormData();
+        form_data.append('id', id);
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        $.ajax({
+            url: 'php/mgrfilereject.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("taginfo").innerHTML = "发票拒绝失败！后台返回错误结果：" + ret.content;
+                    $('#uploadModal').modal({
+                        keyboard: false
+                    });
+                    return;
+                }
+                $('#bgbtn-dl').click();
+            },
+            error: function(){
+                document.getElementById("taginfo").innerHTML = "拒绝发票时发生错误，请检查网络连接和服务器状态！";
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+            }
+        });
+    }
+
+    function download_receipt(id, filename) {
+        document.getElementById("field_dl").setAttribute("href", "./uploads/" + filename);
+        document.getElementById("field_dl").setAttribute("download", filename);
+        document.getElementById("field_dl").click();
+    }
+
+    function sleepFor(sleepDuration){
+        var now = new Date().getTime();
+        while(new Date().getTime() < now + sleepDuration){ /* do nothing */ }
+    }
+
+    function download_all() {
+        var arrayLength = dl_id_list.length;
+        for (var i = 0; i < arrayLength; i++) {
+            download_receipt(0, dl_id_list[i]);
+            sleepFor(500);
+        }
+        document.getElementById("taginfo").innerHTML = "已成功下载当前批次所有发票，请在核对下载数量后[立马点击]下方的一键标记按钮，对发票进行批量标记！<br>" +
+            "对用户来说，在批量标记后，页面上的当前批次号将会顺移一位";
+        $('#uploadModal').modal({
+            keyboard: false
+        });
+    }
+
+    function tag_receipt(id, needConfirm) {
+        if(needConfirm) {
+            var r = confirm("若您还未开始批量处理本次报销，请不要尝试继续本操作，否则会影响后续统一报销处理的准确性，确认继续则点击确定，否则请取消操作！");
+            if (r === false) {
+                return;
+            }
+        }
+        var form_data = new FormData();
+        form_data.append('id', id);
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        $.ajax({
+            url: 'php/mgrfiletag.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("taginfo").innerHTML = "标记处理失败！后台返回错误结果：" + ret.content;
+                    $('#uploadModal').modal({
+                        keyboard: false
+                    });
+                    return;
+                }
+                document.getElementById("mgrli_"+id).setAttribute("style", "background-color: #CCFF99");
+                document.getElementById("tagger_"+id).innerText = "处理完成";
+                $("#tagger_" + id).prop("disabled", true);
+            },
+            error: function(){
+                document.getElementById("taginfo").innerHTML = "标记处理时发生错误，请检查网络连接和服务器状态！";
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+            }
+        });
+    }
+
+    function tag_all(batchnum) {
+        var r = confirm("请确保您已下载了当前批次的所有发票，再执行本项标记操作！您是否已经下载了所有发票？");
+        if (r === false) {
+            return;
+        }
+        var arrayLength = tag_id_list.length;
+        for (var i = 0; i < arrayLength; i++) {
+            tag_receipt(tag_id_list[i], false);
+        }
+
+        var form_data = new FormData();
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        form_data.append('batch', batchnum);
+        $.ajax({
+            url: 'php/mgrbatchmove.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("taginfo").innerHTML = "批次号更新失败，【事关重大】请立即联系管理员！后台返回错误结果：" + ret.content;
+                    $('#uploadModal').modal({
+                        keyboard: false
+                    });
+                    return;
+                }
+                document.getElementById("taginfo").innerHTML = "批次号更新成功！您需要手动刷新页面以适应批次变化！";
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+            }
+        });
+    }
+
+    function finish_pending_batch(batch_number) {
+        var form_data = new FormData();
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        form_data.append('batch', batch_number);
+        $.ajax({
+            url: 'php/mgrbatchfinish.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    alert("办结批次失败！后台返回错误结果：" + ret.content);
+                    get_pending_batch_finish_button();
+                    return;
+                }
+                alert("批次办结成功！您办结的批次号所有发票状态已从 [正在报销中] 更改为 [报销完成]")
+                get_pending_batch_finish_button();
+            }
+        });
+    }
+
+    function get_pending_batch_finish_button() {
+        var form_data = new FormData();
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        $.ajax({
+            url: 'php/mgrgetpendingbatch.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    alert("待完结批次号码检索失败！后台返回错误结果：" + ret.content);
+                    return;
+                }
+                document.getElementById("div_pendingbatch").innerHTML = "";
+                if (ret.content.length === 0)
+                    return;
+                for (var i = 0; i < ret.content.length; i++) {
+                    document.getElementById("div_pendingbatch").innerHTML += "<button type='button' class='btn btn-outline-warning' onclick='javascript:finish_pending_batch(" + ret.content[i].batch + ")'>办结批次#"
+                        + ret.content[i].batch
+                        + "</button> ";
+                }
+            }
+        });
+    }
+
+    $('#bgbtn').click(function(){
+        checkPermission();
+        if (permission < 1) {
+            document.getElementById("taginfo").innerHTML = "请先填写<span style='color: red'>正确的</span>并<span style='color: red'>经过授权的</span>一卡通号，再尝试进入控制台！";
+            $('#uploadModal').modal({
+                keyboard: false
+            });
+            return;
+        }
+        if (permission === 2) {
+            document.getElementById("personlist").innerHTML = "";
+            get_personmgr_dropdown();
+
+            $.ajax({
+            url: 'php/basecfg.php', // point to server-side PHP script
+            dataType: 'text',  // what to expect back from the PHP script, if anything
+            cache: false,
+            contentType: false,
+            processData: false,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0' || ret.content.length < 1) {
+                    return;
+                }
+                pricelimit = parseFloat(ret.content[0].price_limit).toFixed(2);
+                document.getElementById("limitcontrolinput").value = pricelimit;
+                // alert(pricelimit);
+            },
+            error: function () {
+            }
+        });
+        }
+        if (permission === 1) {
+            document.getElementById("personlist").innerHTML = "";
+            document.getElementById("limitcontrol").innerHTML = "";
+        }
+        get_pending_batch_finish_button();
+        $('#bgModal').modal({
+            keyboard: false
+        });
+        return;
+    });
+
+    $('#bgbtn-bg').click(function(){
+        var win = window.open('php/filemgr.php', '_blank');
+        if (win) {
+            win.focus();
+        } else {
+            alert('请允许页面弹出新窗口，否则后台文件管理无法打开！');
+        }
+    });
+    $('#bgbtn-dl').click(function(){
+
+        if (is_timeover == false) {
+            alert("时间还没到，别着急鸭！到点儿了再来处理");
+            return;
+        }
+
+        var filetypearr = [];
+        if (document.getElementById("inlineCheckbox1").checked)
+            filetypearr.push(document.getElementById("inlineCheckbox1").value);
+        if (document.getElementById("inlineCheckbox2").checked)
+            filetypearr.push(document.getElementById("inlineCheckbox2").value);
+        if (document.getElementById("inlineCheckbox3").checked)
+            filetypearr.push(document.getElementById("inlineCheckbox3").value);
+        if (document.getElementById("inlineCheckbox4").checked)
+            filetypearr.push(document.getElementById("inlineCheckbox4").value);
+        if (document.getElementById("inlineCheckbox5").checked)
+            filetypearr.push(document.getElementById("inlineCheckbox5").value);
+        var filetype = filetypearr.join('|');
+        var batchnum = document.getElementById('batchassigner').value;
+        var form_data = new FormData();
+        form_data.append('batch', batchnum);
+        form_data.append('filetype', filetype);
+        form_data.append('username', document.getElementById("username").value.replace(' ', ''));
+        form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+        $.ajax({
+            url: 'php/mgrfilesearch.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function(data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    alert("检索失败！后台返回错误结果：" + ret.content);
+                    return;
+                }
+                document.getElementById("ret_values").innerHTML = "";
+                if (ret.content.length === 0) {
+                    alert("批次#" + batchnum + " 暂时没有未报销发票");
+                    document.getElementById("taginfo").innerHTML = "";
+                    document.getElementById("banner_analysis").innerHTML = "";
+                    $("#banner_analysis").prop('hidden', true);
+                    $('#bgModal').modal('hide');
+                    return;
+                }
+                var totalamount = new Array();
+                var totalamount_people = new Array();
+                var totalcount = new Array();
+                totalcount["图书"] = 0;
+                totalcount["电子材料"] = 0;
+                totalcount["IEEE会员"] = 0;
+                totalcount["办公用品"] = 0;
+                totalcount["差旅"] = 0;
+                var totalamount_num = 0.0;
+                totalamount["图书"] = 0.0;
+                totalamount["电子材料"] = 0.0;
+                totalamount["IEEE会员"] = 0.0;
+                totalamount["办公用品"] = 0.0;
+                totalamount["差旅"] = 0.0;
+                dl_id_list = [];
+                tag_id_list = [];
+                document.getElementById("ret_values").innerHTML +=
+                    "  <thead>\n" +
+                    "    <tr>\n" +
+                    "      <th scope=\"col\">#批次</th>\n" +
+                    "      <th scope=\"col\">操作</th>\n" +
+                    "      <th scope=\"col\">申请人</th>\n" +
+                    "      <th scope=\"col\">发票名</th>\n" +
+                    "      <th scope=\"col\">类型</th>\n" +
+                    "      <th scope=\"col\">含税总价</th>\n" +
+                    "      <th scope=\"col\">申报日期</th>\n" +
+                    "      <th scope=\"col\">商品名</th>\n" +
+                    "      <th scope=\"col\">状态</th>\n" +
+                    "    </tr>\n" +
+                    "  </thead>\n" +
+                    "  <tbody>";
+                for (var i = 0; i < ret.content.length; i++) {
+                    if (ret.content[i].isfinished === '0'){
+                        document.getElementById("ret_values").innerHTML += "    <tr id='mgrli_" + ret.content[i].id + "'>\n" +
+                            "      <th scope=\"row\">" + ret.content[i].batch + "</th>\n" +
+                            "      <td>" + "<button type='button' class='btn btn-info btn-sm' onclick=\"javascript:download_receipt(" + ret.content[i].id + ", '" + ret.content[i].filename + "')\" rel='nofollow'> 下载 </button> " +
+                            "<button type='button' class='btn btn-outline-danger btn-sm' onclick=\"javascript:reject_receipt(" + ret.content[i].id + ", '" + ret.content[i].filename + "')\" rel='nofollow'> 拒绝 </button> " + "</td>\n" +
+                            "      <td>" + ret.content[i].username + " (" + ret.content[i].userid + ")" + "</td>\n" +
+                            "      <td>" + ret.content[i].filename + "</td>\n" +
+                            "      <td>" + get_filetype_dropdown(ret.content[i].id, ret.content[i].filetype) + "</td>\n" +
+                            "      <td>" + ret.content[i].fileprice + "元</td>\n" +
+                            "      <td>" + ret.content[i].uploadtime + "</td>\n" +
+                            "      <td>" + ret.content[i].checkerquote + "</td>\n" +
+                            "      <td>" + "等待报销" + "</td>\n" +
+                            "    </tr>";
+                        dl_id_list.push(ret.content[i].filename);
+                        tag_id_list.push(ret.content[i].id);
+                        totalamount[ret.content[i].filetype] += parseFloat(ret.content[i].fileprice);
+                        totalcount[ret.content[i].filetype] += 1;
+                        totalamount_num += parseFloat(ret.content[i].fileprice);
+                        var t_key = ret.content[i].username + "(" + ret.content[i].userid + ")";
+                        if (!totalamount_people.hasOwnProperty(t_key))
+                            totalamount_people[t_key] = parseFloat(ret.content[i].fileprice);
+                        else
+                            totalamount_people[t_key] += parseFloat(ret.content[i].fileprice);
+                    }
+                }
+                document.getElementById("ret_values").innerHTML += "</tbody>";
+                $('#bgModal').modal('hide');
+                var price_cate = "";
+                for (var key in totalamount){
+                    price_cate += key + ": " + totalamount[key].toFixed(2) + "元； ";
+                }
+                var price_people = "";
+                for (var key in totalamount_people){
+                    price_people += key + ": " + totalamount_people[key].toFixed(2) + " 元<br>";
+                }
+                var count_cate = "";
+                for (var key in totalcount){
+                    count_cate += key + ": " + totalcount[key] + "张； ";
+                }
+                var info_analysis = "<b><span style='color: red'>您当前操作的是 批次#" + batchnum + " ！</span> </b><br><span style='color: black'><b>!!! 请在检查完发票内容后备份此处的最新信息【您发票调整的操作会影响此处统计，请以您调整完成后信息为准备份】 !!!</b></span><br>【*】纸质发票请向对应申请人索取；如部分发票不符合规定，请直接拒绝！<br>【报销信息汇总】<br>" +
+                    price_cate + "<br>" + count_cate + "<br><b>您勾选的汇总类目核销总价为" + totalamount_num.toFixed(2) +
+                    "元</b><br>【各申请人报销金额】<br>" + price_people;
+                document.getElementById("taginfo").innerHTML = info_analysis;
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+                var info_download = "<button type=\"button\" class=\"btn btn-primary btn-sm\" onclick='download_all()'>1. 一键下载当前批次所有发票</button> " +
+                    "<br>  ↓↓ 请在下载无误(主要是文件不能少)后，立即点击下方按钮确认此批次报销 ↓↓ <br>" +
+                    "<button type=\"button\" class=\"btn btn-warning btn-sm\" onclick='tag_all(" + batchnum + ")'>2. 一键标记处理当前批次所有发票</button>";
+                document.getElementById("banner_analysis").innerHTML = info_download + "<br>" + info_analysis;
+                $("#banner_analysis").prop('hidden', false);
+
+            }
+        });
+    });
+</script>
+
+<div class="alert alert-warning" role="alert">
+    <h5 class="alert-heading">使用提示 <span style="color: red" id="cur_batch"></span></h5>
+    <h5 class="alert-heading"><span style="color: red" id="rem_time"></span></h5>
+    <span class="badge badge-pill badge-warning">信息</span> 疑难问题请在学生微信群中反馈，等待负责人处理
+    <br><span class="badge badge-pill badge-warning">新功能提示</span> 新增发票自动填写功能，可在选择电子发票文件后，直接点击“校验读取发票内容”按钮，由系统自动填写金额和类别
+    <br><span class="badge badge-pill badge-danger">注意</span> 【2025年1月提醒】 请备注报销的商品名，不超过30字（已放宽字数限制），诚信填写
+    <br><span class="badge badge-pill badge-danger">注意</span> IEEE会员费报销请完整提供RECEIPT、支付工具支付页、付款卡银行账单页 / 差旅费用报销需提供行程单和报销发票原件。
+</div>
+
+<br>
+
+<div class="card border-0">
+
+    <div class="card-body">
+
+        <div class="input-group mb-3" style="display: none">
+            <div class="input-group-prepend">
+                <span class="input-group-text" id="basic-addon3">真实姓名：</span>
+            </div>
+            <input type="text" class="form-control" id="username" name="username" aria-describedby="basic-addon3" required>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-md-8">
+                <div class="input-group mb-3">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text" id="basic-addon4">一卡通号：</span>
+                    </div>
+                    <input type="number" class="form-control" id="usernumber" name="usernumber" aria-describedby="basic-addon4" required>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" value="" id="checkerpaper">
+            <label class="form-check-label" for="checkerpaper">
+                << 这是份纸质发票（勾选后无需传附件，原件请亲手转交负责人）
+            </label>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-md-8">
+                <div class="input-group is-invalid">
+                    <div class="custom-file">
+                        <input type="file" class="custom-file-input" id="file" name="file" required>
+                        <label class="custom-file-label" for="file" id="filenamelabel" data-browse="选取本地发票文件" style="background-color: #E9FBDF;">选择电子发票/凭证文件 (若为纸质发票请勾选上方框框)</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-md-left">
+            <div class="btn-group" align="left" role="group" aria-label="Basic example">
+                <button class="btn btn-info" style="display:block;margin:0 auto" id="verify" name="verify">  &nbsp;&nbsp;校验读取发票内容&nbsp;&nbsp;  </button>
+            </div>
+        </div>    
+
+        <br><br>
+
+        <div class="form-row">
+            <div class="form-group col-md-7">
+                <div class="input-group mb-3">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text" id="basic-addon5">发票类型：</span>
+                    </div>
+                    <select class="custom-select" id="receipttype">
+                        <option value="电子材料">电子材料</option>
+                        <option value="图书">图书</option>
+                        <option value="办公用品">办公用品</option>
+                        <option value="IEEE会员">IEEE会员</option>
+                        <option value="差旅">差旅</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group col-md-3">
+                <button type="button" class="btn btn-outline-secondary" id="receipttypecheck" name="receipttypecheck">>发票类型查询<</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-md-8">
+                <div class="input-group mb-3">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text" id="basic-addon9">发票总价（含税）：</span>
+                    </div>
+                    <input type="number" class="form-control" id="receiptprice" name="receiptprice" aria-describedby="basic-addon9" required>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-md-8">
+                <div class="input-group mb-3">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text" id="basic-addon13">报销批次：</span>
+                    </div>
+                    <select class="custom-select" id="arrangebatch">
+                        <option>0</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group col-md-8">
+                <div class="input-group mb-3">
+                    <div class="input-group-prepend">
+                        <span class="input-group-text" id="basic-addon88">商品名：</span>
+                    </div>
+                    <input type="text" class="form-control" id="checkerquote" name="checkerquote" placeholder="30字以内，请务必诚信填写，明细票须填'无'" aria-describedby="basic-addon88" required>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card-footer text-muted">
+
+        <div class="text-md-left">
+            <div class="btn-group" align="left" role="group" aria-label="Basic example">
+                <button class="btn btn-primary" style="display:block;margin:0 auto" id="upload" name="upload">  &nbsp;&nbsp;上传这张发票&nbsp;&nbsp;  </button>
+                <button class="btn" style="display:none;" id="search" name="search">  &nbsp;&nbsp;上传这张发票&nbsp;&nbsp;  </button>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<script>
+    $('#file').change(function(e){
+        var fileName = e.target.files[0].name;
+        $('.custom-file-label').html(fileName);
+    });
+
+    $('#checkerpaper').change(function(){
+        if($(this).is(':checked')) {
+            $("#file").prop('disabled', true);
+            document.getElementById("filenamelabel").style = "background-color: #FB958F;";
+            document.getElementById("file").value = "";
+            document.getElementById("filenamelabel").innerHTML = "已勾选纸质发票，此处无需上传";
+        } else {
+            $("#file").prop('disabled', false);
+            document.getElementById("filenamelabel").style = "background-color: #E9FBDF;";
+            document.getElementById("filenamelabel").innerHTML = "选择电子发票/凭证文件 (若为纸质发票请勾选上方框框)";
+        }
+    });
+</script>
+
+<br>
+
+<script>
+
+    var welcome_str = "";
+    var is_timeover = false;
+
+    function checkPermission() {
+        if (document.getElementById("usernumber").value.length >= 9) {
+            var form_data = new FormData();
+            form_data.append('usernumber', document.getElementById("usernumber").value.replace(' ', ''));
+            document.getElementById("ret_values").innerHTML = "";
+            $.ajax({
+                url: 'php/usersearch.php', // point to server-side PHP script
+                dataType: 'text',  // what to expect back from the PHP script, if anything
+                cache: false,
+                contentType: false,
+                processData: false,
+                data: form_data,
+                type: 'post',
+                success: function(data) {
+                    var ret = JSON.parse(data);
+                    if (ret.result === '0') {
+                        permission = -1;
+                        $("#banner_userinfo").prop('hidden', false);
+                        document.getElementById("banner_userinfo").innerHTML = "<b><span style='color: #ff0000'>" + ret.content + "</span></b>";
+                        $('#btn_dlrec').prop('style', 'display:none');
+                        return;
+                    }
+                    $("#banner_userinfo").prop('hidden', false);
+                    if (ret.content[0]['permission'] === '0') {
+                        permission = 0;
+                        document.getElementById("banner_userinfo").innerHTML = "欢迎您：<b>" + ret.content[0]['username'] + "</b>，您的当前权限为：一般用户（上传并查看个人发票）";
+                        $("#banner_analysis").attr("style", "display:none;");
+                    } else if (ret.content[0]['permission'] === '1') {
+                        permission = 1;
+                        document.getElementById("banner_userinfo").innerHTML = "欢迎您：<b>" + ret.content[0]['username'] +
+                            "</b>，您的当前权限为：报销负责人（上传并查看个人发票、下载并标记未报销发票） " +
+                            "<br><a href='uploads/tutorial.pdf' rel='nofollow'><< 点此下载最新报销指南 >></a>";
+                        $("#banner_analysis").attr("style", "display:block;");
+                        document.getElementById('batchassigner').innerHTML = "<option>" + batch + "</option>";
+                    } else if (ret.content[0]['permission'] === '2') {
+                        permission = 2;
+                        document.getElementById("banner_userinfo").innerHTML = "欢迎您：<b>" + ret.content[0]['username'] +
+                            "</b>，您的当前权限为：高级管理员（上传并查看个人发票、下载并标记所有暂未报销发票、管理人员权限） " +
+                            "<br><a href='uploads/tutorial.pdf' rel='nofollow'><< 点此下载最新报销指南 >></a>";
+                        document.getElementById('batchassigner').innerHTML = document.getElementById('arrangebatch').innerHTML;
+                        $("#banner_analysis").attr("style", "display:block;");
+                    }
+                    welcome_str = document.getElementById("banner_userinfo").innerHTML;
+                    document.getElementById("username").value = ret.content[0]['username'];
+                    $('#search').click();
+                },
+                error: function(){
+                    permission = -1;
+                }
+            });
+        }
+    }
+
+    $("#usernumber").keyup(function(){
+        if (document.getElementById("usernumber").value.replace(' ', '').indexOf("1995") === 0) {
+            $("#usernumber").attr("type", "password");
+            $("#username").attr("style", "background: #FFFACD");
+            $("#usernumber").attr("style", "background: #FFFACD");
+            // Select your input
+            var $input = $('#usernumber');
+            // Get current value length
+            var len = $input.val().length;
+            // Set the caret position to the end
+            $input[0].setSelectionRange(len, len);
+            // Make sure the field is focused
+            $input.focus();
+        } else {
+            $("#usernumber").attr("type", "number");
+            $("#username").attr("style", "");
+            $("#usernumber").attr("style", "");
+        }
+        checkPermission();
+    });
+
+</script>
+
+
+<script>
+    var pricelimit = 150;
+    var uprate = 0.25; // display price would be pricelimit / (1 + uprate)
+    var timelimit = 0;
+    var batch = 0;
+
+    function pad(num, size) {
+        num = num.toString();
+        while (num.length < size) num = "0" + num;
+        return num;
+    }
+
+    function dateFromString(str) {
+        var a = $.map(str.split(/[^0-9]/), function(s) { return parseInt(s, 10) });
+        return new Date(a[0], a[1]-1 || 0, a[2] || 1, a[3] || 0, a[4] || 0, a[5] || 0, a[6] || 0);
+    }
+
+    function get_remaining_time() {
+        var datetime_set = dateFromString(timelimit);
+        var datetime_now = Date.now();
+        var timeleft = datetime_set-datetime_now;
+
+        var d = Math.floor(timeleft / (1000 * 60 * 60 * 24));
+        var h = Math.floor((timeleft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        var m = Math.floor((timeleft % (1000 * 60 * 60)) / (1000 * 60));
+        var s = Math.floor((timeleft % (1000 * 60)) / 1000);
+
+        rem_time = d + "天" + h + "时" + m + "分" + s + "秒";
+        if (d>=0 && h>=0 && m>=0 && s>=0) {
+            is_timeover = false;
+            document.getElementById('rem_time').innerHTML = "距离本批次报销结束(" + timelimit + ")：" + rem_time;
+            setTimeout(get_remaining_time, 1000);
+        } else {
+            is_timeover = true;
+            document.getElementById('rem_time').innerHTML = "上一批次已结束，报销负责人正在处理中，您可在此页面处理后续批次的发票";
+            // $("#file").prop('disabled', true);
+            // $("#upload").prop('disabled', true);
+            $("#upload").text('上传这张发票至后续批次');
+        }
+
+    }
+
+    function init_batch_selection(batch_num) {
+        document.getElementById('cur_batch').innerHTML = "当前报销批次是#" + batch_num.toString();
+        var inHTML = "";
+        inHTML += "<option>" + batch_num.toString() + "</option>>";
+        document.getElementById('batchassigner').innerHTML = inHTML;
+        inHTML += "<option>" + (batch_num+1).toString() + "</option>>";
+        inHTML += "<option>" + (batch_num+2).toString() + "</option>>";
+        document.getElementById('arrangebatch').innerHTML = inHTML;
+    }
+
+    function initialization() {
+        $.ajax({
+            url: 'php/basecfg.php', // point to server-side PHP script
+            dataType: 'text',  // what to expect back from the PHP script, if anything
+            cache: false,
+            contentType: false,
+            processData: false,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0' || ret.content.length < 1) {
+                    return;
+                }
+                pricelimit = parseFloat(ret.content[0].price_limit).toFixed(2);
+                uprate = parseFloat(ret.content[0].up_rate);
+                batch = parseInt(ret.content[0].batch);
+                timelimit = ret.content[0].current_limit;
+                init_batch_selection(batch);
+                $("#datepicker").val(timelimit);
+                setTimeout(get_remaining_time, 1000);
+            },
+            error: function () {
+            }
+        });
+    }
+
+    $('#datepicker').datetimepicker({
+        locale: 'zh-cn',
+        uiLibrary: 'bootstrap4',
+        weekStartDay: 1,
+        keyboardNavigation: true,
+        showOtherMonths: true,
+        format: 'yyyy-mm-dd hh:mm:ss',
+        modal: false,
+        footer: true,
+        change: function (e) {
+            var bak_timelimit = timelimit;
+            timelimit = this.value;
+            var username = document.getElementById("username").value;
+            // 对姓名中的空格情况进行处理。
+            username = username.replace(' ', '');
+            var usernumber = document.getElementById("usernumber").value;
+            // 对一卡通号中的空格情况进行处理。
+            usernumber = usernumber.replace(' ', '');
+            var form_data = new FormData();
+            form_data.append('new_timelimit', this.value);
+            form_data.append('username', username);
+            form_data.append('usernumber', usernumber);
+            $.ajax({
+                url: 'php/basecfg.php', // point to server-side PHP script
+                dataType: 'text',  // what to expect back from the PHP script, if anything
+                cache: false,
+                contentType: false,
+                processData: false,
+                data: form_data,
+                type: 'post',
+                success: function (data) {
+                    var ret = JSON.parse(data);
+                    if (ret.result === '0' || ret.content.length < 1) {
+                        alert("设置失败:" + ret.content);
+                        timelimit = bak_timelimit;
+                        $("#datepicker").val(timelimit);
+                        return;
+                    }
+                    alert("新一轮报销截止时间设置成功！");
+                },
+                error: function () {
+                }
+            });
+        }
+    });
+
+    initialization();
+
+    function isAssetTypeValid(filePath) {
+        var index= filePath.lastIndexOf(".");
+        var ext = filePath.substr(index+1);
+        return [
+            'png', 'jpg', 'jpeg', 'bmp', 'zip', 'rar', 'doc', 'docx', 'heic', 'pdf', 'txt'].
+        indexOf(ext.toLowerCase()) !== -1;
+    }
+
+    $('#receipttypecheck').click(function() {
+        document.getElementById("taginfo").innerHTML = "请查看以下允许的常用报销品对应类别，可用页面搜索快速定位。<br>" +
+            "【电子材料类】<br>" +
+            "FPGA、树莓派等开发套件、电路板等模电实验室能见到的东西<br>" +
+            "<span style='color: red'>请注意：电子材料近期不可乱报，不在上述列出产品中的报销单品会被驳回！</span><br>" +
+            "【办公用品类】 (禁止报销！！！)<br>" +
+            "网线、网卡、鼠标、键盘、台灯、任何转接线、U盘、移动硬盘、蓝牙适配器、USB拓展坞、读卡器、任何形式耳机、插线板、纸张、硒鼓墨盒等 <br>" +
+            "【图书类】<br>" +
+            "不允许开具图书类别发票，请勿购买非通信、系统、数学类书籍<br>" +
+            "<span style='color: red'>找工作相关书籍、升学准备相关书籍禁止报销，例如《剑指offer》和雅思等相关书籍，请勿预约报销！</span><br>" +
+            "【请务必明确报销品类别再进行报销！】";
+        $('#uploadModal').modal({
+            keyboard: false
+        });
+        return;
+    });
+
+    function do_real_upload(){
+        var file_data = $('#file').prop('files')[0];
+        var username = document.getElementById("username").value;
+        // 对姓名中的空格情况进行处理。
+        username = username.replace(' ', '');
+        var usernumber = document.getElementById("usernumber").value;
+        // 对一卡通号中的空格情况进行处理。
+        usernumber = usernumber.replace(' ', '');
+        var receipttype = document.getElementById("receipttype").value;
+        var batchnumber = document.getElementById("arrangebatch").value;
+        var receiptprice = document.getElementById("receiptprice").value;
+        var checkerquote = document.getElementById("checkerquote").value;
+        var checkerpaper = document.getElementById("checkerpaper").checked;
+        var form_data = new FormData();
+        form_data.append('file', file_data);
+        form_data.append('username', username);
+        form_data.append('usernumber', usernumber);
+        form_data.append('receipttype', receipttype);
+        form_data.append('receiptprice', receiptprice);
+        form_data.append('checkerquote', checkerquote);
+        form_data.append('batch', batchnumber);
+        form_data.append('checkerpaper', checkerpaper.toString());
+
+        // first check total amount of uploaded receipts
+        $.ajax({
+            url: 'php/filesearch.php', // point to server-side PHP script
+            dataType: 'text',  // what to expect back from the PHP script, if anything
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function(data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("taginfo").innerHTML = "上传发生错误！后台返回错误结果：" + ret.content;
+                    $('#uploadModal').modal({
+                        keyboard: false
+                    });
+                    return;
+                }
+                var totalamount = 0.0;
+                var isfileexist = false;
+                for (var i = 0; i < ret.content.length; i++) {
+                    if (ret.content[i].isfinished === '0' && parseInt(ret.content[i].batch) === parseInt(batchnumber)) {
+                        totalamount += parseFloat(ret.content[i].fileprice);
+                    }
+                    if (!checkerpaper && ret.content[i].filename === file_data.name)
+                        isfileexist = true;
+                }
+                var price_now = totalamount + parseFloat(receiptprice);
+                price_now = price_now.toFixed(2);
+                if (parseFloat(price_now) > parseFloat(pricelimit)) {
+                    alert("您的发票总额即将达到 " + price_now + "元/批次#" + batchnumber + "，将超过您选定批次的报销限额！您可以选择进入发票管理撤销部分发票。");
+                    return;
+                }
+                if (isfileexist) {
+                    alert("当前发票已有记录，若您确定该发票是否已被上传，或请更名后重试！");
+                    return;
+                }
+
+                // start uploading...
+                $.ajax({
+                    url: 'php/upload_file.php', // point to server-side PHP script
+                    dataType: 'text',  // what to expect back from the PHP script, if anything
+                    cache: false,
+                    contentType: false,
+                    processData: false,
+                    data: form_data,
+                    type: 'post',
+                    success: function(data) {
+                        //var obj = jQuery.parseJSON(data); if the dataType is not specified as json uncomment this
+                        // document.getElementById("ret_values").innerHTML = '<li class="list-group-item">' + data + '</li>' + document.getElementById("ret_values").innerHTML;
+                        var ret = JSON.parse(data);
+                        if (ret.result.toString() === '0') {
+                            alert("发票上传失败！后台返回错误原因：" + ret.content);
+                            return;
+                        }
+                        document.getElementById("file").value = "";
+                        document.getElementById("receiptprice").value = "";
+                        document.getElementById("checkerquote").value = "";
+                        document.getElementById("checkerpaper").checked = false;
+                        $("#file").prop('disabled', false);
+                        document.getElementById("filenamelabel").innerHTML = "选择发票/凭证文件 (纸质发票勿点)";
+                        alert("发票上载成功！后台返回状态：" + ret.content);
+                        $('#search').click();
+                    },
+                    error: function(){
+                        alert("文件上传时发生错误，请优先检查您的文件上传大小、网络连接和服务器状态！");
+                    }
+                });
+            },
+            error: function(){
+                alert("数据检索错误，请检查网络连接和服务器状态！");
+            }
+        });
+    }
+
+    function do_content_scrutinize(pdfText) {
+        const hasSoutheastUniversity = pdfText.includes("东南大学");
+        if (hasSoutheastUniversity) {
+            checkMainStr = "抬头正确！ 确认为<b>东南大学</b>";
+        } else {
+            checkMainStr = "抬头错误！ 请仔细检查确认发票抬头信息！";
+        }
+
+        const rmbRegex = /[¥￥]\s*(\d+(?:\.\d+)?)/g;
+        let match;
+        const prices = [];
+
+        while ((match = rmbRegex.exec(pdfText)) !== null) {
+            const numericValue = parseFloat(match[1]);
+            if (!isNaN(numericValue)) {
+            prices.push(numericValue);
+            }
+        }
+        const highestRmbPrice = prices.length ? Math.max(...prices) : null;
+
+        const lines = pdfText.split(/\r?\n/);
+        const merchantLine = lines.find(line => line.includes("*")) || "";
+
+        const lowerMerchantName = merchantLine.toLowerCase();
+        const categories = [
+            {
+                name: "电子材料",
+                keywords: ["机械", "电子", "材料", "配件", "电气", "设备", "通信", "设施", "通讯", "数据"]
+            },
+            {
+                name: "图书",
+                keywords: ["书", "图书", "教材", "教学"]
+            },
+            {
+                name: "办公用品",
+                keywords: ["纸", "笔", "盘"]
+            },
+            {
+                name: "差旅",
+                keywords: ["滴滴", "t3", "携程", "高德", "小猪", "行程", "美团", "百度", "曹操", "青桔"]
+            }
+        ];
+        cate = "IEEE会员";
+        for (let cat of categories) {
+            // If *any* keyword matches, we consider the merchant in that category
+            if (cat.keywords.some(keyword => lowerMerchantName.includes(keyword))) {
+                cate = cat.name;
+                break;
+            }
+        }
+
+        document.getElementById("taginfo").innerHTML = "识别结果：<br>" +
+        checkMainStr + "<br> 金额: " + highestRmbPrice + "元<br> 商品名: " + lowerMerchantName + "<br> 自动归类为: " + cate + " <br>系统将自动填写发票信息，您也可手动纠正错误信息！";
+        $('#uploadModal').modal({
+            keyboard: false
+        });
+
+        document.getElementById("receiptprice").value = highestRmbPrice;
+        document.getElementById("checkerquote").value = lowerMerchantName;
+        document.getElementById("receipttype").value = cate;
+        
+    }
+
+    function do_verify(){
+        var file_data = $('#file').prop('files')[0];
+        if (!file_data) {
+            // No file was chosen
+            document.getElementById("taginfo").innerHTML = "请先选择电子发票文件！";
+            $('#uploadModal').modal({
+                keyboard: false
+            });
+            return;
+        }
+        var username = document.getElementById("username").value;
+        // 对姓名中的空格情况进行处理。
+        username = username.replace(' ', '');
+        if (username.length == 0) {
+            document.getElementById("taginfo").innerHTML = "请先输入一卡通号登录！";
+            $('#uploadModal').modal({
+                keyboard: false
+            });
+            return;
+        }
+        var usernumber = document.getElementById("usernumber").value;
+        // 对一卡通号中的空格情况进行处理。
+        usernumber = usernumber.replace(' ', '');
+        var checkerpaper = document.getElementById("checkerpaper").checked;
+        var form_data = new FormData();
+        form_data.append('file', file_data);
+        form_data.append('username', username);
+        form_data.append('usernumber', usernumber);
+        form_data.append('checkerpaper', checkerpaper.toString());
+
+        // first check total amount of uploaded receipts
+        // start uploading...
+        $.ajax({
+            url: 'php/verify_file.php', // point to server-side PHP script
+            dataType: 'text',  // what to expect back from the PHP script, if anything
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function(data) {
+                //var obj = jQuery.parseJSON(data); if the dataType is not specified as json uncomment this
+                // document.getElementById("ret_values").innerHTML = '<li class="list-group-item">' + data + '</li>' + document.getElementById("ret_values").innerHTML;
+                var ret = JSON.parse(data);
+                if (ret.result.toString() === '0') {
+                    alert("发票校验失败！后台返回错误原因：" + ret.parse);
+                    return;
+                }
+                do_content_scrutinize(ret.parse);
+            },
+            error: function(){
+                alert("文件上传时发生错误，请优先检查您的文件上传大小、网络连接和服务器状态！");
+            }
+        });
+    }
+
+
+    $('#upload').click(function() {
+        var file_data = $('#file').prop('files')[0];
+        var username = document.getElementById("username").value;
+        // 对姓名中的空格情况进行处理。
+        username = username.replace(' ', '');
+        var usernumber = document.getElementById("usernumber").value;
+        // 对一卡通号中的空格情况进行处理。
+        usernumber = usernumber.replace(' ', '');
+        var receipttype = document.getElementById("receipttype").value;
+        var receiptprice = document.getElementById("receiptprice").value;
+        var batchnumber = document.getElementById("arrangebatch").value;
+        var checkerpaper = document.getElementById("checkerpaper").checked;
+        var checkerquote = document.getElementById("checkerquote").value;
+
+        if (username === "" || usernumber === "" || receipttype === "" || receiptprice === "" || (checkerpaper === false && file_data === undefined)) {
+            document.getElementById("taginfo").innerHTML = "您填写的基本信息不完整，请先完善所有待填框！";
+            $('#uploadModal').modal({
+                keyboard: false
+            });
+            return;
+        }
+        if (checkerquote === "" || checkerquote.length > 30) {
+            document.getElementById("taginfo").innerHTML = "发票商品名未填写或长度超限(30字)，请检查后重试！";
+            $('#uploadModal').modal({
+                keyboard: false
+            });
+            return;
+        }
+        if (checkerpaper === false && !isAssetTypeValid(file_data['name'])) {
+            document.getElementById("taginfo").innerHTML = "上传文件格式仅接受JPG,PNG,JPEG,PDF,DOCX,DOC,HEIC,TXT,ZIP,RAR";
+            $('#uploadModal').modal({
+                keyboard: false
+            });
+            return;
+        }
+
+        // 发票情况汇总警告。
+        $('#btn_norm_check').attr('style', 'display:none');
+        $('#btn_upload_check').attr('style', 'display:block');
+        document.getElementById("taginfo").innerHTML = "请务必确认以下报销信息：<br><span style='font-size: xx-large; color: red'>" + receiptprice + "</span> 元<br>" +
+            "<span style='font-size: xx-large; color: blue'>" + receipttype + "</span> 类<br>" +
+            "批次号<span style='font-size: xx-large; color: red'>#" + batchnumber + "</span> <br>电子材料与办公用品类发票常有同学弄混，请通过页面的发票类型查询核对确认！<br>" +
+            "如信息不正确，请先继续本次上传，然后立即撤销本张发票并重填重传！";
+        $('#uploadModal').modal({
+            keyboard: false
+        });
+
+    });
+
+    $('#btn_norm_check').click(function(){
+        $('#btn_upload_check').attr('style', 'display:none');
+    });
+
+    $('#btn_upload_check').click(function(){
+        do_real_upload();
+        $('#btn_upload_check').attr('style', 'display:none');
+        $('#btn_norm_check').attr('style', 'display:block');
+    });
+
+    $('#verify').click(function(){
+        do_verify();
+    });
+
+    function delete_receipt(id, filename) {
+        var form_data = new FormData();
+        form_data.append('id', id);
+        form_data.append('filename', filename);
+        $.ajax({
+            url: 'php/filedelete.php', // point to server-side PHP script
+            dataType: 'text',  // what to expect back from the PHP script, if anything
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function(data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("taginfo").innerHTML = "撤销发票失败！后台返回错误结果：" + ret.content;
+                    $('#uploadModal').modal({
+                        keyboard: false
+                    });
+                    return;
+                }
+                document.getElementById("taginfo").innerHTML = "发票撤销成功，该发票将不会在本轮报销中被处理！";
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+                $("#search").click();
+            },
+            error: function(){
+                document.getElementById("taginfo").innerHTML = "撤销发票请求错误，请检查网络连接和服务器状态！";
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+            }
+        });
+    }
+
+    function change_checkerquote(id, newquote) {
+        if (newquote.length >= 30) {
+            alert("更改的商品名长度超限(30字)，请调整后重试！");
+            return;
+        }
+        var form_data = new FormData();
+        form_data.append('id', id);
+        form_data.append('checkerquote', newquote);
+        $.ajax({
+            url: 'php/mgrfilechangequote.php',
+            dataType: 'text',
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("taginfo").innerHTML = "发票商品名更改失败！后台返回错误结果：" + ret.content;
+                    $('#uploadModal').modal({
+                        keyboard: false
+                    });
+                    return;
+                }
+                $('#search').click();
+            },
+            error: function(){
+                document.getElementById("taginfo").innerHTML = "发票商品名更改时发生错误，请检查网络连接和服务器状态！";
+                $('#uploadModal').modal({
+                    keyboard: false
+                });
+            }
+        });
+    }
+
+    function change_pricelimit(new_pricelimit) {
+        var username = document.getElementById("username").value;
+        // 对姓名中的空格情况进行处理。
+        username = username.replace(' ', '');
+        var usernumber = document.getElementById("usernumber").value;
+        // 对一卡通号中的空格情况进行处理。
+        usernumber = usernumber.replace(' ', '');
+        var form_data = new FormData();
+        form_data.append('new_pricelimit', new_pricelimit);
+        form_data.append('username', username);
+        form_data.append('usernumber', usernumber);
+        $.ajax({
+            url: 'php/basecfg.php', // point to server-side PHP script
+            dataType: 'text',  // what to expect back from the PHP script, if anything
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function (data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0' || ret.content.length < 1) {
+                    alert("设置失败:" + ret.content);
+                    timelimit = bak_timelimit;
+                    $("#datepicker").val(timelimit);
+                    return;
+                }
+                alert("新的报销限额设置成功！点击确定后，页面将会强制刷新重载");
+                location.reload(true);
+            },
+            error: function () {
+            }
+        });
+    }
+
+    $('#search').click(function() {
+        var username = document.getElementById("username").value;
+        // 对姓名中的空格情况进行处理。
+        username = username.replace(' ', '');
+        var usernumber = document.getElementById("usernumber").value;
+        // 对一卡通号中的空格情况进行处理。
+        usernumber = usernumber.replace(' ', '');
+        var form_data = new FormData();
+        if (username === "" || usernumber === "") {
+            return;
+        }
+        form_data.append('username', username);
+        form_data.append('usernumber', usernumber);
+        $.ajax({
+            url: 'php/filesearch.php', // point to server-side PHP script
+            dataType: 'text',  // what to expect back from the PHP script, if anything
+            cache: false,
+            contentType: false,
+            processData: false,
+            data: form_data,
+            type: 'post',
+            success: function(data) {
+                var ret = JSON.parse(data);
+                if (ret.result === '0') {
+                    document.getElementById("banner_userinfo").innerHTML = welcome_str + "<br>" + "您的个人发票数据获取失败！错误：" + ret.content;
+                    $('#btn_dlrec').prop('style', 'display:none');
+                    return;
+                }
+                document.getElementById("ret_values").innerHTML = "";
+                if (ret.content.length === 0) {
+                    document.getElementById("banner_userinfo").innerHTML = welcome_str + "<br>" + "您暂时没有参与过发票报销，无发票记录";
+                    $('#btn_dlrec').prop('style', 'display:none');
+                    return;
+                }
+
+                var totalamount = new Array();
+                totalamount[batch] = 0.0;
+                totalamount[batch+1] = 0.0;
+                totalamount[batch+2] = 0.0;
+                document.getElementById("ret_values").innerHTML +=
+                    "  <thead>\n" +
+                    "    <tr>\n" +
+                    "      <th scope=\"col\">#批次</th>\n" +
+                    "      <th scope=\"col\">操作</th>\n" +
+                    "      <th scope=\"col\">发票名</th>\n" +
+                    "      <th scope=\"col\">类型</th>\n" +
+                    "      <th scope=\"col\">含税总价</th>\n" +
+                    "      <th scope=\"col\">申报日期</th>\n" +
+                    "      <th scope=\"col\">商品名</th>\n" +
+                    "      <th scope=\"col\">状态</th>\n" +
+                    "    </tr>\n" +
+                    "  </thead>\n" +
+                    "  <tbody>";
+                var last_batch_no = -1;
+                var last_batch_amount = 0.0;
+                for (var i = 0; i < ret.content.length; i++) {
+
+                    if (last_batch_no === -1)
+                        last_batch_no = ret.content[i].batch;
+                    if (ret.content[i].batch !== last_batch_no) {
+                        document.getElementById("ret_values").innerHTML += "    <tr style='background-color: #e2e4e5'>\n" +
+                            "      <th scope=\"row\"> </th>\n" +
+                            "      <td> 批次#" + last_batch_no + "<b> 小计：</b> </td>\n" +
+                            "      <td> <b>¥ " + last_batch_amount + "</b></td>\n <td></td><td></td><td></td><td></td><td></td>" +
+                            "    </tr>";
+                        last_batch_amount = 0.0;
+                        last_batch_no = ret.content[i].batch;
+                    }
+                    last_batch_amount += parseFloat(ret.content[i].fileprice);
+
+                    if (ret.content[i].isfinished === '0'){
+                        if (ret.content[i].filename.indexOf('纸质发票') > 0 && ret.content[i].filename.indexOf('txt') > 0) {
+                            document.getElementById("ret_values").innerHTML += "    <tr>\n" +
+                                "      <th scope=\"row\">" + ret.content[i].batch + "</th>\n" +
+                                "      <td>" + "<button type='button' class='btn btn-danger btn-sm' onclick='javascript:delete_receipt(" + ret.content[i].id + ", \"\")'> 撤销 </button> <button type='button' class='btn btn-info btn-sm' onclick=\"javascript:download_receipt(" + ret.content[i].id + ", '" + ret.content[i].filename + "')\" rel='nofollow'> 查看 </button> " + "</td>\n" +
+                                "      <td>纸质发票</td>\n" +
+                                "      <td>" + get_filetype_dropdown_normal(ret.content[i].id, ret.content[i].filetype) + "</td>\n" +
+                                "      <td>" + ret.content[i].fileprice + "元</td>\n" +
+                                "      <td>" + ret.content[i].uploadtime + "</td>\n" +
+                                "      <td><input class='input-group-sm' id='checkerquote_" + ret.content[i].id + "' onchange='change_checkerquote(" + ret.content[i].id + ", document.getElementById(\"checkerquote_" + ret.content[i].id + "\").value)' value='" + ret.content[i].checkerquote + "' /></td>\n" +
+                                "      <td>" + "暂未报销" + "</td>\n" +
+                                "    </tr>";
+                        } else {
+                            document.getElementById("ret_values").innerHTML += "    <tr>\n" +
+                                "      <th scope=\"row\">" + ret.content[i].batch + "</th>\n" +
+                                "      <td>" + "<button type='button' class='btn btn-danger btn-sm' onclick='javascript:delete_receipt(" + ret.content[i].id + ", \"\")'> 撤销 </button> <button type='button' class='btn btn-info btn-sm' onclick=\"javascript:download_receipt(" + ret.content[i].id + ", '" + ret.content[i].filename + "')\" rel='nofollow'> 查看 </button> " + "</td>\n" +
+                                "      <td>" + ret.content[i].filename + "</td>\n" +
+                                "      <td>" + get_filetype_dropdown_normal(ret.content[i].id, ret.content[i].filetype) + "</td>\n" +
+                                "      <td>" + ret.content[i].fileprice + "元</td>\n" +
+                                "      <td>" + ret.content[i].uploadtime + "</td>\n" +
+                                "      <td><input class='input-group-sm' id='checkerquote_" + ret.content[i].id + "' onchange='change_checkerquote(" + ret.content[i].id + ", document.getElementById(\"checkerquote_" + ret.content[i].id + "\").value)' value='" + ret.content[i].checkerquote + "' /></td>\n" +
+                                "      <td>" + "暂未报销" + "</td>\n" +
+                                "    </tr>";
+                        }
+                        totalamount[parseInt(ret.content[i].batch)] += parseFloat(ret.content[i].fileprice);
+                    } else if (ret.content[i].isfinished === '1'){
+                        document.getElementById("ret_values").innerHTML += "    <tr>\n" +
+                            "      <th scope=\"row\">" + ret.content[i].batch + "</th>\n" +
+                            "      <td>" + "<button type='button' class='btn btn-info btn-sm' onclick=\"javascript:download_receipt(" + ret.content[i].id + ", '" + ret.content[i].filename + "')\" rel='nofollow'> 下载 </button> " + "</td>\n" +
+                            "      <td>" + ret.content[i].filename + "</td>\n" +
+                            "      <td>" + ret.content[i].filetype + "</td>\n" +
+                            "      <td>" + ret.content[i].fileprice + "元</td>\n" +
+                            "      <td>" + ret.content[i].uploadtime + "</td>\n" +
+                            "      <td>" + ret.content[i].checkerquote + "</td>\n" +
+                            "      <td>" + "正在报销中" + "</td>\n" +
+                            "    </tr>";
+                    } else if (ret.content[i].isfinished === '2'){
+                        document.getElementById("ret_values").innerHTML += "    <tr>\n" +
+                            "      <th scope=\"row\">" + ret.content[i].batch + "</th>\n" +
+                            "      <td>" + "<button type='button' class='btn btn-info btn-sm' onclick=\"javascript:download_receipt(" + ret.content[i].id + ", '" + ret.content[i].filename + "')\" rel='nofollow'> 下载 </button> " + "</td>\n" +
+                            "      <td>" + ret.content[i].filename + "</td>\n" +
+                            "      <td>" + ret.content[i].filetype + "</td>\n" +
+                            "      <td>" + ret.content[i].fileprice + "元</td>\n" +
+                            "      <td>" + ret.content[i].uploadtime + "</td>\n" +
+                            "      <td>" + ret.content[i].checkerquote + "</td>\n" +
+                            "      <td>" + "已报销" + "</td>\n" +
+                            "    </tr>";
+                    }
+
+                }
+                $('#btn_dlrec').prop('style', '');
+                document.getElementById("ret_values").innerHTML += "</tbody>";
+                var strAna = "您的待报销发票金额统计：<b><span style='color: red'>";
+                for (var key in totalamount) {
+                    strAna += " [#" + key.toString() + "] ¥" + totalamount[key].toFixed(2);
+                }
+                strAna += " / 限额¥" + (pricelimit/(1+uprate)).toFixed(2) + "</span></b>";
+                document.getElementById("banner_userinfo").innerHTML = welcome_str + "<br>" + strAna;
+            },
+            error: function(){
+                document.getElementById("banner_userinfo").innerHTML = welcome_str + "<br>" + "您的个人发票数据获取失败，请检查网络连接和服务器状态！";
+                $('#btn_dlrec').prop('style', 'display:none');
+            }
+        });
+    });
+
+    document.getElementById("taginfo").innerHTML = "<table class=\"table table-bordered table-striped\">\n" +
+        "  <tbody>\n" +
+        "    <tr>\n" +
+        "      <th scope=\"row\">普票抬头：</th>\n" +
+        "      <td>东南大学</td>\n" +
+        "    </tr>\n" +
+        "    <tr>\n" +
+        "      <th scope=\"row\">税号：</th>\n" +
+        "      <td>12100000466006770Q</td>\n" +
+        "    </tr>\n" +
+        "\t<tr>\n" +
+        "      <th scope=\"row\" colspan=\"2\">请开增值税普通发票，不可开专票！</th>\n" +
+        "    </tr>\n" +
+        "  </tbody>\n" +
+        "</table>" +
+        "<div class=\"alert alert-warning\" role=\"alert\">\n" +
+        "<b style='color:red'>【必读要求1】</b> 办公用品类禁止，请不要报销办公用品，或开具类别票重传！<br>" +
+        "<b style='color:red'>【必读要求2】</b> 图书类只接受明细！仅可报销数学、通信、系统类专业书籍" +
+        "</div>" +
+        "<ul>\n" +
+        "  <li>请主动开具<b style='color:red'>明细票</b>，类别票每月每人最多一张(除图书)；</li>\n" +
+        "  <li>仅可报销实验室/科研相关的费用，<b style='color:red'>私人用品禁止报销</b>；</li>\n" +
+        "  <li><b style='color:red'>纸质发票请勾选纸质发票复选框</b>，勿传附件，请将原件转交给当月报销负责人；</li>\n" +
+        "  <li>报销金额、发票类别填写时<b style='color:red'>注意核对</b>，您的每一次核对都将为报销负责人节约一根头发！</li>\n" +
+        "  <li><b style='color:red'>报销限额时有浮动</b>，以输入卡号后数值为准！</li>" +
+        "</ul>";
+    $('#uploadModal').modal({
+        keyboard: false
+    });
+</script>
+
+<script>
+    function base64(content) {
+        return window.btoa(unescape(encodeURIComponent(content)));
+    }
+    function tableToExcel(tableID, fileName) {
+        var excelContent = $("#" + tableID).html();
+        // 		alert(excelContent);
+        var excelFile = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:x='urn:schemas-microsoft-com:office:excel' xmlns='http://www.w3.org/TR/REC-html40'>";
+        excelFile += "<head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>";
+        excelFile += "<body><table width='10%'  border='1'>";
+        excelFile += excelContent;
+        excelFile += "</table></body>";
+        excelFile += "</html>";
+        var link = "data:application/vnd.ms-excel;base64," + base64(excelFile);
+        var a = document.createElement("a");
+        a.download = fileName + ".xls";
+        a.href = link;
+        a.click();
+    }
+</script>
+
+<div class="card bg-light mb-3">
+    <div class="card-header">
+        发票列表 &nbsp;&nbsp;&nbsp; <button id="btn_dlrec" type="button" class="btn btn-dark" style="display: none" onclick="javascript:tableToExcel('ret_values', document.getElementById('username').value.replace(' ', '') + '_' + document.getElementById('usernumber').value.replace(' ', '') + '.xls' )">下载所有报销记录</button>
+    </div>
+    <table class="table table-hover" id="ret_values" name="ret_values">
+
+    </table>
+</div>
+
+</body>
+
+</html>
