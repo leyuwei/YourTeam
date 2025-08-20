@@ -1,0 +1,102 @@
+<?php
+include 'auth.php';
+include 'header.php';
+$is_manager = ($_SESSION['role'] === 'manager');
+$member_id = $_SESSION['member_id'] ?? null;
+
+if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST'){
+    $id = $_POST['id'] ?? '';
+    $title = trim($_POST['title']);
+    $incharge = $_POST['in_charge'] ?: null;
+    $deadline = $_POST['deadline'];
+    if($id){
+        $stmt = $pdo->prepare("UPDATE reimbursement_batches SET title=?, in_charge_member_id=?, deadline=? WHERE id=?");
+        $stmt->execute([$title, $incharge, $deadline, $id]);
+    } else {
+        $stmt = $pdo->prepare("INSERT INTO reimbursement_batches (title, in_charge_member_id, deadline) VALUES (?,?,?)");
+        $stmt->execute([$title, $incharge, $deadline]);
+    }
+}
+
+$batches = $pdo->query("SELECT b.*, m.name AS in_charge_name, (SELECT COUNT(*) FROM reimbursement_receipts r WHERE r.batch_id=b.id) AS receipt_count FROM reimbursement_batches b LEFT JOIN members m ON b.in_charge_member_id=m.id ORDER BY b.id DESC")->fetchAll();
+$members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll();
+?>
+<div class="d-flex justify-content-between mb-3">
+  <h2 data-i18n="reimburse.title">Reimbursement Batches</h2>
+  <?php if($is_manager): ?>
+  <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#batchModal" data-i18n="reimburse.add_batch">Add Batch</button>
+  <?php endif; ?>
+</div>
+<table class="table table-bordered">
+<tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.table_actions">Actions</th></tr>
+<?php foreach($batches as $b): ?>
+<tr>
+  <td><?= htmlspecialchars($b['title']); ?></td>
+  <td><?= htmlspecialchars($b['deadline']); ?></td>
+  <td><?= htmlspecialchars($b['in_charge_name']); ?></td>
+  <td>
+    <a class="btn btn-sm btn-primary" href="reimbursement_batch.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_details">Details</a>
+    <?php if($is_manager || $b['in_charge_member_id']==$member_id): ?>
+    <a class="btn btn-sm btn-info" href="reimbursement_download.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_download">Download</a>
+    <?php endif; ?>
+    <?php if($is_manager): ?>
+    <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-i18n="reimburse.action_edit">Edit</button>
+    <?php endif; ?>
+  </td>
+</tr>
+<?php endforeach; ?>
+</table>
+<?php if($is_manager): ?>
+<div class="modal fade" id="batchModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post">
+      <div class="modal-header">
+        <h5 class="modal-title" id="batchModalLabel" data-i18n="reimburse.add_batch">Add Batch</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="id" id="batch-id">
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.title">Title</label>
+          <input type="text" name="title" class="form-control" id="batch-title" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.incharge">In Charge</label>
+          <select name="in_charge" class="form-select" id="batch-incharge">
+            <option value="" data-i18n="reimburse.batch.none">None</option>
+            <?php foreach($members as $m): ?>
+            <option value="<?= $m['id']; ?>"><?= htmlspecialchars($m['name']); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.deadline">Deadline</label>
+          <input type="date" name="deadline" class="form-control" id="batch-deadline" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.save">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  document.querySelectorAll('.edit-batch').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.getElementById('batch-id').value=btn.dataset.id;
+      document.getElementById('batch-title').value=btn.dataset.title;
+      document.getElementById('batch-incharge').value=btn.dataset.incharge;
+      document.getElementById('batch-deadline').value=btn.dataset.deadline;
+      document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'en']['reimburse.action_edit'];
+      var modal=new bootstrap.Modal(document.getElementById('batchModal'));
+      modal.show();
+    });
+  });
+  document.getElementById('batchModal').addEventListener('hidden.bs.modal',()=>{
+    document.getElementById('batch-id').value='';
+    document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'en']['reimburse.add_batch'];
+  });
+</script>
+<?php endif; ?>
+<?php include 'footer.php'; ?>
