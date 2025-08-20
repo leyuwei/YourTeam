@@ -18,14 +18,19 @@ $items = $receipts->fetchAll();
 $zip = new ZipArchive();
 $tmp = tempnam(sys_get_temp_dir(),'zip');
 $zip->open($tmp, ZipArchive::CREATE);
-$csv = "id,member,original_filename,category,description,price,status,uploaded_at\n";
+$fp = fopen('php://temp', 'r+');
+fputs($fp, "\xEF\xBB\xBF");
+fputcsv($fp, ['id','member','original_filename','category','description','price','status','uploaded_at']);
 foreach($items as $r){
     $path = __DIR__."/reimburse_uploads/".$id."/".$r['stored_filename'];
     if(is_file($path)){
         $zip->addFile($path, $r['original_filename']);
     }
-    $csv .= $r['id'].',"'.$r['member_name'].'","'.$r['original_filename'].'","'.$r['category'].'","'.$r['description'].'",'.$r['price'].','.$r['status'].','.$r['uploaded_at']."\n";
+    fputcsv($fp, [$r['id'],$r['member_name'],$r['original_filename'],$r['category'],$r['description'],$r['price'],$r['status'],$r['uploaded_at']]);
 }
+rewind($fp);
+$csv = stream_get_contents($fp);
+fclose($fp);
 $zip->addFromString('summary.csv', $csv);
 $zip->close();
 header('Content-Type: application/zip');

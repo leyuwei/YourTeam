@@ -29,12 +29,14 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
   <?php endif; ?>
 </div>
 <table class="table table-bordered">
-<tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
+<tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.limit">Limit</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
 <?php foreach($batches as $b): ?>
 <tr>
   <td><?= htmlspecialchars($b['title']); ?></td>
   <td><?= htmlspecialchars($b['deadline']); ?></td>
   <td><?= htmlspecialchars($b['in_charge_name']); ?></td>
+  <td><span data-i18n="reimburse.status.<?= $b['status']; ?>"><?= htmlspecialchars($b['status']); ?></span></td>
+  <td><?= htmlspecialchars($b['price_limit']); ?></td>
   <?php if(!$is_manager): ?>
   <td>
     <?php

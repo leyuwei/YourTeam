@@ -27,21 +27,38 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $pdo->prepare("UPDATE reimbursement_receipts SET status='complete' WHERE batch_id=?")->execute([$id]);
         $batch['status']='completed';
         $batch_locked = true;
+    } elseif(isset($_POST['unlock']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
+        $pdo->prepare("UPDATE reimbursement_batches SET status='open' WHERE id=?")->execute([$id]);
+        $pdo->prepare("UPDATE reimbursement_receipts SET status='submitted' WHERE batch_id=?")->execute([$id]);
+        $batch['status']='open';
+        $batch_locked = false;
+    } elseif(isset($_POST['reopen']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
+        $pdo->prepare("UPDATE reimbursement_batches SET status='locked' WHERE id=?")->execute([$id]);
+        $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=?")->execute([$id]);
+        $batch['status']='locked';
+        $batch_locked = true;
     } elseif(isset($_FILES['receipt']) && $_FILES['receipt']['error']===UPLOAD_ERR_OK && !$batch_locked && (!$deadline_passed || $is_manager)){
+        $description = trim($_POST['description'] ?? '');
         $price = $_POST['price'] !== '' ? (float)$_POST['price'] : 0;
-        if(!$is_manager && $batch['price_limit'] !== null && $price > $batch['price_limit']){
-            $error = 'exceed';
+        if($description===''){
+            $error = 'desc';
         } else {
-            $category = $_POST['category'];
-            $description = $_POST['description'] ?? null;
-            $orig = $_FILES['receipt']['name'];
-            $ext = pathinfo($orig, PATHINFO_EXTENSION);
-            $newname = uniqid().'.'.$ext;
-            $dir = __DIR__.'/reimburse_uploads/'.$id;
-            if(!is_dir($dir)) mkdir($dir,0777,true);
-            move_uploaded_file($_FILES['receipt']['tmp_name'], $dir.'/'.$newname);
-            $stmt = $pdo->prepare("INSERT INTO reimbursement_receipts (batch_id, member_id, original_filename, stored_filename, category, description, price) VALUES (?,?,?,?,?,?,?)");
-            $stmt->execute([$id, $member_id, $orig, $newname, $category, $description, $price]);
+            $totalStmt = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM reimbursement_receipts WHERE batch_id=? AND member_id=?");
+            $totalStmt->execute([$id,$member_id]);
+            $currentTotal = (float)$totalStmt->fetchColumn();
+            if(!$is_manager && $batch['price_limit'] !== null && $currentTotal + $price > $batch['price_limit']){
+                $error = 'exceed';
+            } else {
+                $category = $_POST['category'];
+                $orig = $_FILES['receipt']['name'];
+                $ext = pathinfo($orig, PATHINFO_EXTENSION);
+                $newname = uniqid().'.'.$ext;
+                $dir = __DIR__.'/reimburse_uploads/'.$id;
+                if(!is_dir($dir)) mkdir($dir,0777,true);
+                move_uploaded_file($_FILES['receipt']['tmp_name'], $dir.'/'.$newname);
+                $stmt = $pdo->prepare("INSERT INTO reimbursement_receipts (batch_id, member_id, original_filename, stored_filename, category, description, price) VALUES (?,?,?,?,?,?,?)");
+                $stmt->execute([$id, $member_id, $orig, $newname, $category, $description, $price]);
+            }
         }
     }
 }
@@ -67,7 +84,7 @@ $receipts = $stmt->fetchAll();
   <a class="btn btn-info" href="reimbursement_download.php?id=<?= $batch['id']; ?>" data-i18n="reimburse.action_download">Download</a>
   <?php endif; ?>
 </div>
-<p><strong data-i18n="reimburse.batch.incharge">In Charge:</strong> <?= htmlspecialchars($batch['in_charge_name']); ?> &nbsp; <strong data-i18n="reimburse.batch.deadline">Deadline:</strong> <?= htmlspecialchars($batch['deadline']); ?> &nbsp; <strong data-i18n="reimburse.batch.limit">Limit:</strong> <?= htmlspecialchars($batch['price_limit']); ?> &nbsp; <strong data-i18n="reimburse.batch.status">Status:</strong> <?= htmlspecialchars($batch['status']); ?></p>
+<p><strong data-i18n="reimburse.batch.incharge">In Charge:</strong> <?= htmlspecialchars($batch['in_charge_name']); ?> &nbsp; <strong data-i18n="reimburse.batch.deadline">Deadline:</strong> <?= htmlspecialchars($batch['deadline']); ?> &nbsp; <strong data-i18n="reimburse.batch.limit">Limit:</strong> <?= htmlspecialchars($batch['price_limit']); ?> &nbsp; <strong data-i18n="reimburse.batch.status">Status:</strong> <span data-i18n="reimburse.status.<?= $batch['status']; ?>"><?= htmlspecialchars($batch['status']); ?></span></p>
 <?php if(!$batch_locked && (!$deadline_passed || $is_manager)): ?>
 <form method="post" enctype="multipart/form-data" class="mb-4">
   <div class="mb-3">
@@ -84,15 +101,16 @@ $receipts = $stmt->fetchAll();
       <option value="trip" data-i18n="reimburse.category.trip">Trip</option>
     </select>
   </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="reimburse.batch.description">Description</label>
-    <input type="text" name="description" class="form-control">
-  </div>
+    <div class="mb-3">
+      <label class="form-label" data-i18n="reimburse.batch.description">Description</label>
+      <input type="text" name="description" class="form-control" required>
+    </div>
   <div class="mb-3">
     <label class="form-label" data-i18n="reimburse.batch.price">Price</label>
     <input type="number" step="0.01" name="price" class="form-control" required>
   </div>
   <?php if($error=='exceed'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.limit_exceed">Price exceeds limit</div><?php endif; ?>
+  <?php if($error=='desc'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.description_required">Description required</div><?php endif; ?>
   <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.upload">Upload</button>
 </form>
 <?php else: ?>
@@ -103,10 +121,10 @@ $receipts = $stmt->fetchAll();
 <?php foreach($receipts as $r): ?>
 <tr>
   <td><a href="<?='reimburse_uploads/'.$id.'/'.urlencode($r['stored_filename']);?>" target="_blank"><?= htmlspecialchars($r['original_filename']); ?></a></td>
-  <td><?= htmlspecialchars($r['category']); ?></td>
+  <td><span data-i18n="reimburse.category.<?= $r['category']; ?>"><?= htmlspecialchars($r['category']); ?></span></td>
   <td><?= htmlspecialchars($r['description']); ?></td>
   <td><?= htmlspecialchars($r['price']); ?></td>
-  <td><?= htmlspecialchars($r['status']); ?></td>
+  <td><span data-i18n="reimburse.status.<?= $r['status']; ?>"><?= htmlspecialchars($r['status']); ?></span></td>
   <td><?= htmlspecialchars($r['name']); ?></td>
   <td>
     <?php if($is_manager || ($r['member_id']==$member_id && $r['status']=='submitted' && !$batch_locked)): ?>
@@ -131,7 +149,7 @@ $receipts = $stmt->fetchAll();
 <table class="table table-bordered">
 <tr><th data-i18n="reimburse.batch.category">Category</th><th data-i18n="reimburse.batch.total">Total</th></tr>
 <?php foreach($category_totals as $ct): ?>
-<tr><td><?= htmlspecialchars($ct['category']); ?></td><td><?= htmlspecialchars($ct['total']); ?></td></tr>
+<tr><td><span data-i18n="reimburse.category.<?= $ct['category']; ?>"><?= htmlspecialchars($ct['category']); ?></span></td><td><?= htmlspecialchars($ct['total']); ?></td></tr>
 <?php endforeach; ?>
 </table>
 <form method="post" class="mt-3">
@@ -139,6 +157,9 @@ $receipts = $stmt->fetchAll();
   <button type="submit" name="lock" value="1" class="btn btn-warning" data-i18n="reimburse.batch.lock">Lock</button>
   <?php elseif($batch['status']=='locked'): ?>
   <button type="submit" name="complete" value="1" class="btn btn-success" data-i18n="reimburse.batch.complete">Complete</button>
+  <button type="submit" name="unlock" value="1" class="btn btn-secondary" data-i18n="reimburse.batch.unlock">Unlock</button>
+  <?php elseif($batch['status']=='completed'): ?>
+  <button type="submit" name="reopen" value="1" class="btn btn-secondary" data-i18n="reimburse.batch.reopen">Reopen</button>
   <?php endif; ?>
 </form>
 <?php endif; ?>
