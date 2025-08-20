@@ -75,6 +75,7 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
   $stmt->execute([$member_id]);
   $receipts = $stmt->fetchAll();
 ?>
+<br>
 <h3 data-i18n="reimburse.refused.title">Refused Receipts</h3>
 <?php if($receipts): ?>
 <table class="table table-bordered">
