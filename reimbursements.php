@@ -64,6 +64,7 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
     <?php endif; ?>
     <?php if($is_manager): ?>
     <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-i18n="reimburse.action_edit">Edit</button>
+    <a class="btn btn-sm btn-danger" href="reimbursement_batch_delete.php?id=<?= $b['id']; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'en']['reimburse.batch.confirm_delete_batch']);">Delete</a>
     <?php endif; ?>
   </td>
 </tr>
