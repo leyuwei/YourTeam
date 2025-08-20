@@ -6,7 +6,7 @@ if(isset($_SESSION['role'])){
 }
 $error = '';
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
-    $type = $_POST['login_type'] ?? 'manager';
+    $type = $_POST['login_type'] ?? 'member';
     if($type === 'manager'){
         $username = $_POST['username'] ?? '';
         $password = $_POST['password'] ?? '';
@@ -61,21 +61,22 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
   <div class="row justify-content-center">
     <div class="col-md-4">
       <div class="card">
-        <div class="card-header" id="loginTitle" data-i18n="login.title.manager">Login</div>
+        <div class="card-header" id="loginTitle" data-i18n="login.title.member">Login</div>
         <div class="card-body">
           <?php if($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
           <form method="post" id="loginForm">
             <div class="mb-3">
               <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="login_type" id="loginManager" value="manager" checked>
+                <input class="form-check-input" type="radio" name="login_type" id="loginManager" value="manager">
                 <label class="form-check-label" for="loginManager" data-i18n="login.radio.manager">Manager</label>
               </div>
               <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="login_type" id="loginMember" value="member">
+                <input class="form-check-input" type="radio" name="login_type" id="loginMember" value="member" checked>
                 <label class="form-check-label" for="loginMember" data-i18n="login.radio.member">Member</label>
               </div>
             </div>
-            <div id="managerFields">
+            <div id="identityWarning" class="alert alert-warning" data-i18n="login.warning.member"></div>
+            <div id="managerFields" style="display:none">
               <div class="mb-3">
                 <label class="form-label" data-i18n="login.username">Username</label>
                 <input type="text" name="username" class="form-control">
@@ -85,7 +86,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                 <input type="password" name="password" class="form-control">
               </div>
             </div>
-            <div id="memberFields" style="display:none">
+            <div id="memberFields">
               <div class="mb-3">
                 <label class="form-label" data-i18n="login.name">Name</label>
                 <input type="text" name="name" class="form-control">
@@ -107,6 +108,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 document.addEventListener('DOMContentLoaded',function(){
   const managerFields=document.getElementById('managerFields');
   const memberFields=document.getElementById('memberFields');
+  const identityWarning=document.getElementById('identityWarning');
   document.querySelectorAll('input[name="login_type"]').forEach(r=>{
     r.addEventListener('change',function(){
       const titleEl = document.getElementById('loginTitle');
@@ -114,10 +116,12 @@ document.addEventListener('DOMContentLoaded',function(){
         managerFields.style.display='block';
         memberFields.style.display='none';
         titleEl.setAttribute('data-i18n','login.title.manager');
+        identityWarning.setAttribute('data-i18n','login.warning.manager');
       }else{
         managerFields.style.display='none';
         memberFields.style.display='block';
         titleEl.setAttribute('data-i18n','login.title.member');
+        identityWarning.setAttribute('data-i18n','login.warning.member');
       }
       applyTranslations();
     });
