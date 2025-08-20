@@ -146,3 +146,9 @@ CREATE TABLE reimbursement_receipts (
   FOREIGN KEY (batch_id) REFERENCES reimbursement_batches(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
+
+CREATE TABLE reimbursement_announcement (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  content TEXT NOT NULL
+);
+INSERT INTO reimbursement_announcement (id, content) VALUES (1, '');
