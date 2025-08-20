@@ -1,6 +1,6 @@
 <?php
 include 'auth_manager.php';
-include 'header.php';
+
 $id = $_GET['id'] ?? null;
 $notification = ['content'=>'','valid_begin_date'=>'','valid_end_date'=>''];
 $selected = [];
@@ -12,7 +12,7 @@ if($id){
     $stmt->execute([$id]);
     $selected = $stmt->fetchAll(PDO::FETCH_COLUMN);
 }
-$members = $pdo->query('SELECT id,name FROM members ORDER BY name')->fetchAll();
+
 if($_SERVER['REQUEST_METHOD']==='POST'){
     $content = $_POST['content'];
     $begin = $_POST['valid_begin_date'];
@@ -36,6 +36,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     header('Location: notifications.php');
     exit();
 }
+
+$members = $pdo->query('SELECT id,name FROM members ORDER BY name')->fetchAll();
+
+include 'header.php';
 ?>
 <h2 data-i18n="<?= $id? 'notification_edit.title_edit':'notification_edit.title_add'; ?>"><?= $id? 'Edit Notification':'Add Notification'; ?></h2>
 <form method="post">
