@@ -46,7 +46,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title data-i18n="login.title">Login</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="./style/bootstrap.min.css" rel="stylesheet">
 <style>
   .container { max-width: 80%; }
 </style>
@@ -103,7 +103,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     </div>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="./style/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
   const managerFields=document.getElementById('managerFields');
