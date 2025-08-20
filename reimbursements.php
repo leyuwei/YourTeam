@@ -21,17 +21,24 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']
 
 $batches = $pdo->query("SELECT b.*, m.name AS in_charge_name, (SELECT COUNT(*) FROM reimbursement_receipts r WHERE r.batch_id=b.id) AS receipt_count FROM reimbursement_batches b LEFT JOIN members m ON b.in_charge_member_id=m.id ORDER BY (b.status='completed'), b.deadline ASC")->fetchAll();
 $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll();
-$announcement = $pdo->query("SELECT content FROM reimbursement_announcement WHERE id=1")->fetchColumn();
+$announcement = $pdo->query("SELECT content_en, content_zh FROM reimbursement_announcement WHERE id=1")
+                ->fetch(PDO::FETCH_ASSOC);
 ?>
-<?php if($announcement || $is_manager): ?>
+<?php if(($announcement['content_en'] ?? '') || ($announcement['content_zh'] ?? '') || $is_manager): ?>
 <div class="alert alert-warning">
-  <?php if($announcement): ?>
-  <?= nl2br($announcement); ?>
+  <?php if(($announcement['content_en'] ?? '') || ($announcement['content_zh'] ?? '')): ?>
+  <div class="announcement" data-lang="en"><?= $announcement['content_en']; ?></div>
+  <div class="announcement" data-lang="zh"><?= $announcement['content_zh']; ?></div>
   <?php endif; ?>
   <?php if($is_manager): ?>
-  <a href="reimbursement_announcement_edit.php" class="btn btn-sm btn-light ms-3">Edit Announcement</a>
+  <a href="reimbursement_announcement_edit.php" class="btn btn-sm btn-light ms-3" data-i18n="reimburse.announcement.edit">Edit Announcement</a>
   <?php endif; ?>
 </div>
+<style>
+.announcement[data-lang]{display:none;}
+html[lang="en"] .announcement[data-lang="en"]{display:block;}
+html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
+</style>
 <?php endif; ?>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="reimburse.title">Reimbursement Batches</h2>

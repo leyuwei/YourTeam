@@ -326,7 +326,12 @@ const translations = {
   'reimburse.batch.total_member': 'Total by Member',
   'reimburse.batch.total_category': 'Total by Category',
   'reimburse.batch.campus_id': 'Campus ID',
-  'reimburse.batch.total': 'Total'
+  'reimburse.batch.total': 'Total',
+  'reimburse.announcement.title': 'Reimbursement Announcement',
+  'reimburse.announcement.label_en': 'English Announcement',
+  'reimburse.announcement.label_zh': 'Chinese Announcement',
+  'reimburse.announcement.edit': 'Edit Announcement',
+  'reimburse.announcement.note_html': 'You can use HTML tags for styling.'
   },
   zh: {
     'nav.home': '团队管理',
@@ -655,7 +660,12 @@ const translations = {
   'reimburse.batch.total_member': '成员金额汇总',
   'reimburse.batch.total_category': '类别金额汇总',
   'reimburse.batch.campus_id': '学号',
-  'reimburse.batch.total': '总金额'
+  'reimburse.batch.total': '总金额',
+  'reimburse.announcement.title': '报销公告',
+  'reimburse.announcement.label_en': '英文公告',
+  'reimburse.announcement.label_zh': '中文公告',
+  'reimburse.announcement.edit': '编辑公告',
+  'reimburse.announcement.note_html': '可以使用HTML标签进行排版'
   }
 };
 
