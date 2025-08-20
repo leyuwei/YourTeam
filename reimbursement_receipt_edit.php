@@ -1,6 +1,5 @@
 <?php
 include 'auth.php';
-include 'header.php';
 $id = (int)($_GET['id'] ?? 0);
 $is_manager = ($_SESSION['role'] === 'manager');
 $member_id = $_SESSION['member_id'] ?? 0;
@@ -8,12 +7,14 @@ $stmt = $pdo->prepare("SELECT r.*, b.price_limit, b.status AS batch_status, b.ti
 $stmt->execute([$id]);
 $rec = $stmt->fetch();
 if(!$rec || (!$is_manager && $rec['member_id'] != $member_id)){
+    include 'header.php';
     echo '<div class="alert alert-danger">No permission</div>';
     include 'footer.php';
     exit;
 }
 $can_edit = ($rec['status']=='refused') || ($rec['status']=='submitted' && $rec['batch_status']=='open');
 if(!$can_edit){
+    include 'header.php';
     echo '<div class="alert alert-warning">Cannot edit this receipt</div>';
     include 'footer.php';
     exit;
@@ -82,6 +83,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         }
     }
 }
+include 'header.php';
 ?>
 <h2 data-i18n="reimburse.batch.edit">Edit Receipt</h2>
 <form method="post" enctype="multipart/form-data">
@@ -122,7 +124,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   <?php if($error=='file'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.file_required">File required</div><?php endif; ?>
   <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.save">Save</button>
   <?php if($rec['status']=='refused'): ?>
-  <a href="refused_receipts.php" class="btn btn-secondary" data-i18n="reimburse.batch.cancel">Cancel</a>
+  <a href="reimbursements.php" class="btn btn-secondary" data-i18n="reimburse.batch.cancel">Cancel</a>
   <?php else: ?>
   <a href="reimbursement_batch.php?id=<?= $rec['batch_id']; ?>" class="btn btn-secondary" data-i18n="reimburse.batch.cancel">Cancel</a>
   <?php endif; ?>

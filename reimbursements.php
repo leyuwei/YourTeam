@@ -25,9 +25,6 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="reimburse.title">Reimbursement Batches</h2>
   <div>
-    <?php if(!$is_manager): ?>
-    <a class="btn btn-secondary me-2" href="refused_receipts.php" data-i18n="reimburse.refused.list">Refused Receipts</a>
-    <?php endif; ?>
     <?php if($is_manager): ?>
     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#batchModal" data-i18n="reimburse.add_batch">Add Batch</button>
     <?php endif; ?>
@@ -49,9 +46,9 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
       $stmt->execute([$b['id'],$member_id]);
       $urs = $stmt->fetchAll();
       if($urs){
-        echo '<ul class="mb-0">';
+        echo '<ul class="list-group list-group-flush mb-0">';
         foreach($urs as $r){
-          echo '<li><a href="reimburse_uploads/'.$b['id'].'/'.urlencode($r['stored_filename']).'" target="_blank">'.htmlspecialchars($r['stored_filename']).'</a><br><small>'.htmlspecialchars($r['description']).' - <span data-i18n="reimburse.category.'.$r['category'].'">'.htmlspecialchars($r['category']).'</span> - '.htmlspecialchars($r['price']).'</small></li>';
+          echo '<li class="list-group-item px-2 py-1"><a href="reimburse_uploads/'.$b['id'].'/'.urlencode($r['stored_filename']).'" target="_blank">'.htmlspecialchars($r['stored_filename']).'</a><br><small>'.htmlspecialchars($r['description']).' - <span data-i18n="reimburse.category.'.$r['category'].'">'.htmlspecialchars($r['category']).'</span> - '.htmlspecialchars($r['price']).'</small></li>';
         }
         echo '</ul>';
       } else {
@@ -72,6 +69,31 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
 </tr>
 <?php endforeach; ?>
 </table>
+<?php if(!$is_manager): ?>
+<?php
+  $stmt = $pdo->prepare("SELECT r.*, b.title AS batch_title FROM reimbursement_receipts r JOIN reimbursement_batches b ON r.batch_id=b.id WHERE r.member_id=? AND r.status='refused' ORDER BY r.id DESC");
+  $stmt->execute([$member_id]);
+  $receipts = $stmt->fetchAll();
+?>
+<h3 data-i18n="reimburse.refused.title">Refused Receipts</h3>
+<?php if($receipts): ?>
+<table class="table table-bordered">
+<tr><th data-i18n="reimburse.batch.receipt">Receipt</th><th data-i18n="reimburse.batch.category">Category</th><th data-i18n="reimburse.batch.description">Description</th><th data-i18n="reimburse.batch.price">Price</th><th data-i18n="reimburse.refused.original_batch">Original Batch</th><th data-i18n="reimburse.batch.actions">Actions</th></tr>
+<?php foreach($receipts as $r): ?>
+<tr>
+  <td><a href="<?= 'reimburse_uploads/'.$r['batch_id'].'/'.urlencode($r['stored_filename']); ?>" target="_blank"><?= htmlspecialchars($r['stored_filename']); ?></a></td>
+  <td><span data-i18n="reimburse.category.<?= $r['category']; ?>"><?= htmlspecialchars($r['category']); ?></span></td>
+  <td><?= htmlspecialchars($r['description']); ?></td>
+  <td><?= htmlspecialchars($r['price']); ?></td>
+  <td><?= htmlspecialchars($r['batch_title']); ?></td>
+  <td><a class="btn btn-sm btn-secondary" href="reimbursement_receipt_edit.php?id=<?= $r['id']; ?>" data-i18n="reimburse.batch.edit">Edit</a></td>
+</tr>
+<?php endforeach; ?>
+</table>
+<?php else: ?>
+<div class="alert alert-info" data-i18n="reimburse.batch.none">None</div>
+<?php endif; ?>
+<?php endif; ?>
 <?php if($is_manager): ?>
 <div class="modal fade" id="batchModal" tabindex="-1">
   <div class="modal-dialog">
