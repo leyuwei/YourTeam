@@ -37,7 +37,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='locked';
         $batch_locked = true;
-    } elseif(isset($_FILES['receipt']) && $_FILES['receipt']['error']===UPLOAD_ERR_OK && !$batch_locked && (!$deadline_passed || $is_manager)){
+    } elseif(!$is_manager && isset($_FILES['receipt']) && $_FILES['receipt']['error']===UPLOAD_ERR_OK && !$batch_locked && !$deadline_passed){
         $description = trim($_POST['description'] ?? '');
         $price = $_POST['price'] !== '' ? (float)$_POST['price'] : 0;
         if($description===''){
@@ -92,7 +92,7 @@ $receipts = $stmt->fetchAll();
   <?php endif; ?>
 </div>
 <p><strong data-i18n="reimburse.batch.incharge">In Charge:</strong> <?= htmlspecialchars($batch['in_charge_name']); ?> &nbsp; <strong data-i18n="reimburse.batch.deadline">Deadline:</strong> <?= htmlspecialchars($batch['deadline']); ?> &nbsp; <strong data-i18n="reimburse.batch.limit">Limit:</strong> <?= htmlspecialchars($batch['price_limit']); ?> &nbsp; <strong data-i18n="reimburse.batch.status">Status:</strong> <span data-i18n="reimburse.status.<?= $batch['status']; ?>"><?= htmlspecialchars($batch['status']); ?></span></p>
-<?php if(!$batch_locked && (!$deadline_passed || $is_manager)): ?>
+<?php if(!$is_manager && !$batch_locked && !$deadline_passed): ?>
 <form method="post" enctype="multipart/form-data" class="mb-4">
   <div class="mb-3">
     <label class="form-label" data-i18n="reimburse.batch.file">Receipt File</label>
@@ -120,6 +120,8 @@ $receipts = $stmt->fetchAll();
   <?php if($error=='desc'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.description_required">Description required</div><?php endif; ?>
   <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.upload">Upload</button>
 </form>
+<?php elseif($is_manager): ?>
+<div class="alert alert-warning" data-i18n="reimburse.batch.manager_no_upload">Managers cannot upload receipts</div>
 <?php else: ?>
 <div class="alert alert-warning" data-i18n="reimburse.batch.deadline_passed">Deadline passed or batch locked</div>
 <?php endif; ?>
