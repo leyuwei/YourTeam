@@ -18,13 +18,13 @@ $items = $receipts->fetchAll();
 $zip = new ZipArchive();
 $tmp = tempnam(sys_get_temp_dir(),'zip');
 $zip->open($tmp, ZipArchive::CREATE);
-$csv = "id,member,original_filename,amount,uploaded_at\n";
+$csv = "id,member,original_filename,category,description,price,status,uploaded_at\n";
 foreach($items as $r){
     $path = __DIR__."/reimburse_uploads/".$id."/".$r['stored_filename'];
     if(is_file($path)){
         $zip->addFile($path, $r['original_filename']);
     }
-    $csv .= $r['id'].',"'.$r['member_name'].'","'.$r['original_filename'].'",'.$r['amount'].','.$r['uploaded_at']."\n";
+    $csv .= $r['id'].',"'.$r['member_name'].'","'.$r['original_filename'].'","'.$r['category'].'","'.$r['description'].'",'.$r['price'].','.$r['status'].','.$r['uploaded_at']."\n";
 }
 $zip->addFromString('summary.csv', $csv);
 $zip->close();
