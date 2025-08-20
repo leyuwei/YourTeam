@@ -126,6 +126,8 @@ CREATE TABLE reimbursement_batches (
   title VARCHAR(100) NOT NULL,
   in_charge_member_id INT DEFAULT NULL,
   deadline DATE NOT NULL,
+  price_limit DECIMAL(10,2) DEFAULT NULL,
+  status ENUM('open','locked','completed') DEFAULT 'open',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (in_charge_member_id) REFERENCES members(id) ON DELETE SET NULL
 );
@@ -136,7 +138,10 @@ CREATE TABLE reimbursement_receipts (
   member_id INT NOT NULL,
   original_filename VARCHAR(255) NOT NULL,
   stored_filename VARCHAR(255) NOT NULL,
-  amount DECIMAL(10,2) DEFAULT NULL,
+  category ENUM('office','electronic','membership','book','trip') NOT NULL,
+  description VARCHAR(255) DEFAULT NULL,
+  price DECIMAL(10,2) NOT NULL,
+  status ENUM('submitted','locked','complete') DEFAULT 'submitted',
   uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (batch_id) REFERENCES reimbursement_batches(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE

@@ -9,12 +9,13 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST'){
     $title = trim($_POST['title']);
     $incharge = $_POST['in_charge'] ?: null;
     $deadline = $_POST['deadline'];
+    $limit = $_POST['price_limit'] !== '' ? $_POST['price_limit'] : null;
     if($id){
-        $stmt = $pdo->prepare("UPDATE reimbursement_batches SET title=?, in_charge_member_id=?, deadline=? WHERE id=?");
-        $stmt->execute([$title, $incharge, $deadline, $id]);
+        $stmt = $pdo->prepare("UPDATE reimbursement_batches SET title=?, in_charge_member_id=?, deadline=?, price_limit=? WHERE id=?");
+        $stmt->execute([$title, $incharge, $deadline, $limit, $id]);
     } else {
-        $stmt = $pdo->prepare("INSERT INTO reimbursement_batches (title, in_charge_member_id, deadline) VALUES (?,?,?)");
-        $stmt->execute([$title, $incharge, $deadline]);
+        $stmt = $pdo->prepare("INSERT INTO reimbursement_batches (title, in_charge_member_id, deadline, price_limit) VALUES (?,?,?,?)");
+        $stmt->execute([$title, $incharge, $deadline, $limit]);
     }
 }
 
@@ -28,19 +29,37 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
   <?php endif; ?>
 </div>
 <table class="table table-bordered">
-<tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.table_actions">Actions</th></tr>
+<tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
 <?php foreach($batches as $b): ?>
 <tr>
   <td><?= htmlspecialchars($b['title']); ?></td>
   <td><?= htmlspecialchars($b['deadline']); ?></td>
   <td><?= htmlspecialchars($b['in_charge_name']); ?></td>
+  <?php if(!$is_manager): ?>
+  <td>
+    <?php
+      $stmt = $pdo->prepare("SELECT * FROM reimbursement_receipts WHERE batch_id=? AND member_id=? ORDER BY id DESC");
+      $stmt->execute([$b['id'],$member_id]);
+      $urs = $stmt->fetchAll();
+      if($urs){
+        echo '<ul class="mb-0">';
+        foreach($urs as $r){
+          echo '<li><a href="reimburse_uploads/'.$b['id'].'/'.urlencode($r['stored_filename']).'" target="_blank">'.htmlspecialchars($r['original_filename']).'</a> - '.htmlspecialchars($r['price']).'</li>';
+        }
+        echo '</ul>';
+      } else {
+        echo '<span data-i18n="reimburse.batch.none">None</span>';
+      }
+    ?>
+  </td>
+  <?php endif; ?>
   <td>
     <a class="btn btn-sm btn-primary" href="reimbursement_batch.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_details">Details</a>
     <?php if($is_manager || $b['in_charge_member_id']==$member_id): ?>
     <a class="btn btn-sm btn-info" href="reimbursement_download.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_download">Download</a>
     <?php endif; ?>
     <?php if($is_manager): ?>
-    <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-i18n="reimburse.action_edit">Edit</button>
+    <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-i18n="reimburse.action_edit">Edit</button>
     <?php endif; ?>
   </td>
 </tr>
@@ -73,6 +92,10 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
           <label class="form-label" data-i18n="reimburse.batch.deadline">Deadline</label>
           <input type="date" name="deadline" class="form-control" id="batch-deadline" required>
         </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.limit">Price Limit</label>
+          <input type="number" step="0.01" name="price_limit" class="form-control" id="batch-limit">
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.cancel">Cancel</button>
@@ -88,6 +111,7 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
       document.getElementById('batch-title').value=btn.dataset.title;
       document.getElementById('batch-incharge').value=btn.dataset.incharge;
       document.getElementById('batch-deadline').value=btn.dataset.deadline;
+      document.getElementById('batch-limit').value=btn.dataset.limit;
       document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'en']['reimburse.action_edit'];
       var modal=new bootstrap.Modal(document.getElementById('batchModal'));
       modal.show();
@@ -95,6 +119,7 @@ $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll()
   });
   document.getElementById('batchModal').addEventListener('hidden.bs.modal',()=>{
     document.getElementById('batch-id').value='';
+    document.getElementById('batch-limit').value='';
     document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'en']['reimburse.add_batch'];
   });
 </script>
