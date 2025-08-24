@@ -58,7 +58,7 @@ if($status){
 document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('.delete-task').forEach(link=>{
     link.addEventListener('click',e=>{
-      const lang=document.documentElement.lang||'en';
+      const lang=document.documentElement.lang||'zh';
       const msg=translations[lang]['tasks.confirm.delete'];
       if(!doubleConfirm(msg)) e.preventDefault();
     });

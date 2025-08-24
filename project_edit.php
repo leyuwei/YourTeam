@@ -91,7 +91,7 @@ projForm.addEventListener('submit', function(e){
   const begin = projForm.querySelector('input[name="begin_date"]').value;
   const end = projForm.querySelector('input[name="end_date"]').value;
   if(begin && end && new Date(end) <= new Date(begin)){
-    const lang = document.documentElement.lang || 'en';
+    const lang = document.documentElement.lang || 'zh';
     alert(translations[lang]['project_edit.error_range']);
     e.preventDefault();
   }

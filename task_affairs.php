@@ -37,6 +37,7 @@ if($is_manager){
   <th data-i18n="task_affairs.table_start">Start Date</th>
   <th data-i18n="task_affairs.table_end">End Date</th>
   <th data-i18n="task_affairs.table_days">Days</th>
+  <th data-i18n="task_affairs.table_status">Status</th>
   <?php if($is_manager): ?><th data-i18n="task_affairs.table_actions">Actions</th><?php endif; ?>
 </tr>
 <?php foreach($affairs as $a): ?>
@@ -48,10 +49,16 @@ if($is_manager){
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['start_time']))); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['end_time'] . ' -1 day'))); ?></td>
   <td><?= htmlspecialchars($days); ?></td>
+  <td data-i18n="task_affairs.status.<?= $a['status']; ?>"><?= htmlspecialchars($a['status']); ?></td>
   <?php if($is_manager): ?>
   <td>
     <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="modal" data-bs-target="#editModal<?= $a['id']; ?>" data-i18n="task_affairs.action_edit">Edit</button>
     <a class="btn btn-sm btn-danger delete-affair" href="affair_delete.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>" data-i18n="task_affairs.action_delete">Delete</a>
+    <?php if($a['status']==='pending'): ?>
+    <a class="btn btn-sm btn-success" href="affair_confirm.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>&status=confirmed" data-i18n="task_affairs.action_confirm">Confirm</a>
+    <?php else: ?>
+    <a class="btn btn-sm btn-warning" href="affair_confirm.php?id=<?= $a['id']; ?>&task_id=<?= $task_id; ?>&status=pending" data-i18n="task_affairs.action_unconfirm">Unconfirm</a>
+    <?php endif; ?>
   </td>
   <?php endif; ?>
 </tr>
@@ -94,6 +101,13 @@ if($is_manager){
           <div class="mb-3">
             <label class="form-label" data-i18n="task_affairs.label_end">End Date</label>
             <input type="date" name="end_time" class="form-control edit-end" required value="<?= date('Y-m-d', strtotime($a['end_time'] . ' -1 day')); ?>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="task_affairs.label_status">Status</label>
+            <select name="status" class="form-select">
+              <option value="pending" data-i18n="task_affairs.status.pending" <?= $a['status']==='pending' ? 'selected' : ''; ?>>Pending</option>
+              <option value="confirmed" data-i18n="task_affairs.status.confirmed" <?= $a['status']==='confirmed' ? 'selected' : ''; ?>>Confirmed</option>
+            </select>
           </div>
         </div>
         <div class="modal-footer">
@@ -138,7 +152,7 @@ const affairForm = document.querySelector('form[action="affair_add.php"]');
 const startField = document.getElementById('startDate');
 const endField = document.getElementById('endDate');
 const dayCount = document.getElementById('dayCount');
-const getLang = () => document.documentElement.lang || 'en';
+const getLang = () => document.documentElement.lang || 'zh';
 function updateDays(){
   if(startField.value && endField.value){
     const start = new Date(startField.value);

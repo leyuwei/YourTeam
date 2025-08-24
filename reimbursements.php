@@ -82,7 +82,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
     <?php endif; ?>
     <?php if($is_manager): ?>
     <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-i18n="reimburse.action_edit">Edit</button>
-    <a class="btn btn-sm btn-danger" href="reimbursement_batch_delete.php?id=<?= $b['id']; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'en']['reimburse.batch.confirm_delete_batch']);">Delete</a>
+    <a class="btn btn-sm btn-danger" href="reimbursement_batch_delete.php?id=<?= $b['id']; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_delete_batch']);">Delete</a>
     <?php endif; ?>
   </td>
 </tr>
@@ -161,7 +161,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
       document.getElementById('batch-incharge').value=btn.dataset.incharge;
       document.getElementById('batch-deadline').value=btn.dataset.deadline;
       document.getElementById('batch-limit').value=btn.dataset.limit;
-      document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'en']['reimburse.action_edit'];
+      document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'zh']['reimburse.action_edit'];
       var modal=new bootstrap.Modal(document.getElementById('batchModal'));
       modal.show();
     });
@@ -169,7 +169,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
   document.getElementById('batchModal').addEventListener('hidden.bs.modal',()=>{
     document.getElementById('batch-id').value='';
     document.getElementById('batch-limit').value='';
-    document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'en']['reimburse.add_batch'];
+    document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'zh']['reimburse.add_batch'];
   });
 </script>
 <?php endif; ?>

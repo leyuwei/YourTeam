@@ -65,6 +65,7 @@ CREATE TABLE task_affairs (
   description TEXT,
   start_time DATETIME NOT NULL,
   end_time DATETIME NOT NULL,
+  status ENUM('pending','confirmed') DEFAULT 'pending',
   FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
 

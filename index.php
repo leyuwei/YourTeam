@@ -36,7 +36,7 @@ if($_SESSION['role']==='member'){
 <script>
 document.querySelectorAll('.check-notification').forEach(link=>{
   link.addEventListener('click',e=>{
-    const lang=document.documentElement.lang||'en';
+    const lang=document.documentElement.lang||'zh';
     const msg=translations[lang]['notifications.confirm.check'];
     if(!confirm(msg)) e.preventDefault();
   });

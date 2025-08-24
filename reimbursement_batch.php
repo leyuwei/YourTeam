@@ -137,13 +137,13 @@ $receipts = $stmt->fetchAll();
   <td><?= htmlspecialchars($r['name']); ?></td>
   <td>
     <?php if($is_manager || $batch['in_charge_member_id']==$member_id): ?>
-    <a class="btn btn-sm btn-warning" href="reimbursement_receipt_refuse.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.refuse" onclick="return doubleConfirm(translations[document.documentElement.lang||'en']['reimburse.batch.confirm_refuse']);">Refuse</a>
+    <a class="btn btn-sm btn-warning" href="reimbursement_receipt_refuse.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.refuse" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_refuse']);">Refuse</a>
     <?php endif; ?>
     <?php if($is_manager || ($r['member_id']==$member_id && $r['status']=='submitted' && !$batch_locked)): ?>
     <a class="btn btn-sm btn-secondary" href="reimbursement_receipt_edit.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.edit">Edit</a>
     <?php endif; ?>
     <?php if($is_manager || ($r['member_id']==$member_id && $r['status']=='submitted' && !$batch_locked)): ?>
-    <a class="btn btn-sm btn-danger" href="reimbursement_receipt_delete.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'en']['reimburse.batch.confirm_delete']);">Delete</a>
+    <a class="btn btn-sm btn-danger" href="reimbursement_receipt_delete.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_delete']);">Delete</a>
     <?php endif; ?>
   </td>
 </tr>

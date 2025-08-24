@@ -4,7 +4,7 @@ const TEAM_NAME = { en: '', zh: '' };
 
 function applyTeamName() {
   if (typeof TEAM_NAME === 'undefined') return;
-  const lang = localStorage.getItem('lang') || document.documentElement.lang || 'en';
+  const lang = localStorage.getItem('lang') || document.documentElement.lang || 'zh';
   const name = typeof TEAM_NAME === 'string' ? TEAM_NAME : (TEAM_NAME[lang] || '');
   if (!name) return;
   const regex = /(团队|Team)/g;

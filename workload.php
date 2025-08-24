@@ -2,7 +2,7 @@
 include 'auth_manager.php';
 $start = $_GET['start'] ?? '';
 $end = $_GET['end'] ?? '';
-$lang = $_GET['lang'] ?? 'en';
+$lang = $_GET['lang'] ?? 'zh';
 $report = [];
 $error = '';
 if($start && $end){
@@ -13,7 +13,7 @@ if($start && $end){
     foreach($members as $m){
         $total_task = 0;
         $task_hours = [];
-        $stmt = $pdo->prepare('SELECT t.title, a.description, a.start_time, a.end_time FROM task_affairs a JOIN task_affair_members am ON a.id=am.affair_id JOIN tasks t ON a.task_id=t.id WHERE am.member_id=? AND a.start_time < ? AND a.end_time > ?');
+        $stmt = $pdo->prepare('SELECT t.title, a.description, a.start_time, a.end_time FROM task_affairs a JOIN task_affair_members am ON a.id=am.affair_id JOIN tasks t ON a.task_id=t.id WHERE am.member_id=? AND a.start_time < ? AND a.end_time > ? AND a.status="confirmed"');
         $stmt->execute([$m['id'],$end,$start]);
         foreach($stmt as $row){
             $join = max($row['start_time'],$start);
@@ -123,7 +123,7 @@ rangeForm.addEventListener('submit', function(e){
 <?php endif; ?>
 <script>
 document.getElementById('exportBtn')?.addEventListener('click',function(){
-  const lang=document.documentElement.lang||'en';
+  const lang=document.documentElement.lang||'zh';
   this.href=`workload.php?start=<?= urlencode($start); ?>&end=<?= urlencode($end); ?>&export=1&lang=${lang}`;
 });
 </script>
