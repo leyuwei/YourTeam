@@ -1,6 +1,6 @@
 <?php include_once 'auth.php'; $current_page = basename($_SERVER['PHP_SELF']); ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -95,7 +95,7 @@
           <?php endif; ?>
         </ul>
       <span class="navbar-text me-3"><span data-i18n="welcome">Welcome</span>, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
-      <button id="langToggle" class="btn btn-outline-light me-2">中文</button>
+      <button id="langToggle" class="btn btn-outline-light me-2">English</button>
       <button id="themeToggle" class="btn btn-outline-light me-2" data-i18n="theme.dark">Dark</button>
       <a class="btn btn-outline-light" id="logoutLink" href="logout.php" data-i18n="logout">Logout</a>
     </div>

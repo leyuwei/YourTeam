@@ -1,69 +1,65 @@
-# Research Team Management Website
-## 一款适用于国内牛马研究生体质的团队管理网站
+[English](#english) | [中文](#中文)
 
-<img width="3801" height="1743" alt="2025-08-14_154519_367" src="https://github.com/user-attachments/assets/3a028bf9-a077-44f3-9070-f04f5721134e" />
+# English
 
-A simple responsive website for managing research team members, projects, small tasks and workload reports. Built with PHP, MySQL and Bootstrap 5.
+## Research Team Management Website
+A responsive web application for managing research team members, projects, tasks and workload reports. Built with PHP, MySQL and Bootstrap 5.
 
-## Features
-- Manager login (multiple accounts defined in database)
-- Manage team members (create, edit, delete, import/export CSV/Excel) with detailed fields: name, email, identity number, campus ID number, year of join, current degree, degree pursuing, phone, WeChat, department, workplace and homeplace
-- Manage projects with member assignments and status filtering
-- Manage Research Directions assigned to each member
-- Manage tasks and their regular affairs
-- Generate workload reports for each member within a time range (exportable to CSV)
-- Animated navigation bar with sliding highlight
+### Features
+- Manager and member login
+- Manage members, projects and research directions
+- Track tasks with member-reported affairs
+- Manager must confirm affairs before they appear in workload reports
+- Pending affairs can still be joined, edited or deleted by members
+- Workload report generation and Excel export
+- Language toggle (Chinese by default)
 
-## Requirements
+### Requirements
 - PHP 8+
 - MySQL 5.7+/MariaDB
-- Apache with PHP support (LAMP stack)
+- Apache with PHP support
 
-## Installation
-### Preparing the LAMP stack (Ubuntu example)
-1. Update package index:
-   ```bash
-   sudo apt update
-   ```
-2. Install Apache:
-   ```bash
-   sudo apt install apache2
-   ```
-3. Install MySQL Server:
-   ```bash
-   sudo apt install mysql-server
-   sudo mysql_secure_installation
-   ```
-4. Install PHP and required extensions:
-   ```bash
-   sudo apt install php libapache2-mod-php php-mysql
-   ```
-5. Restart Apache so PHP is enabled:
-   ```bash
-   sudo systemctl restart apache2
-   ```
-
-### Deploying the application
-1. Clone or download this repository to your web root.
-2. Import the database schema and sample data:
+### Installation
+1. Deploy the code to your web server.
+2. Import the database schema:
    ```bash
    mysql -u root -p < database.sql
    ```
-   (Change `root` to your DB user.)
-3. Edit `config.php` if your database credentials differ.
-4. Access the site via `http://your-server/login.php` and log in using one of the predefined accounts:
-   - Username: `manager1`, Password: `password`
-   - Username: `manager2`, Password: `password`
+3. Edit `config.php` for database credentials if needed.
+4. Access `login.php` to sign in.
 
-## Usage
-- After logging in, use the navigation bar to access members, projects, tasks and workload report pages.
-- Import/export member lists and workload reports using CSV files (compatible with Excel).
-- Member CSV columns are: `CampusID,Name,Email,IdentityNumber,YearOfJoin,CurrentDegree,DegreePursuing,Phone,WeChat,Department,Workplace,Homeplace`.
-- When adding or removing members from projects, you will be asked to supply exact join/exit timestamps so that workload can be tracked accurately.
-- To customize the organization name shown before any “Team/团队” text, edit `team_name.js` and set `TEAM_NAME` with English and Chinese versions, e.g. `{ en: 'ACME ', zh: 'ACME ' }` (include a trailing space if desired).
+### Database Upgrade
+If upgrading from a previous version, run `update_db.sql` after backing up your database to add the new `status` field to `task_affairs`.
 
-## Notes
-This project uses Bootstrap from a CDN for styling and is responsive on both desktop and mobile browsers.
+---
 
-## License
-This sample project is provided as-is without warranty.
+# 中文
+
+## 研究团队管理网站
+一个用于管理科研团队成员、项目、任务与工作量统计的响应式网站，基于 PHP、MySQL 与 Bootstrap 5 开发。
+
+### 功能特性
+- 管理员与成员登录
+- 管理成员、项目和研究方向
+- 跟踪任务及成员申报的具体事务
+- 成员申报的事务需经管理员确认后方可计入工作量报表
+- 待确认事务仍可被其他成员加入、编辑或删除
+- 生成工作量报表并支持导出为 Excel
+- 默认中文界面，可切换中英语言
+
+### 环境要求
+- PHP 8+
+- MySQL 5.7+/MariaDB
+- 支持 PHP 的 Apache 服务器
+
+### 安装步骤
+1. 将代码部署到 Web 服务器。
+2. 导入数据库结构：
+   ```bash
+   mysql -u root -p < database.sql
+   ```
+3. 如有需要，修改 `config.php` 中的数据库配置。
+4. 访问 `login.php` 登录系统。
+
+### 数据库升级
+从旧版本升级时，请先备份数据库，再运行 `update_db.sql` 为 `task_affairs` 表添加新的 `status` 字段。

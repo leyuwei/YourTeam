@@ -12,8 +12,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     }
     $start_time = $start_date . ' 00:00:00';
     $end_time = date('Y-m-d 00:00:00', strtotime($end_date . ' +1 day'));
-    $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time) VALUES (?,?,?,?)');
-    $stmt->execute([$task_id,$description,$start_time,$end_time]);
+    $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time,status) VALUES (?,?,?,?,?)');
+    $stmt->execute([$task_id,$description,$start_time,$end_time,'confirmed']);
     $affair_id = $pdo->lastInsertId();
     foreach($member_ids as $mid){
         $pdo->prepare('INSERT INTO task_affair_members(affair_id,member_id) VALUES (?,?)')->execute([$affair_id,$mid]);

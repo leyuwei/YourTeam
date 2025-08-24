@@ -22,8 +22,8 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $memberStmt = $pdo->prepare("SELECT DISTINCT member_id FROM task_affair_members WHERE affair_id IN ($placeholders)");
     $memberStmt->execute($ids);
     $members = $memberStmt->fetchAll(PDO::FETCH_COLUMN);
-    $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time) VALUES (?,?,?,?)')
-        ->execute([$task_id,$description,$start_time,$end_time]);
+    $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time,status) VALUES (?,?,?,?,?)')
+        ->execute([$task_id,$description,$start_time,$end_time,'pending']);
     $new_id = $pdo->lastInsertId();
     $insert = $pdo->prepare('INSERT INTO task_affair_members(affair_id,member_id) VALUES (?,?)');
     foreach($members as $mid){

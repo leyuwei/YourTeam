@@ -206,6 +206,7 @@ const translations = {
     'task_affairs.table_start': 'Start Date',
     'task_affairs.table_end': 'End Date',
     'task_affairs.table_days': 'Days',
+    'task_affairs.table_status': 'Status',
     'task_affairs.table_actions': 'Actions',
     'task_affairs.action_edit': 'Edit',
     'task_affairs.action_delete': 'Delete',
@@ -213,6 +214,7 @@ const translations = {
     'task_affairs.label_description': 'Description',
     'task_affairs.label_start': 'Start Date',
     'task_affairs.label_end': 'End Date',
+    'task_affairs.label_status': 'Status',
     'task_affairs.save': 'Save',
     'task_affairs.cancel': 'Cancel',
     'task_affairs.new_title': 'New Affair',
@@ -225,6 +227,10 @@ const translations = {
     'task_affairs.confirm.delete': 'Delete affair?',
     'task_affairs.merge_selected': 'Merge Selected',
     'task_affairs.confirm.merge': 'Merge selected affairs?',
+    'task_affairs.status.pending': 'Pending',
+    'task_affairs.status.confirmed': 'Confirmed',
+    'task_affairs.action_confirm': 'Confirm',
+    'task_affairs.action_unconfirm': 'Unconfirm',
     'workload.title': 'Workload Report',
     'workload.error.range': 'End date must be after start date',
     'workload.label.start': 'Start Date',
@@ -541,6 +547,7 @@ const translations = {
     'task_affairs.table_start': '起始日期',
     'task_affairs.table_end': '结束日期',
     'task_affairs.table_days': '天数',
+    'task_affairs.table_status': '状态',
     'task_affairs.table_actions': '操作',
     'task_affairs.action_edit': '编辑',
     'task_affairs.action_delete': '删除',
@@ -548,6 +555,7 @@ const translations = {
     'task_affairs.label_description': '具体事务描述',
     'task_affairs.label_start': '起始日期',
     'task_affairs.label_end': '结束日期',
+    'task_affairs.label_status': '状态',
     'task_affairs.save': '保存',
     'task_affairs.cancel': '取消',
     'task_affairs.new_title': '新建具体事务',
@@ -560,6 +568,10 @@ const translations = {
     'task_affairs.confirm.delete': '删除事务?',
     'task_affairs.merge_selected': '合并选择的事务',
     'task_affairs.confirm.merge': '合并已选事务？',
+    'task_affairs.status.pending': '待确认',
+    'task_affairs.status.confirmed': '已确认',
+    'task_affairs.action_confirm': '确认',
+    'task_affairs.action_unconfirm': '撤回确认',
     'workload.title': '工作量统计报表',
     'workload.error.range': '报表截止时间必须晚于起始时间',
     'workload.label.start': '报表起始时间',
@@ -697,7 +709,7 @@ function copyText(text) {
 }
 
 function applyTranslations() {
-  const lang = localStorage.getItem('lang') || 'en';
+  const lang = localStorage.getItem('lang') || 'zh';
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
@@ -737,7 +749,7 @@ function initApp() {
   const langBtn = document.getElementById('langToggle');
   if (langBtn) {
     langBtn.addEventListener('click', () => {
-      const current = localStorage.getItem('lang') || 'en';
+      const current = localStorage.getItem('lang') || 'zh';
       const next = current === 'en' ? 'zh' : 'en';
       localStorage.setItem('lang', next);
       applyTranslations();

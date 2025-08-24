@@ -41,7 +41,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -54,7 +54,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 <body>
 <div class="container mt-5">
   <div class="text-end mb-3">
-    <button id="langToggle" class="btn btn-outline-secondary btn-sm">中文</button>
+    <button id="langToggle" class="btn btn-outline-secondary btn-sm">English</button>
     <button id="themeToggle" class="btn btn-outline-secondary btn-sm" data-i18n="theme.dark">Dark</button>
   </div>
   <h2 class="text-center mb-4" data-i18n="header.title">Team Management Platform</h2>

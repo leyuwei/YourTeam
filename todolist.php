@@ -183,7 +183,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 
 function printTodoList(){
-  const lang=document.documentElement.lang||'en';
+  const lang=document.documentElement.lang||'zh';
   const totalItems=document.querySelectorAll('.todolist li').length;
   const fontSize=Math.max(8,14-totalItems*0.1); // shrink font when there are many items
   const weekStart='<?= date('Y.m.d', strtotime($week_start)); ?>';

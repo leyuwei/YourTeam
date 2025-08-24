@@ -48,7 +48,7 @@ document.querySelectorAll('.toggle-members').forEach(btn=>{
 });
 document.querySelectorAll('.delete-notification').forEach(link=>{
   link.addEventListener('click',e=>{
-    const lang=document.documentElement.lang||'en';
+    const lang=document.documentElement.lang||'zh';
     const msg=translations[lang]['notifications.confirm.revoke'];
     if(!doubleConfirm(msg)) e.preventDefault();
   });

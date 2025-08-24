@@ -41,8 +41,8 @@ if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']
     } else {
         $start_time = $start_date . ' 00:00:00';
         $end_time = date('Y-m-d 00:00:00', strtotime($end_date . ' +1 day'));
-        $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time) VALUES (?,?,?,?)');
-        $stmt->execute([$task_id,$description,$start_time,$end_time]);
+        $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time,status) VALUES (?,?,?,?,?)');
+        $stmt->execute([$task_id,$description,$start_time,$end_time,'pending']);
         $affair_id = $pdo->lastInsertId();
         $pdo->prepare('INSERT INTO task_affair_members(affair_id,member_id) VALUES (?,?)')->execute([$affair_id,$member_id]);
         $msg = '已提交';
@@ -64,7 +64,7 @@ if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']
 }
 $affairs = [];
 if($member_id){
-    $stmt = $pdo->prepare('SELECT a.id,a.description,a.start_time,a.end_time,GROUP_CONCAT(m.name SEPARATOR ", ") AS members, GROUP_CONCAT(m.id) AS member_ids FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
+    $stmt = $pdo->prepare('SELECT a.id,a.description,a.start_time,a.end_time,a.status,GROUP_CONCAT(m.name SEPARATOR ", ") AS members, GROUP_CONCAT(m.id) AS member_ids FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
     $stmt->execute([$task_id]);
     $affairs = $stmt->fetchAll();
 }
@@ -107,15 +107,16 @@ if($member_id){
 </div>
 <h4><b>已填工作事务</b></h4>
 <table class="table table-bordered">
-<tr><th>描述</th><th>负责成员</th><th>起始日期</th><th>结束日期</th><th>天数</th><th>操作</th></tr>
+<tr><th>描述</th><th>负责成员</th><th>起始日期</th><th>结束日期</th><th>天数</th><th>状态</th><th>操作</th></tr>
 <?php foreach($affairs as $a): ?>
-<?php $days = (strtotime($a['end_time']) - strtotime($a['start_time'])) / 86400; $joined = $a['member_ids'] ? in_array($member_id, explode(',', $a['member_ids'])) : false; ?>
+<?php $days = (strtotime($a['end_time']) - strtotime($a['start_time'])) / 86400; $joined = $a['member_ids'] ? in_array($member_id, explode(',', $a['member_ids'])) : false; $status_text = $a['status']==='confirmed' ? '已确认' : '待确认'; ?>
 <tr>
   <td><?= htmlspecialchars($a['description']); ?></td>
   <td><?= htmlspecialchars($a['members']); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['start_time']))); ?></td>
   <td><?= htmlspecialchars(date('Y-m-d', strtotime($a['end_time'] . ' -1 day'))); ?></td>
   <td><?= htmlspecialchars($days); ?></td>
+  <td><?= $status_text; ?></td>
   <td>
     <?php if(!$joined): ?>
     <form method="post" style="display:inline;">
