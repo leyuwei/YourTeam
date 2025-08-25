@@ -77,6 +77,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 include 'header.php';
 ?>
 <h2 data-i18n="<?php echo $id? 'regulation_edit.title_edit':'regulation_edit.title_add'; ?>"><?php echo $id? 'Edit Regulation':'Add Regulation'; ?></h2>
+
 <?php if(!empty($error)): ?>
 <div class="alert alert-danger"><?= htmlspecialchars($error); ?></div>
 <?php endif; ?>
