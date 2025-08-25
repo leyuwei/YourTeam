@@ -19,8 +19,20 @@ $items = [];
 foreach($stmt as $row){
     $items[$row['category']][$row['day']][] = $row;
 }
+$stats = ['work'=>['done'=>0,'total'=>0],
+          'personal'=>['done'=>0,'total'=>0],
+          'longterm'=>['done'=>0,'total'=>0]];
+foreach($items as $cat=>$daysArr){
+    foreach($daysArr as $dayItems){
+        foreach($dayItems as $it){
+            $stats[$cat]['total']++;
+            if($it['is_done']) $stats[$cat]['done']++;
+        }
+    }
+}
 $week_end = date('Y-m-d', strtotime($week_start . ' +6 days'));
 $next_week_param = date('o-\\WW', strtotime($week_start . ' +7 days'));
+$prev_week_param = date('o-\\WW', strtotime($week_start . ' -7 days'));
 $current_week_param = date('o-\\WW');
 $last_week_param = date('o-\\WW', strtotime('-1 week'));
 $next_week_hint_param = date('o-\\WW', strtotime('+1 week'));
@@ -59,13 +71,16 @@ $today_key = strtolower(date('D'));
 <?= $week_hint; ?>
 <form method="get" class="mb-3 d-flex flex-wrap align-items-center gap-2">
   <input type="week" name="week" class="form-control form-control-lg w-auto" value="<?= htmlspecialchars($week_param); ?>">
+  <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($prev_week_param); ?>" data-i18n="todolist.prev_week">看上周</a>
+  <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($next_week_param); ?>" data-i18n="todolist.next_week">看下周</a>
   <a class="btn btn-success" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
+  <a class="btn btn-info" href="todolist_assessment.php" data-i18n="todolist.assessment">待办统计</a>
   <button type="button" class="btn btn-secondary" id="copyNextWeek" data-i18n="todolist.copy_next">下周继续</button>
   <button type="button" class="btn btn-outline-primary" onclick="printTodoList()" data-i18n="todolist.print">打印</button>
 </form>
 <div class="row">
   <div class="col-md-6">
-    <h3><b data-i18n="todolist.category.work">工作</b></h3>
+    <h3 data-category="work"><b data-i18n="todolist.category.work">工作</b> <small class="stats">(<?= $stats['work']['done']; ?>/<?= $stats['work']['total']; ?>)</small></h3>
     <?php foreach($days as $k=>$label): ?>
     <?php $is_today = $is_current_week && $k === $today_key; ?>
     <h5 class="<?= $is_today ? 'today-heading' : '' ?>"><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="work" data-day="<?= $k; ?>">+</button></h5>
@@ -76,6 +91,7 @@ $today_key = strtolower(date('D'));
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
         <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">下周继续</button>
+        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item" data-i18n="todolist.cut_tomorrow">鸽明天</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
@@ -83,7 +99,7 @@ $today_key = strtolower(date('D'));
     <?php endforeach; ?>
   </div>
   <div class="col-md-6">
-    <h3><b data-i18n="todolist.category.personal">私人</b></h3>
+    <h3 data-category="personal"><b data-i18n="todolist.category.personal">私人</b> <small class="stats">(<?= $stats['personal']['done']; ?>/<?= $stats['personal']['total']; ?>)</small></h3>
     <?php foreach($days as $k=>$label): ?>
     <?php $is_today = $is_current_week && $k === $today_key; ?>
     <h5 class="<?= $is_today ? 'today-heading' : '' ?>"><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="personal" data-day="<?= $k; ?>">+</button></h5>
@@ -94,12 +110,13 @@ $today_key = strtolower(date('D'));
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
         <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>
+        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item" data-i18n="todolist.cut_tomorrow">鸽明天</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
     </ul>
     <?php endforeach; ?>
-    <h3><b data-i18n="todolist.category.longterm">长期</b> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="longterm" data-day="">+</button></h3>
+    <h3 data-category="longterm"><b data-i18n="todolist.category.longterm">长期</b> <small class="stats">(<?= $stats['longterm']['done']; ?>/<?= $stats['longterm']['total']; ?>)</small> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="longterm" data-day="">+</button></h3>
     <ul class="list-group mb-3 todolist" data-category="longterm" data-day="">
       <?php if(!empty($items['longterm'][''])): foreach($items['longterm'][''] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
@@ -135,13 +152,27 @@ window.addEventListener('DOMContentLoaded',()=>{
     return fetch('todolist_save.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
       .finally(()=>{pendingSaves--;showHint();updateWarning();});
   }
+  function updateStats(){
+    ['work','personal','longterm'].forEach(cat=>{
+      const lists=document.querySelectorAll(`.todolist[data-category='${cat}']`);
+      let total=0,done=0;
+      lists.forEach(l=>{
+        l.querySelectorAll('li').forEach(li=>{
+          total++;
+          if(li.querySelector('.item-done').checked) done++;
+        });
+      });
+      const span=document.querySelector(`h3[data-category='${cat}'] .stats`);
+      if(span) span.textContent=`(${done}/${total})`;
+    });
+  }
   function saveItem(li){
     const id=li.dataset.id;
     const content=li.querySelector('.item-content').value;
     const done=li.querySelector('.item-done').checked;
     const list=li.parentElement;
     const data={action:'update',id:id,content:content,is_done:done,category:list.dataset.category,day:list.dataset.day,week_start:'<?= $week_start; ?>'};
-    postData(data).then(r=>r.json()).then(j=>{if(!id)li.dataset.id=j.id;});
+    postData(data).then(r=>r.json()).then(j=>{if(!id)li.dataset.id=j.id;}).then(()=>updateStats());
   }
   function attach(li){
     li.querySelector('.item-content').addEventListener('input',()=>saveItem(li));
@@ -150,7 +181,24 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(copyBtn) copyBtn.addEventListener('click',()=>copyText(li.querySelector('.item-content').value));
     const nextBtn=li.querySelector('.next-week-item');
     if(nextBtn) nextBtn.addEventListener('click',()=>{postData({action:'copy_item_next',id:li.dataset.id,week_start:'<?= $week_start; ?>'});});
-    li.querySelector('.delete-item').addEventListener('click',()=>{postData({action:'delete',id:li.dataset.id}).then(()=>li.remove());});
+    const tomorrowBtn=li.querySelector('.tomorrow-item');
+    if(tomorrowBtn) tomorrowBtn.addEventListener('click',()=>{
+      const list=li.parentElement;
+      const day=list.dataset.day;
+      if(day==='sun'){
+        postData({action:'tomorrow',id:li.dataset.id,day:day,week_start:'<?= $week_start; ?>'}).then(()=>{li.remove();updateStats();});
+      }else{
+        const order=['mon','tue','wed','thu','fri','sat','sun'];
+        const nextDay=order[order.indexOf(day)+1];
+        const target=document.querySelector(`.todolist[data-category='${list.dataset.category}'][data-day='${nextDay}']`);
+        target.appendChild(li);
+        saveItem(li);
+        const orderArr=Array.from(target.children).map((li,i)=>({id:li.dataset.id,position:i}));
+        postData({action:'order',order:orderArr});
+        updateStats();
+      }
+    });
+    li.querySelector('.delete-item').addEventListener('click',()=>{postData({action:'delete',id:li.dataset.id}).then(()=>{li.remove();updateStats();});});
   }
   document.querySelectorAll('.todolist').forEach(list=>{
     Sortable.create(list,{group:'todolist',animation:150,onEnd:function(evt){
@@ -160,6 +208,7 @@ window.addEventListener('DOMContentLoaded',()=>{
         const order=Array.from(l.children).map((li,i)=>({id:li.dataset.id,position:i}));
         postData({action:'order',order:order});
       });
+      updateStats();
     }});
     list.querySelectorAll('li').forEach(attach);
   });
@@ -168,7 +217,8 @@ window.addEventListener('DOMContentLoaded',()=>{
       const list=document.querySelector(`.todolist[data-category='${btn.dataset.category}'][data-day='${btn.dataset.day}']`);
       const li=document.createElement('li');
       li.className='list-group-item d-flex align-items-center flex-nowrap';
-      li.innerHTML=`<input type="checkbox" class="form-check-input me-2 item-done"><input type="text" class="form-control item-content flex-grow-1 me-2"><button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button><button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button><button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>`;
+      const tomorrowBtn = btn.dataset.day ? '<button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item" data-i18n="todolist.cut_tomorrow">鸽明天</button>' : '';
+      li.innerHTML=`<input type="checkbox" class="form-check-input me-2 item-done"><input type="text" class="form-control item-content flex-grow-1 me-2"><button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button><button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>${tomorrowBtn}<button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>`;
       list.appendChild(li);
       applyTranslations();
       attach(li);
@@ -180,6 +230,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     postData({action:'copy_next',week_start:'<?= $week_start; ?>'})
       .then(()=>{window.location='todolist.php?week=<?= $next_week_param; ?>';});
   });
+  updateStats();
 });
 
 function printTodoList(){
@@ -212,7 +263,11 @@ function printTodoList(){
     const lists=document.querySelectorAll(`.todolist[data-category='${cat}']`);
     if(Array.from(lists).every(l=>!l.children.length)) return '';
     const catKey='todolist.category.'+cat;
-    let catHtml='<h3 class="'+cat+'">'+(translations[lang][catKey]||'')+'</h3>';
+    let total=0,done=0;
+    lists.forEach(l=>{
+      l.querySelectorAll('li').forEach(li=>{total++;if(li.querySelector('.item-done').checked) done++;});
+    });
+    let catHtml='<h3 class="'+cat+'">'+(translations[lang][catKey]||'')+' ('+done+'/'+total+')</h3>';
     lists.forEach(list=>{
       if(!list.children.length) return;
       const day=list.dataset.day;

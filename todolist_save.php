@@ -44,5 +44,20 @@ if($action === 'update'){
     $stmt = $pdo->prepare('INSERT INTO todolist_items (user_id,user_role,week_start,category,day,content,is_done,sort_order) SELECT user_id,user_role,?,category,day,content,0,sort_order FROM todolist_items WHERE id=? AND user_id=? AND user_role=?');
     $stmt->execute([$next_week_start,$id,$user_id,$role]);
     echo json_encode(['status'=>'ok']);
+} elseif($action === 'tomorrow'){
+    $id = $data['id'];
+    $day = $data['day'];
+    $week_start = $data['week_start'];
+    $map = ['mon'=>'tue','tue'=>'wed','wed'=>'thu','thu'=>'fri','fri'=>'sat','sat'=>'sun'];
+    if($day === 'sun'){
+        $new_week_start = date('Y-m-d', strtotime($week_start.' +7 days'));
+        $new_day = 'mon';
+    } else {
+        $new_week_start = $week_start;
+        $new_day = $map[$day] ?? $day;
+    }
+    $stmt = $pdo->prepare('UPDATE todolist_items SET week_start=?, day=? WHERE id=? AND user_id=? AND user_role=?');
+    $stmt->execute([$new_week_start,$new_day,$id,$user_id,$role]);
+    echo json_encode(['status'=>'ok','new_day'=>$new_day,'new_week_start'=>$new_week_start]);
 }
 ?>
