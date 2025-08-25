@@ -26,11 +26,12 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             $stmt = $pdo->prepare('UPDATE regulations SET category=?, description=?, updated_at=CURDATE() WHERE id=?');
             $stmt->execute([$category,$description,$id]);
         }else{
-            $stmt = $pdo->prepare('INSERT INTO regulations (category, description, updated_at, sort_order) VALUES (?,?,CURDATE(),(SELECT COALESCE(MAX(sort_order),0)+1 FROM regulations))');
-            $stmt->execute([$category,$description]);
+            $sort = $pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM regulations')->fetchColumn();
+            $stmt = $pdo->prepare('INSERT INTO regulations (category, description, updated_at, sort_order) VALUES (?,?,CURDATE(),?)');
+            $stmt->execute([$category,$description,$sort]);
             $id = $pdo->lastInsertId();
         }
-        if(!empty($_FILES['attachments']['name'][0])){
+        if(isset($_FILES['attachments']['name']) && $_FILES['attachments']['name'][0] !== ''){
             $dir = __DIR__.'/regulation_uploads/'.$id;
             if(!is_dir($dir)) mkdir($dir,0777,true);
             foreach($_FILES['attachments']['name'] as $idx=>$orig){
