@@ -21,11 +21,17 @@ if($id){
 $error = '';
 if($_SERVER['REQUEST_METHOD']==='POST'){
     $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-    $category = trim($_POST['category'] ?? '');
-    $description = trim($_POST['description'] ?? '');
     $errors = [];
-    if($category === '' || $description === ''){
-        $errors[] = 'Category and description are required';
+    if(empty($_POST) && empty($_FILES) && ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0){
+        $errors[] = 'File too large';
+        $category = '';
+        $description = '';
+    }else{
+        $category = trim($_POST['category'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        if($category === '' || $description === ''){
+            $errors[] = 'Category and description are required';
+        }
     }
     if(!$errors){
         if($id){
