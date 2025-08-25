@@ -217,7 +217,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       const list=document.querySelector(`.todolist[data-category='${btn.dataset.category}'][data-day='${btn.dataset.day}']`);
       const li=document.createElement('li');
       li.className='list-group-item d-flex align-items-center flex-nowrap';
-      const tomorrowBtn = btn.dataset.day ? '<button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item" data-i18n="todolist.cut_tomorrow">鸽明天</button>' : '';
+      const tomorrowBtn = btn.dataset.day ? '<button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap" data-i18n="todolist.cut_tomorrow">鸽明天</button>' : '';
       li.innerHTML=`<input type="checkbox" class="form-check-input me-2 item-done"><input type="text" class="form-control item-content flex-grow-1 me-2"><button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button><button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>${tomorrowBtn}<button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>`;
       list.appendChild(li);
       applyTranslations();
