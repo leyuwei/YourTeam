@@ -77,6 +77,7 @@ document.querySelectorAll('.check-notification').forEach(link=>{
     <?php endif; ?>
   </tbody>
 </table>
+<br>
 
 <div class="modal fade" id="regDetailModal" tabindex="-1">
   <div class="modal-dialog">
