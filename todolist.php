@@ -75,7 +75,7 @@ $today_key = strtolower(date('D'));
   <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($next_week_param); ?>" data-i18n="todolist.next_week">看下周</a>
   <a class="btn btn-success" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
   <a class="btn btn-info" href="todolist_assessment.php" data-i18n="todolist.assessment">待办统计</a>
-  <button type="button" class="btn btn-secondary" id="copyNextWeek" data-i18n="todolist.copy_next">下周继续</button>
+  <button type="button" class="btn btn-secondary" id="copyNextWeek" data-i18n="todolist.copy_next">鸽下周</button>
   <button type="button" class="btn btn-outline-primary" onclick="printTodoList()" data-i18n="todolist.print">打印</button>
 </form>
 <div class="row">
@@ -90,8 +90,8 @@ $today_key = strtolower(date('D'));
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
-        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">下周继续</button>
-        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item" data-i18n="todolist.cut_tomorrow">鸽明天</button>
+        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">鸽下周</button>
+        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap" data-i18n="todolist.cut_tomorrow">鸽明天</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
@@ -109,8 +109,8 @@ $today_key = strtolower(date('D'));
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
-        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>
-        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item" data-i18n="todolist.cut_tomorrow">鸽明天</button>
+        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">鸽下周</button>
+        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap" data-i18n="todolist.cut_tomorrow">鸽明天</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
@@ -123,7 +123,7 @@ $today_key = strtolower(date('D'));
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
-        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>
+        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">鸽下周</button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
