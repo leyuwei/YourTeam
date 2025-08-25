@@ -10,7 +10,7 @@ if($_SESSION['role']==='member'){
 ?>
 
 <?php if($_SESSION['role']==='member'): ?>
-<b><h2 class="mt-4 mb-3" data-i18n="index.notifications">Notifications</h2></b>
+<h2 class="mt-4 mb-3" data-i18n="index.notifications" style="font-weight:bold; color:red; font-color:red">Notifications</h2>
 <div class="list-group mb-4">
   <?php foreach($notifications as $n): ?>
   <div class="list-group-item">
@@ -30,6 +30,7 @@ if($_SESSION['role']==='member'){
   <div class="list-group-item" data-i18n="notifications.none">No notifications</div>
   <?php endif; ?>
 </div>
+<br><br>
 <script>
 document.querySelectorAll('.check-notification').forEach(link=>{
   link.addEventListener('click',e=>{
