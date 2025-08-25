@@ -8,12 +8,9 @@ if($_SESSION['role']==='member'){
     $notifications = $stmt->fetchAll();
 }
 ?>
-<div class="hero-banner text-center mb-4">
-  <h1 class="display-4 fw-bold mb-3" data-i18n="index.title">Dashboard</h1>
-  <p class="lead" data-i18n="index.info">Use the navigation bar to manage team members, projects, tasks, and workload reports.</p>
-</div>
+
 <?php if($_SESSION['role']==='member'): ?>
-<h2 class="mt-4 mb-3" data-i18n="index.notifications">Notifications</h2>
+<b><h2 class="mt-4 mb-3" data-i18n="index.notifications">Notifications</h2></b>
 <div class="list-group mb-4">
   <?php foreach($notifications as $n): ?>
   <div class="list-group-item">
@@ -43,4 +40,10 @@ document.querySelectorAll('.check-notification').forEach(link=>{
 });
 </script>
 <?php endif; ?>
+
+<div class="hero-banner text-center mb-4">
+  <h1 class="display-4 fw-bold mb-3" data-i18n="index.title">Dashboard</h1>
+  <p class="lead" data-i18n="index.info">Use the navigation bar to manage team members, projects, tasks, and workload reports.</p>
+</div>
+
 <?php include 'footer.php'; ?>
