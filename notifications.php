@@ -9,6 +9,7 @@ foreach($regulations as &$r){
     $stmt->execute([$r['id']]);
     $r['files'] = $stmt->fetchAll();
 }
+unset($r);
 ?>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="notifications.title">Notifications</h2>
