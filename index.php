@@ -6,6 +6,7 @@ foreach($regulations as &$r){
     $stmt->execute([$r['id']]);
     $r['files'] = $stmt->fetchAll();
 }
+unset($r);
 if($_SESSION['role']==='member'){
     $member_id = $_SESSION['member_id'];
     $pdo->prepare('UPDATE notification_targets nt JOIN notifications n ON nt.notification_id=n.id SET nt.status="seen" WHERE nt.member_id=? AND nt.status="sent" AND n.is_revoked=0 AND CURDATE() BETWEEN n.valid_begin_date AND n.valid_end_date')->execute([$member_id]);
