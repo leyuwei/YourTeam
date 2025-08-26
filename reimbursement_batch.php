@@ -96,8 +96,9 @@ $receipts = $stmt->fetchAll();
 <form method="post" enctype="multipart/form-data" class="mb-4">
   <div class="mb-3">
     <label class="form-label" data-i18n="reimburse.batch.file">Receipt File</label>
-    <input type="file" name="receipt" class="form-control" required>
+    <input type="file" name="receipt" id="receipt-file" class="form-control" required>
   </div>
+  <button type="button" id="auto-fill" class="btn btn-secondary mb-3" data-i18n="reimburse.batch.autofill">Auto Fill</button>
   <div class="mb-3">
     <label class="form-label" data-i18n="reimburse.batch.category">Category</label>
     <select name="category" class="form-select" required>
@@ -175,4 +176,27 @@ $receipts = $stmt->fetchAll();
   <?php endif; ?>
 </form>
 <?php endif; ?>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const btn=document.getElementById('auto-fill');
+  if(!btn) return;
+  btn.addEventListener('click',async()=>{
+    const file=document.getElementById('receipt-file');
+    if(!file.files.length){
+      alert(translations[document.documentElement.lang||'zh']['reimburse.batch.file_required']);
+      return;
+    }
+    const fd=new FormData();
+    fd.append('receipt',file.files[0]);
+    const res=await fetch('reimbursement_autofill.php',{method:'POST',body:fd});
+    const data=await res.json();
+    if(data.price){
+      document.querySelector('input[name="price"]').value=data.price;
+    }
+    if(data.category){
+      document.querySelector('select[name="category"]').value=data.category;
+    }
+  });
+});
+</script>
 <?php include 'footer.php'; ?>
