@@ -1,9 +1,74 @@
 [English](#english) | [中文](#中文)
 
+<img width="2706" height="1395" alt="mainpage" src="https://github.com/user-attachments/assets/f64c2de2-1b69-43ae-b723-7407f0b09940" />
+
+# 中文
+
+## 超轻量级研究团队（牛马）管理网站
+一个用于管理科研团队成员、项目、任务与工作量统计的响应式网站，基于 PHP、MySQL 与 Bootstrap 5 开发，丐版云服务器即可流畅托管！
+
+### 功能特性
+- 管理员与成员登录
+- 管理成员、项目和研究方向
+- 跟踪任务及成员申报的具体事务
+- 成员申报的事务需经管理员确认后方可计入工作量报表
+- 待确认事务仍可被其他成员加入、编辑或删除
+- 财务报销流程与单据上传
+- 管理员发布定向通知/单位规章制度
+- 生成工作量报表并支持导出为 Excel
+- 默认中文界面，可切换中英语言
+
+### 服务器环境配置（LAMP）
+1. **安装软件包**（以 Ubuntu 为例）：
+   ```bash
+   sudo apt update
+   sudo apt install apache2 mysql-server php libapache2-mod-php php-mysql php-zip php-mbstring
+   ```
+2. **MySQL 安全设置**（可选）：
+   ```bash
+   sudo mysql_secure_installation
+   ```
+3. **启用 Apache 模块**并重启：
+   ```bash
+   sudo a2enmod rewrite
+   sudo systemctl restart apache2
+   ```
+4. **创建虚拟主机**指向项目目录（如 `/var/www/yourteam`），并确保 Apache 对上传目录拥有读写权限。
+5. **配置 PHP**：根据需要在 `php.ini` 中调整时区、文件上传等参数。
+
+### 安装步骤
+1. 将代码部署到 Web 服务器（例如 `/var/www/yourteam`）。
+2. 导入数据库结构：
+   ```bash
+   mysql -u root -p < database.sql
+   ```
+3. 如有需要，修改 `config.php` 中的数据库配置。
+4. 访问 `login.php` 登录系统。
+
+### 自定义团队名称
+在 `team_name.js` 中设置组织名称，例如：
+```javascript
+const TEAM_NAME = { en: 'ACME', zh: 'ACME' };
+```
+脚本会自动在页面标题和内容中的“Team/团队”前添加该名称。
+
+### 导航功能
+- **成员管理**：添加、编辑、导入或导出成员信息。
+- **待办列表**：成员维护个人待办并在完成后勾选。
+- **项目管理**：创建项目、分配成员并跟踪进度。
+- **研究方向**：设定研究方向并关联相应成员。
+- **定向通知**（仅管理员）：发布、编辑或撤销通知并查看成员阅读情况。
+- **财务报销**：成员上传单据申请报销，管理员审核通过或拒绝。
+- **任务分配**：为成员分派任务，成员申报事务等待确认。
+- **工作量统计**（仅管理员）：汇总已确认事务并导出报表。
+- **经费账户**（仅管理员）：管理报销账户余额与记录。
+
+---
+
 # English
 
-## Research Team Management Website
-A responsive web application for managing research team members, projects, tasks and workload reports. Built with PHP, MySQL and Bootstrap 5.
+## Ultra Lightweight Research Team Management Website
+A responsive web application for managing research team members, projects, tasks and workload reports. Built with PHP, MySQL and Bootstrap 5. Can be Hosted Using Budget Cloud Server!
 
 ### Features
 - Manager and member login
@@ -60,72 +125,3 @@ The script automatically inserts the name before "Team/团队" in page titles an
 - **Tasks**: Assign tasks; members report affairs which managers then confirm.
 - **Workload** (manager only): View statistics from confirmed affairs and export reports.
 - **Account** (manager only): Adjust reimbursement account balance and review records.
-
-### Database Upgrade
-If upgrading from a previous version, run `update_db.sql` after backing up your database to add the new `status` field to `task_affairs`.
-
----
-
-# 中文
-
-## 研究团队管理网站
-一个用于管理科研团队成员、项目、任务与工作量统计的响应式网站，基于 PHP、MySQL 与 Bootstrap 5 开发。
-
-### 功能特性
-- 管理员与成员登录
-- 管理成员、项目和研究方向
-- 跟踪任务及成员申报的具体事务
-- 成员申报的事务需经管理员确认后方可计入工作量报表
-- 待确认事务仍可被其他成员加入、编辑或删除
-- 财务报销流程与单据上传
-- 管理员发布定向通知
-- 生成工作量报表并支持导出为 Excel
-- 默认中文界面，可切换中英语言
-
-### 服务器环境配置（LAMP）
-1. **安装软件包**（以 Ubuntu 为例）：
-   ```bash
-   sudo apt update
-   sudo apt install apache2 mysql-server php libapache2-mod-php php-mysql php-zip php-mbstring
-   ```
-2. **MySQL 安全设置**（可选）：
-   ```bash
-   sudo mysql_secure_installation
-   ```
-3. **启用 Apache 模块**并重启：
-   ```bash
-   sudo a2enmod rewrite
-   sudo systemctl restart apache2
-   ```
-4. **创建虚拟主机**指向项目目录（如 `/var/www/yourteam`），并确保 Apache 对上传目录拥有读写权限。
-5. **配置 PHP**：根据需要在 `php.ini` 中调整时区、文件上传等参数。
-
-### 安装步骤
-1. 将代码部署到 Web 服务器（例如 `/var/www/yourteam`）。
-2. 导入数据库结构：
-   ```bash
-   mysql -u root -p < database.sql
-   ```
-3. 如有需要，修改 `config.php` 中的数据库配置。
-4. 访问 `login.php` 登录系统。
-
-### 自定义团队名称
-在 `team_name.js` 中设置组织名称，例如：
-```javascript
-const TEAM_NAME = { en: 'ACME', zh: 'ACME' };
-```
-脚本会自动在页面标题和内容中的“Team/团队”前添加该名称。
-
-### 导航功能
-- **成员管理**：添加、编辑、导入或导出成员信息。
-- **待办列表**：成员维护个人待办并在完成后勾选。
-- **项目管理**：创建项目、分配成员并跟踪进度。
-- **研究方向**：设定研究方向并关联相应成员。
-- **定向通知**（仅管理员）：发布、编辑或撤销通知并查看成员阅读情况。
-- **财务报销**：成员上传单据申请报销，管理员审核通过或拒绝。
-- **任务分配**：为成员分派任务，成员申报事务等待确认。
-- **工作量统计**（仅管理员）：汇总已确认事务并导出报表。
-- **经费账户**（仅管理员）：管理报销账户余额与记录。
-
-### 数据库升级
-从旧版本升级时，请先备份数据库，再运行 `update_db.sql` 为 `task_affairs` 表添加新的 `status` 字段。
