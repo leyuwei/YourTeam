@@ -14,8 +14,11 @@ $output = shell_exec($command);
 $text = mb_convert_encoding($output, 'UTF-8', 'auto');
 
 $price = 0;
-if(preg_match('/[¥￥]\\s*(\\d+(?:\\.\\d+)?)/u', $text, $m)){
-    $price = $m[1];
+if (preg_match_all('/[\x{00A5}\x{FFE5}]\\s*(\\d+(?:\\.\\d+)?)/u', $text, $matches)) {
+    $prices = array_map('floatval', $matches[1]);
+    if ($prices) {
+        $price = max($prices);
+    }
 }
 
 $category = '';
