@@ -66,6 +66,14 @@ $today_key = strtolower(date('D'));
   .todolist li .item-done { transform: scale(1.2); margin-right: 5mm; }
   .todolist li .item-content { border: none; box-shadow: none; padding: 0; font-size: 12pt; }
 }
+@media (max-width: 767.98px) {
+  .todolist li .copy-item,
+  .todolist li .next-week-item,
+  .todolist li .tomorrow-item,
+  .todolist li .delete-item,
+  .add-item { display: none !important; }
+  .todolist li .item-content { border: none; box-shadow: none; padding-left: 0; }
+}
 </style>
 <h2 class="text-center"><span data-i18n="todolist.title">待办事项</span> @ <?= date('Y.m.d', strtotime($week_start)) ?> - <?= date('Y.m.d', strtotime($week_end)) ?></small></h2>
 <?= $week_hint; ?>
@@ -135,6 +143,7 @@ $today_key = strtolower(date('D'));
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
 window.addEventListener('DOMContentLoaded',()=>{
+  const enableEditing = window.innerWidth >= 768;
   let pendingSaves=0;
   function showHint(){
     const hint=document.getElementById('saveHint');
@@ -175,55 +184,70 @@ window.addEventListener('DOMContentLoaded',()=>{
     postData(data).then(r=>r.json()).then(j=>{if(!id)li.dataset.id=j.id;}).then(()=>updateStats());
   }
   function attach(li){
-    li.querySelector('.item-content').addEventListener('input',()=>saveItem(li));
+    const content=li.querySelector('.item-content');
+    if(enableEditing){
+      content.addEventListener('input',()=>saveItem(li));
+    }else{
+      content.setAttribute('readonly',true);
+    }
     li.querySelector('.item-done').addEventListener('change',()=>saveItem(li));
-    const copyBtn=li.querySelector('.copy-item');
-    if(copyBtn) copyBtn.addEventListener('click',()=>copyText(li.querySelector('.item-content').value));
-    const nextBtn=li.querySelector('.next-week-item');
-    if(nextBtn) nextBtn.addEventListener('click',()=>{postData({action:'copy_item_next',id:li.dataset.id,week_start:'<?= $week_start; ?>'});});
-    const tomorrowBtn=li.querySelector('.tomorrow-item');
-    if(tomorrowBtn) tomorrowBtn.addEventListener('click',()=>{
-      const list=li.parentElement;
-      const day=list.dataset.day;
-      if(day==='sun'){
-        postData({action:'tomorrow',id:li.dataset.id,day:day,week_start:'<?= $week_start; ?>'}).then(()=>{li.remove();updateStats();});
-      }else{
-        const order=['mon','tue','wed','thu','fri','sat','sun'];
-        const nextDay=order[order.indexOf(day)+1];
-        const target=document.querySelector(`.todolist[data-category='${list.dataset.category}'][data-day='${nextDay}']`);
-        target.appendChild(li);
-        saveItem(li);
-        const orderArr=Array.from(target.children).map((li,i)=>({id:li.dataset.id,position:i}));
-        postData({action:'order',order:orderArr});
-        updateStats();
-      }
-    });
-    li.querySelector('.delete-item').addEventListener('click',()=>{postData({action:'delete',id:li.dataset.id}).then(()=>{li.remove();updateStats();});});
+    if(enableEditing){
+      const copyBtn=li.querySelector('.copy-item');
+      if(copyBtn) copyBtn.addEventListener('click',()=>copyText(content.value));
+      const nextBtn=li.querySelector('.next-week-item');
+      if(nextBtn) nextBtn.addEventListener('click',()=>{postData({action:'copy_item_next',id:li.dataset.id,week_start:'<?= $week_start; ?>'});});
+      const tomorrowBtn=li.querySelector('.tomorrow-item');
+      if(tomorrowBtn) tomorrowBtn.addEventListener('click',()=>{
+        const list=li.parentElement;
+        const day=list.dataset.day;
+        if(day==='sun'){
+          postData({action:'tomorrow',id:li.dataset.id,day:day,week_start:'<?= $week_start; ?>'}).then(()=>{li.remove();updateStats();});
+        }else{
+          const order=['mon','tue','wed','thu','fri','sat','sun'];
+          const nextDay=order[order.indexOf(day)+1];
+          const target=document.querySelector(`.todolist[data-category='${list.dataset.category}'][data-day='${nextDay}']`);
+          target.appendChild(li);
+          saveItem(li);
+          const orderArr=Array.from(target.children).map((li,i)=>({id:li.dataset.id,position:i}));
+          postData({action:'order',order:orderArr});
+          updateStats();
+        }
+      });
+      li.querySelector('.delete-item').addEventListener('click',()=>{postData({action:'delete',id:li.dataset.id}).then(()=>{li.remove();updateStats();});});
+    }else{
+      li.querySelectorAll('.copy-item,.next-week-item,.tomorrow-item,.delete-item').forEach(btn=>btn.style.display='none');
+    }
   }
   document.querySelectorAll('.todolist').forEach(list=>{
-    Sortable.create(list,{group:'todolist',animation:150,onEnd:function(evt){
-      saveItem(evt.item);
-      const lists=new Set([evt.from,evt.to]);
-      lists.forEach(l=>{
-        const order=Array.from(l.children).map((li,i)=>({id:li.dataset.id,position:i}));
-        postData({action:'order',order:order});
-      });
-      updateStats();
-    }});
+    if(enableEditing){
+      Sortable.create(list,{group:'todolist',animation:150,onEnd:function(evt){
+        saveItem(evt.item);
+        const lists=new Set([evt.from,evt.to]);
+        lists.forEach(l=>{
+          const order=Array.from(l.children).map((li,i)=>({id:li.dataset.id,position:i}));
+          postData({action:'order',order:order});
+        });
+        updateStats();
+      }});
+    }
     list.querySelectorAll('li').forEach(attach);
   });
   document.querySelectorAll('.add-item').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const list=document.querySelector(`.todolist[data-category='${btn.dataset.category}'][data-day='${btn.dataset.day}']`);
-      const li=document.createElement('li');
-      li.className='list-group-item d-flex align-items-center flex-nowrap';
-      const tomorrowBtn = btn.dataset.day ? '<button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap" data-i18n="todolist.cut_tomorrow">鸽明天</button>' : '';
-      li.innerHTML=`<input type="checkbox" class="form-check-input me-2 item-done"><input type="text" class="form-control item-content flex-grow-1 me-2"><button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button><button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>${tomorrowBtn}<button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>`;
-      list.appendChild(li);
-      applyTranslations();
-      attach(li);
-      saveItem(li);
-    });
+    if(enableEditing){
+      btn.addEventListener('click',()=>{
+        const list=document.querySelector(`.todolist[data-category='${btn.dataset.category}'][data-day='${btn.dataset.day}']`);
+        const li=document.createElement('li');
+        li.className='list-group-item d-flex align-items-center flex-nowrap';
+        const tomorrowBtn = btn.dataset.day ? '<button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap" data-i18n="todolist.cut_tomorrow">鸽明天</button>' : '';
+        li.innerHTML=`<input type="checkbox" class="form-check-input me-2 item-done"><input type="text" class="form-control item-content flex-grow-1 me-2"><button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button><button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">复制到下周</button>${tomorrowBtn}<button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>`;
+        list.appendChild(li);
+        applyTranslations();
+        attach(li);
+        saveItem(li);
+      });
+    }else{
+      btn.style.display='none';
+    }
   });
   document.querySelector("input[name='week']").addEventListener('change',function(){this.form.submit();});
   document.getElementById('copyNextWeek').addEventListener('click',()=>{
