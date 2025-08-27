@@ -13,3 +13,10 @@ CREATE TABLE regulation_files (
   stored_filename VARCHAR(255) NOT NULL,
   FOREIGN KEY (regulation_id) REFERENCES regulations(id) ON DELETE CASCADE
 );
+
+ALTER TABLE reimbursement_batches ADD COLUMN allowed_types VARCHAR(255) DEFAULT NULL;
+
+CREATE TABLE reimbursement_prohibited_keywords (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  keyword VARCHAR(100) UNIQUE NOT NULL
+);

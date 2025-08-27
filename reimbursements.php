@@ -10,12 +10,13 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']
     $incharge = $_POST['in_charge'] ?: null;
     $deadline = $_POST['deadline'];
     $limit = $_POST['price_limit'] !== '' ? $_POST['price_limit'] : null;
+    $allowed = isset($_POST['allowed_types']) ? implode(',', $_POST['allowed_types']) : null;
     if($id){
-        $stmt = $pdo->prepare("UPDATE reimbursement_batches SET title=?, in_charge_member_id=?, deadline=?, price_limit=? WHERE id=?");
-        $stmt->execute([$title, $incharge, $deadline, $limit, $id]);
+        $stmt = $pdo->prepare("UPDATE reimbursement_batches SET title=?, in_charge_member_id=?, deadline=?, price_limit=?, allowed_types=? WHERE id=?");
+        $stmt->execute([$title, $incharge, $deadline, $limit, $allowed, $id]);
     } else {
-        $stmt = $pdo->prepare("INSERT INTO reimbursement_batches (title, in_charge_member_id, deadline, price_limit) VALUES (?,?,?,?)");
-        $stmt->execute([$title, $incharge, $deadline, $limit]);
+        $stmt = $pdo->prepare("INSERT INTO reimbursement_batches (title, in_charge_member_id, deadline, price_limit, allowed_types) VALUES (?,?,?,?,?)");
+        $stmt->execute([$title, $incharge, $deadline, $limit, $allowed]);
     }
 }
 
@@ -44,12 +45,13 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
   <h2 data-i18n="reimburse.title">Reimbursement Batches</h2>
   <div>
     <?php if($is_manager): ?>
+    <a class="btn btn-secondary" href="reimbursement_keywords.php" data-i18n="reimburse.keywords.manage">Keywords</a>
     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#batchModal" data-i18n="reimburse.add_batch">Add Batch</button>
     <?php endif; ?>
   </div>
 </div>
 <table class="table table-bordered">
-<tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.limit">Limit</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
+<tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.limit">Limit</th><th data-i18n="reimburse.batch.allowed_types">Allowed Types</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
 <?php foreach($batches as $b): ?>
 <tr>
   <td><?= htmlspecialchars($b['title']); ?></td>
@@ -57,6 +59,18 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
   <td><?= htmlspecialchars($b['in_charge_name']); ?></td>
   <td><span data-i18n="reimburse.status.<?= $b['status']; ?>"><?= htmlspecialchars($b['status']); ?></span></td>
   <td><?= htmlspecialchars($b['price_limit']); ?></td>
+  <td>
+    <?php
+      if($b['allowed_types']){
+        $types = explode(',', $b['allowed_types']);
+        foreach($types as $t){
+          echo '<span data-i18n="reimburse.category.'.$t.'">'.$t.'</span> ';
+        }
+      } else {
+        echo '<span data-i18n="reimburse.batch.none">None</span>';
+      }
+    ?>
+  </td>
   <?php if(!$is_manager): ?>
   <td>
     <?php
@@ -81,7 +95,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
     <a class="btn btn-sm btn-info" href="reimbursement_download.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_download">Download</a>
     <?php endif; ?>
     <?php if($is_manager): ?>
-    <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-i18n="reimburse.action_edit">Edit</button>
+    <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-types="<?= htmlspecialchars($b['allowed_types']); ?>" data-i18n="reimburse.action_edit">Edit</button>
     <a class="btn btn-sm btn-danger" href="reimbursement_batch_delete.php?id=<?= $b['id']; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_delete_batch']);">Delete</a>
     <?php endif; ?>
   </td>
@@ -145,6 +159,15 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
           <label class="form-label" data-i18n="reimburse.batch.limit">Price Limit</label>
           <input type="number" step="0.01" name="price_limit" class="form-control" id="batch-limit">
         </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.allowed_types">Allowed Types</label>
+          <?php $cats=['office','electronic','membership','book','trip']; foreach($cats as $c): ?>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="allowed_types[]" value="<?= $c; ?>" id="type-<?= $c; ?>">
+            <label class="form-check-label" for="type-<?= $c; ?>" data-i18n="reimburse.category.<?= $c; ?>"><?= $c; ?></label>
+          </div>
+          <?php endforeach; ?>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.cancel">Cancel</button>
@@ -161,6 +184,13 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
       document.getElementById('batch-incharge').value=btn.dataset.incharge;
       document.getElementById('batch-deadline').value=btn.dataset.deadline;
       document.getElementById('batch-limit').value=btn.dataset.limit;
+      document.querySelectorAll('input[name="allowed_types[]"]').forEach(cb=>{cb.checked=false;});
+      if(btn.dataset.types){
+        btn.dataset.types.split(',').forEach(t=>{
+          const el=document.getElementById('type-'+t);
+          if(el) el.checked=true;
+        });
+      }
       document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'zh']['reimburse.action_edit'];
       var modal=new bootstrap.Modal(document.getElementById('batchModal'));
       modal.show();
@@ -169,6 +199,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
   document.getElementById('batchModal').addEventListener('hidden.bs.modal',()=>{
     document.getElementById('batch-id').value='';
     document.getElementById('batch-limit').value='';
+    document.querySelectorAll('input[name="allowed_types[]"]').forEach(cb=>{cb.checked=false;});
     document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'zh']['reimburse.add_batch'];
   });
 </script>
