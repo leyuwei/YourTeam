@@ -10,6 +10,7 @@ if(!$batch){
     include 'footer.php';
     exit;
 }
+$allowedTypes = $batch['allowed_types'] ? explode(',', $batch['allowed_types']) : ['office','electronic','membership','book','trip'];
 $is_manager = ($_SESSION['role'] === 'manager');
 $member_id = $_SESSION['member_id'] ?? null;
 $deadline_passed = (strtotime($batch['deadline']) < strtotime(date('Y-m-d')));
@@ -50,21 +51,39 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                 $error = 'exceed';
             } else {
                 $category = $_POST['category'];
-                $orig = $_FILES['receipt']['name'];
-                $ext = pathinfo($orig, PATHINFO_EXTENSION);
-                $memberInfo = $pdo->prepare("SELECT name,campus_id FROM members WHERE id=?");
-                $memberInfo->execute([$member_id]);
-                $mi = $memberInfo->fetch();
-                $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND status<>'refused'");
-                $countStmt->execute([$id,$member_id]);
-                $index = $countStmt->fetchColumn()+1;
-                $base = $mi['name'].'-'.$mi['campus_id'].'-'.$batch['title'].'-'.$index;
-                $newname = $base.'.'.$ext;
-                $dir = __DIR__.'/reimburse_uploads/'.$id;
-                if(!is_dir($dir)) mkdir($dir,0777,true);
-                move_uploaded_file($_FILES['receipt']['tmp_name'], $dir.'/'.$newname);
-                $stmt = $pdo->prepare("INSERT INTO reimbursement_receipts (batch_id, member_id, original_filename, stored_filename, category, description, price) VALUES (?,?,?,?,?,?,?)");
-                $stmt->execute([$id, $member_id, $orig, $newname, $category, $description, $price]);
+                if(!in_array($category,$allowedTypes)){
+                    $error='type';
+                } else {
+                    $orig = $_FILES['receipt']['name'];
+                    $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+                    $tmpPath = $_FILES['receipt']['tmp_name'];
+                    if($ext === 'pdf'){
+                        $keywords=$pdo->query("SELECT keyword FROM reimbursement_prohibited_keywords")->fetchAll(PDO::FETCH_COLUMN);
+                        $content=@shell_exec('pdftotext '.escapeshellarg($tmpPath).' -');
+                        if(!$content){ $content=@file_get_contents($tmpPath); }
+                        foreach($keywords as $kw){
+                            if($kw!=='' && stripos($content,$kw)!==false){
+                                $error='prohibited';
+                                break;
+                            }
+                        }
+                    }
+                    if(!$error){
+                        $memberInfo = $pdo->prepare("SELECT name,campus_id FROM members WHERE id=?");
+                        $memberInfo->execute([$member_id]);
+                        $mi = $memberInfo->fetch();
+                        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND status<>'refused'");
+                        $countStmt->execute([$id,$member_id]);
+                        $index = $countStmt->fetchColumn()+1;
+                        $base = $mi['name'].'-'.$mi['campus_id'].'-'.$batch['title'].'-'.$index;
+                        $newname = $base.'.'.$ext;
+                        $dir = __DIR__.'/reimburse_uploads/'.$id;
+                        if(!is_dir($dir)) mkdir($dir,0777,true);
+                        move_uploaded_file($tmpPath, $dir.'/'.$newname);
+                        $stmt = $pdo->prepare("INSERT INTO reimbursement_receipts (batch_id, member_id, original_filename, stored_filename, category, description, price) VALUES (?,?,?,?,?,?,?)");
+                        $stmt->execute([$id, $member_id, $orig, $newname, $category, $description, $price]);
+                    }
+                }
             }
         }
     }
@@ -92,6 +111,11 @@ $receipts = $stmt->fetchAll();
   <?php endif; ?>
 </div>
 <p><strong data-i18n="reimburse.batch.incharge">In Charge:</strong> <?= htmlspecialchars($batch['in_charge_name']); ?> &nbsp; <strong data-i18n="reimburse.batch.deadline">Deadline:</strong> <?= htmlspecialchars($batch['deadline']); ?> &nbsp; <strong data-i18n="reimburse.batch.limit">Limit:</strong> <?= htmlspecialchars($batch['price_limit']); ?> &nbsp; <strong data-i18n="reimburse.batch.status">Status:</strong> <span data-i18n="reimburse.status.<?= $batch['status']; ?>"><?= htmlspecialchars($batch['status']); ?></span></p>
+<p><strong data-i18n="reimburse.batch.allowed_types">Allowed Types:</strong>
+<?php if($allowedTypes){ foreach($allowedTypes as $t){ echo '<span data-i18n="reimburse.category.'.$t.'">'.$t.'</span> '; } } else { echo '<span data-i18n="reimburse.batch.none">None</span>'; } ?></p>
+<?php if($is_manager || $batch['in_charge_member_id']==$member_id): ?>
+<div class="alert alert-danger fw-bold" data-i18n="reimburse.batch.check_warning">You should carefully check the content of each receipt and refuse those unqualified receipts before proceeding to the next step</div>
+<?php endif; ?>
 <?php if(!$is_manager && !$batch_locked && !$deadline_passed): ?>
 <form method="post" enctype="multipart/form-data" class="mb-4">
   <div class="mb-3">
@@ -102,11 +126,9 @@ $receipts = $stmt->fetchAll();
   <div class="mb-3">
     <label class="form-label" data-i18n="reimburse.batch.category">Category</label>
     <select name="category" class="form-select" required>
-      <option value="office" data-i18n="reimburse.category.office">Office Stuff</option>
-      <option value="electronic" data-i18n="reimburse.category.electronic">Electronic Gadget</option>
-      <option value="membership" data-i18n="reimburse.category.membership">Membership</option>
-      <option value="book" data-i18n="reimburse.category.book">Book</option>
-      <option value="trip" data-i18n="reimburse.category.trip">Trip</option>
+      <?php foreach($allowedTypes as $t): ?>
+      <option value="<?= $t; ?>" data-i18n="reimburse.category.<?= $t; ?>"><?= $t; ?></option>
+      <?php endforeach; ?>
     </select>
   </div>
     <div class="mb-3">
@@ -119,6 +141,8 @@ $receipts = $stmt->fetchAll();
   </div>
   <?php if($error=='exceed'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.limit_exceed">Price exceeds limit</div><?php endif; ?>
   <?php if($error=='desc'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.description_required">Description required</div><?php endif; ?>
+  <?php if($error=='type'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.type_not_allowed">Type not allowed</div><?php endif; ?>
+  <?php if($error=='prohibited'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.prohibited">Receipt contains prohibited content</div><?php endif; ?>
   <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.upload">Upload</button>
 </form>
 <?php elseif($is_manager): ?>

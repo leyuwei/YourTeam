@@ -128,6 +128,7 @@ CREATE TABLE reimbursement_batches (
   in_charge_member_id INT DEFAULT NULL,
   deadline DATE NOT NULL,
   price_limit DECIMAL(10,2) DEFAULT NULL,
+  allowed_types VARCHAR(255) DEFAULT NULL,
   status ENUM('open','locked','completed') DEFAULT 'open',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (in_charge_member_id) REFERENCES members(id) ON DELETE SET NULL
@@ -146,6 +147,11 @@ CREATE TABLE reimbursement_receipts (
   uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (batch_id) REFERENCES reimbursement_batches(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE TABLE reimbursement_prohibited_keywords (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  keyword VARCHAR(100) UNIQUE NOT NULL
 );
 
 CREATE TABLE reimbursement_announcement (
