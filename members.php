@@ -62,6 +62,7 @@ if($_SESSION['role'] === 'member') {
   <a class="btn btn-sm <?= $statusFilter==='all'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=all&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.all">全部</a>
   <a class="btn btn-sm <?= $statusFilter==='in_work'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=in_work&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.in_work">在岗</a>
   <a class="btn btn-sm <?= $statusFilter==='exited'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=exited&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.exited">已离退</a>
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleColor" data-i18n="members.toggle_color">Toggle Colors</button>
 </div>
 <?php endif; ?>
 <div class="table-responsive">
@@ -84,7 +85,7 @@ if($_SESSION['role'] === 'member') {
   </thead>
   <tbody id="memberList">
   <?php foreach($members as $m): ?>
-  <tr data-id="<?= $m['id']; ?>">
+  <tr data-id="<?= $m['id']; ?>" data-year="<?= htmlspecialchars($m['year_of_join']); ?>" data-degree="<?= htmlspecialchars($m['degree_pursuing']); ?>">
     <?php if($_SESSION['role'] === 'manager'): ?>
     <td class="drag-handle">&#9776;</td>
     <?php else: ?>
@@ -130,6 +131,32 @@ if($_SESSION['role'] === 'member') {
         });
       }
     });
+    const toggleBtn=document.getElementById('toggleColor');
+    if(toggleBtn){
+      let colored=false;
+      const colorMap={};
+      function getColor(key){
+        if(!colorMap[key]){
+          const hue=Object.keys(colorMap).length*60%360;
+          colorMap[key]='hsl('+hue+',70%,80%)';
+        }
+        return colorMap[key];
+      }
+      function applyColors(){
+        document.querySelectorAll('#memberList tr').forEach(row=>{
+          const key=row.dataset.year+'-'+row.dataset.degree;
+          row.style.backgroundColor=getColor(key);
+        });
+      }
+      function clearColors(){
+        document.querySelectorAll('#memberList tr').forEach(row=>{row.style.backgroundColor='';});
+      }
+      toggleBtn.addEventListener('click',()=>{
+        colored=!colored;
+        if(colored){applyColors();toggleBtn.classList.add('btn-primary');}
+        else{clearColors();toggleBtn.classList.remove('btn-primary');}
+      });
+    }
   });
   </script>
   <?php endif; ?>

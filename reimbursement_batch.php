@@ -1,5 +1,6 @@
 <?php
 include 'auth.php';
+include 'reimbursement_log.php';
 include 'header.php';
 $id = (int)($_GET['id'] ?? 0);
 $stmt = $pdo->prepare("SELECT b.*, m.name AS in_charge_name FROM reimbursement_batches b LEFT JOIN members m ON b.in_charge_member_id=m.id WHERE b.id=?");
@@ -23,21 +24,25 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='locked';
         $batch_locked = true;
+        add_batch_log($pdo,$id,$_SESSION['username'],'Batch locked');
     } elseif(isset($_POST['complete']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
         $pdo->prepare("UPDATE reimbursement_batches SET status='completed' WHERE id=?")->execute([$id]);
         $pdo->prepare("UPDATE reimbursement_receipts SET status='complete' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='completed';
         $batch_locked = true;
+        add_batch_log($pdo,$id,$_SESSION['username'],'Batch completed');
     } elseif(isset($_POST['unlock']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
         $pdo->prepare("UPDATE reimbursement_batches SET status='open' WHERE id=?")->execute([$id]);
         $pdo->prepare("UPDATE reimbursement_receipts SET status='submitted' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='open';
         $batch_locked = false;
+        add_batch_log($pdo,$id,$_SESSION['username'],'Batch unlocked');
     } elseif(isset($_POST['reopen']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
         $pdo->prepare("UPDATE reimbursement_batches SET status='locked' WHERE id=?")->execute([$id]);
         $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
         $batch['status']='locked';
         $batch_locked = true;
+        add_batch_log($pdo,$id,$_SESSION['username'],'Batch reopened');
     } elseif(!$is_manager && isset($_FILES['receipt']) && $_FILES['receipt']['error']===UPLOAD_ERR_OK && !$batch_locked && !$deadline_passed){
         $description = trim($_POST['description'] ?? '');
         $price = $_POST['price'] !== '' ? (float)$_POST['price'] : 0;
@@ -82,6 +87,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                         move_uploaded_file($tmpPath, $dir.'/'.$newname);
                         $stmt = $pdo->prepare("INSERT INTO reimbursement_receipts (batch_id, member_id, original_filename, stored_filename, category, description, price) VALUES (?,?,?,?,?,?,?)");
                         $stmt->execute([$id, $member_id, $orig, $newname, $category, $description, $price]);
+                        add_batch_log($pdo,$id,$_SESSION['username'],'Receipt uploaded');
                     }
                 }
             }
@@ -103,6 +109,11 @@ if($is_manager || $batch['in_charge_member_id']==$member_id){
     $stmt->execute([$id,$member_id]);
 }
 $receipts = $stmt->fetchAll();
+if($is_manager){
+    $logStmt=$pdo->prepare("SELECT operator_name, action, created_at FROM reimbursement_batch_logs WHERE batch_id=? ORDER BY created_at DESC");
+    $logStmt->execute([$id]);
+    $logs=$logStmt->fetchAll();
+}
 ?>
 <div class="d-flex justify-content-between mb-3">
   <h2><?= htmlspecialchars($batch['title']); ?></h2>
@@ -151,13 +162,14 @@ $receipts = $stmt->fetchAll();
 <div class="alert alert-warning" data-i18n="reimburse.batch.deadline_passed">Deadline passed or batch locked</div>
 <?php endif; ?>
 <table class="table table-bordered">
-<tr><th data-i18n="reimburse.batch.receipt">Receipt</th><th data-i18n="reimburse.batch.category">Category</th><th data-i18n="reimburse.batch.description">Description</th><th data-i18n="reimburse.batch.price">Price</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.uploader">Uploader</th><th data-i18n="reimburse.batch.actions">Actions</th></tr>
+<tr><th data-i18n="reimburse.batch.receipt">Receipt</th><th data-i18n="reimburse.batch.category">Category</th><th data-i18n="reimburse.batch.description">Description</th><th data-i18n="reimburse.batch.price">Price</th><th data-i18n="reimburse.batch.upload_date">Upload Date</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.uploader">Uploader</th><th data-i18n="reimburse.batch.actions">Actions</th></tr>
 <?php foreach($receipts as $r): ?>
 <tr>
   <td><a href="<?='reimburse_uploads/'.$id.'/'.urlencode($r['stored_filename']);?>" target="_blank"><?= htmlspecialchars($r['original_filename']); ?></a></td>
   <td><span data-i18n="reimburse.category.<?= $r['category']; ?>"><?= htmlspecialchars($r['category']); ?></span></td>
   <td><?= htmlspecialchars($r['description']); ?></td>
   <td><?= htmlspecialchars($r['price']); ?></td>
+  <td><?= htmlspecialchars($r['uploaded_at']); ?></td>
   <td><span data-i18n="reimburse.status.<?= $r['status']; ?>"><?= htmlspecialchars($r['status']); ?></span></td>
   <td><?= htmlspecialchars($r['name']); ?></td>
   <td>
@@ -189,6 +201,14 @@ $receipts = $stmt->fetchAll();
 <tr><td><span data-i18n="reimburse.category.<?= $ct['category']; ?>"><?= htmlspecialchars($ct['category']); ?></span></td><td><?= htmlspecialchars($ct['total']); ?></td></tr>
 <?php endforeach; ?>
 </table>
+<?php if($is_manager && !empty($logs)): ?>
+<h4 data-i18n="reimburse.batch.logs">Change Log</h4>
+<ul class="list-group mb-3">
+  <?php foreach($logs as $log): ?>
+  <li class="list-group-item"><small><?= htmlspecialchars($log['created_at']); ?> - <?= htmlspecialchars($log['operator_name']); ?>: <?= htmlspecialchars($log['action']); ?></small></li>
+  <?php endforeach; ?>
+</ul>
+<?php endif; ?>
 <form method="post" class="mt-3">
   <?php if($batch['status']=='open'): ?>
   <button type="submit" name="lock" value="1" class="btn btn-warning" data-i18n="reimburse.batch.lock">Lock</button>

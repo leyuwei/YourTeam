@@ -1,5 +1,6 @@
 <?php
 include 'auth.php';
+include 'reimbursement_log.php';
 $id = (int)($_GET['id'] ?? 0);
 $is_manager = ($_SESSION['role'] === 'manager');
 $member_id = $_SESSION['member_id'] ?? 0;
@@ -96,6 +97,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                 if(!$error){
                     $stmt = $pdo->prepare("UPDATE reimbursement_receipts SET batch_id=?, original_filename=?, stored_filename=?, category=?, description=?, price=?, status='submitted' WHERE id=?");
                     $stmt->execute([$target_batch_id,$orig,$stored,$category,$description,$price,$id]);
+                    $changes=[];
+                    if($rec['batch_id']!=$target_batch_id) $changes[]='batch';
+                    if($rec['category']!=$category) $changes[]='category';
+                    if($rec['description']!=$description) $changes[]='description';
+                    if($rec['price']!=$price) $changes[]='price';
+                    $msg='Receipt '.$id.' updated'.($changes?': '.implode(', ',$changes):'');
+                    add_batch_log($pdo,$target_batch_id,$_SESSION['username'],$msg);
                     header('Location: reimbursement_batch.php?id='.$target_batch_id);
                     exit;
                 }

@@ -161,6 +161,15 @@ CREATE TABLE reimbursement_announcement (
 );
 INSERT INTO reimbursement_announcement (id, content_en, content_zh) VALUES (1, '', '');
 
+CREATE TABLE reimbursement_batch_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  batch_id INT NOT NULL,
+  operator_name VARCHAR(100) NOT NULL,
+  action VARCHAR(255) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (batch_id) REFERENCES reimbursement_batches(id) ON DELETE CASCADE
+);
+
 CREATE TABLE regulations (
   id INT AUTO_INCREMENT PRIMARY KEY,
   sort_order INT DEFAULT 0,

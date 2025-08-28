@@ -1,5 +1,6 @@
 <?php
 include 'auth.php';
+include 'reimbursement_log.php';
 include 'header.php';
 $is_manager = ($_SESSION['role'] === 'manager');
 $member_id = $_SESSION['member_id'] ?? null;
@@ -12,11 +13,29 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']
     $limit = $_POST['price_limit'] !== '' ? $_POST['price_limit'] : null;
     $allowed = isset($_POST['allowed_types']) ? implode(',', $_POST['allowed_types']) : null;
     if($id){
+        $oldStmt = $pdo->prepare("SELECT title,in_charge_member_id,deadline,price_limit,allowed_types FROM reimbursement_batches WHERE id=?");
+        $oldStmt->execute([$id]);
+        $old = $oldStmt->fetch();
         $stmt = $pdo->prepare("UPDATE reimbursement_batches SET title=?, in_charge_member_id=?, deadline=?, price_limit=?, allowed_types=? WHERE id=?");
         $stmt->execute([$title, $incharge, $deadline, $limit, $allowed, $id]);
+        if($old){
+            if($old['title'] !== $title) add_batch_log($pdo,$id,$_SESSION['username'],'Title changed from '.$old['title'].' to '.$title);
+            if($old['deadline'] !== $deadline) add_batch_log($pdo,$id,$_SESSION['username'],'Deadline changed from '.$old['deadline'].' to '.$deadline);
+            if($old['price_limit'] != $limit) add_batch_log($pdo,$id,$_SESSION['username'],'Price limit changed from '.$old['price_limit'].' to '.$limit);
+            if($old['allowed_types'] !== $allowed) add_batch_log($pdo,$id,$_SESSION['username'],'Allowed types changed');
+            if($old['in_charge_member_id'] != $incharge){
+                $oldName='None';
+                if($old['in_charge_member_id']){ $s=$pdo->prepare('SELECT name FROM members WHERE id=?'); $s->execute([$old['in_charge_member_id']]); $oldName=$s->fetchColumn()?:'None'; }
+                $newName='None';
+                if($incharge){ $s=$pdo->prepare('SELECT name FROM members WHERE id=?'); $s->execute([$incharge]); $newName=$s->fetchColumn()?:'None'; }
+                add_batch_log($pdo,$id,$_SESSION['username'],'In charge changed from '.$oldName.' to '.$newName);
+            }
+        }
     } else {
         $stmt = $pdo->prepare("INSERT INTO reimbursement_batches (title, in_charge_member_id, deadline, price_limit, allowed_types) VALUES (?,?,?,?,?)");
         $stmt->execute([$title, $incharge, $deadline, $limit, $allowed]);
+        $newId=$pdo->lastInsertId();
+        add_batch_log($pdo,$newId,$_SESSION['username'],'Batch created');
     }
 }
 
@@ -80,7 +99,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
       if($urs){
         echo '<ul class="list-group list-group-flush mb-0">';
         foreach($urs as $r){
-          echo '<li class="list-group-item px-2 py-1"><a href="reimburse_uploads/'.$b['id'].'/'.urlencode($r['stored_filename']).'" target="_blank">'.htmlspecialchars($r['stored_filename']).'</a><br><small>'.htmlspecialchars($r['description']).' - <span data-i18n="reimburse.category.'.$r['category'].'">'.htmlspecialchars($r['category']).'</span> - '.htmlspecialchars($r['price']).'</small></li>';
+          echo '<li class="list-group-item px-2 py-1"><a href="reimburse_uploads/'.$b['id'].'/'.urlencode($r['stored_filename']).'" target="_blank">'.htmlspecialchars($r['stored_filename']).'</a><br><small>'.htmlspecialchars($r['description']).' - <span data-i18n="reimburse.category.'.$r['category'].'">'.htmlspecialchars($r['category']).'</span> - '.htmlspecialchars($r['price']).' - '.htmlspecialchars($r['uploaded_at']).'</small></li>';
         }
         echo '</ul>';
       } else {
@@ -112,13 +131,14 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
 <h3 data-i18n="reimburse.refused.title">Refused Receipts</h3>
 <?php if($receipts): ?>
 <table class="table table-bordered">
-<tr><th data-i18n="reimburse.batch.receipt">Receipt</th><th data-i18n="reimburse.batch.category">Category</th><th data-i18n="reimburse.batch.description">Description</th><th data-i18n="reimburse.batch.price">Price</th><th data-i18n="reimburse.refused.original_batch">Original Batch</th><th data-i18n="reimburse.batch.actions">Actions</th></tr>
+<tr><th data-i18n="reimburse.batch.receipt">Receipt</th><th data-i18n="reimburse.batch.category">Category</th><th data-i18n="reimburse.batch.description">Description</th><th data-i18n="reimburse.batch.price">Price</th><th data-i18n="reimburse.batch.upload_date">Upload Date</th><th data-i18n="reimburse.refused.original_batch">Original Batch</th><th data-i18n="reimburse.batch.actions">Actions</th></tr>
 <?php foreach($receipts as $r): ?>
 <tr>
   <td><a href="<?= 'reimburse_uploads/'.$r['batch_id'].'/'.urlencode($r['stored_filename']); ?>" target="_blank"><?= htmlspecialchars($r['stored_filename']); ?></a></td>
   <td><span data-i18n="reimburse.category.<?= $r['category']; ?>"><?= htmlspecialchars($r['category']); ?></span></td>
   <td><?= htmlspecialchars($r['description']); ?></td>
   <td><?= htmlspecialchars($r['price']); ?></td>
+  <td><?= htmlspecialchars($r['uploaded_at']); ?></td>
   <td><?= htmlspecialchars($r['batch_title']); ?></td>
   <td><a class="btn btn-sm btn-secondary" href="reimbursement_receipt_edit.php?id=<?= $r['id']; ?>" data-i18n="reimburse.batch.edit">Edit</a></td>
 </tr>

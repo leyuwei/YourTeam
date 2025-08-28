@@ -1,5 +1,6 @@
 <?php
 include 'auth.php';
+include 'reimbursement_log.php';
 $id = (int)($_GET['id'] ?? 0);
 $batch_id = (int)($_GET['batch_id'] ?? 0);
 $stmt = $pdo->prepare("SELECT r.*, b.deadline, b.status AS batch_status FROM reimbursement_receipts r JOIN reimbursement_batches b ON r.batch_id=b.id WHERE r.id=?");
@@ -14,6 +15,7 @@ if($rec){
         if(is_file($file)) unlink($file);
         $del = $pdo->prepare("DELETE FROM reimbursement_receipts WHERE id=?");
         $del->execute([$id]);
+        add_batch_log($pdo,$rec['batch_id'],$_SESSION['username'],'Receipt '.$id.' deleted');
     }
 }
 header('Location: reimbursement_batch.php?id='.$batch_id);

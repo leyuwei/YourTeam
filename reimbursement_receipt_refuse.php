@@ -1,5 +1,6 @@
 <?php
 include 'auth.php';
+include 'reimbursement_log.php';
 $id = (int)($_GET['id'] ?? 0);
 $batch_id = (int)($_GET['batch_id'] ?? 0);
 $is_manager = ($_SESSION['role'] === 'manager');
@@ -12,6 +13,7 @@ if(!$rec || (!($is_manager) && $rec['in_charge_member_id'] != $member_id)){
     exit;
 }
 $pdo->prepare("UPDATE reimbursement_receipts SET status='refused' WHERE id=?")->execute([$id]);
+add_batch_log($pdo,$batch_id,$_SESSION['username'],'Receipt '.$id.' refused');
 header('Location: reimbursement_batch.php?id='.$batch_id);
 exit;
 ?>
