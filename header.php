@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title data-i18n="header.title">Team Management Platform</title>
 <link href="./style/bootstrap.min.css" rel="stylesheet">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
   body {
     min-height: 100vh;
