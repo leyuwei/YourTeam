@@ -8,10 +8,32 @@ if(!isset($_FILES['receipt']) || $_FILES['receipt']['error'] !== UPLOAD_ERR_OK){
 }
 
 $tmpPath = $_FILES['receipt']['tmp_name'];
-$escapedPath = escapeshellarg($tmpPath);
-$command = "LANG=zh_CN.UTF-8 pdftotext {$escapedPath} - 2>&1";
-$output = shell_exec($command);
-$text = mb_convert_encoding($output, 'UTF-8', 'auto');
+
+$command = ['pdftotext', $tmpPath, '-'];
+$descriptors = [
+    0 => ['pipe', 'r'],
+    1 => ['pipe', 'w'],
+    2 => ['pipe', 'w']
+];
+$process = proc_open($command, $descriptors, $pipes, null, ['LANG' => 'zh_CN.UTF-8'], ['bypass_shell' => true]);
+
+if (is_resource($process)) {
+    fclose($pipes[0]);
+    $output = stream_get_contents($pipes[1]);
+    $error = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $result = proc_close($process);
+    if ($result !== 0) {
+        error_log('pdftotext failed: ' . $error);
+        echo json_encode(['price' => 0, 'category' => '']);
+        exit;
+    }
+    $text = mb_convert_encoding($output, 'UTF-8', 'auto');
+} else {
+    echo json_encode(['price' => 0, 'category' => '']);
+    exit;
+}
 
 $price = 0;
 if (preg_match_all('/[\x{00A5}\x{FFE5}]\\s*(\\d+(?:\\.\\d+)?)/u', $text, $matches)) {
