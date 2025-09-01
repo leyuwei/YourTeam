@@ -305,7 +305,7 @@ function printTodoList(){
           .replace(/</g,'&lt;')
           .replace(/>/g,'&gt;');
         const done=li.querySelector('.item-done').checked;
-        catHtml+='<li>'+(done?'<strong>✓</strong> ':'')+content+'</li>';
+        catHtml+='<li>'+(done?'<strong>✓</strong> ':'<strong>□</strong> ')+content+'</li>';
       });
       catHtml+='</ul>';
     });
