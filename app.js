@@ -139,12 +139,13 @@ const translations = {
     'members.title': 'Team Members',
     'members.add': 'Add Member',
     'members.import': 'Import from Spreadsheet',
-    'members.export': 'Export to Spreadsheet',
+  'members.export': 'Export to Spreadsheet',
   'members.request_update': 'Request Info Update',
   'members.toggle_color': 'Toggle Colors',
+  'members.summary.title': 'Summary',
   'members.filter.all': 'All',
-    'members.filter.in_work': 'In Work',
-    'members.filter.exited': 'Exited',
+  'members.filter.in_work': 'In Work',
+  'members.filter.exited': 'Exited',
     'members.table.campus_id': 'Campus ID',
     'members.table.name': 'Name',
     'members.table.status': 'Status',
@@ -194,10 +195,11 @@ const translations = {
     'tasks.filter_all': 'All Status',
     'tasks.filter.active': 'Active',
     'tasks.filter.paused': 'Paused',
-    'tasks.filter.finished': 'Finished',
-    'tasks.filter.button': 'Filter',
-    'tasks.table_title': 'Title',
-    'tasks.table_start': 'Start',
+  'tasks.filter.finished': 'Finished',
+  'tasks.filter.button': 'Filter',
+  'tasks.pending_warning': 'Unconfirmed member affairs, please confirm ASAP:',
+  'tasks.table_title': 'Title',
+  'tasks.table_start': 'Start',
     'tasks.table_status': 'Status',
     'tasks.table_actions': 'Actions',
     'tasks.action_edit': 'Edit',
@@ -519,12 +521,13 @@ const translations = {
     'members.title': '团队成员',
     'members.add': '新增成员',
     'members.import': '从表格导入',
-    'members.export': '导出至表格',
+  'members.export': '导出至表格',
   'members.request_update': '请求信息更新',
   'members.toggle_color': '切换颜色',
+  'members.summary.title': '成员汇总',
   'members.filter.all': '全部',
-    'members.filter.in_work': '在岗',
-    'members.filter.exited': '已离退',
+  'members.filter.in_work': '在岗',
+  'members.filter.exited': '已离退',
     'members.table.campus_id': '一卡通号',
     'members.table.name': '姓名',
     'members.table.status': '状态',
@@ -576,6 +579,7 @@ const translations = {
     'tasks.filter.paused': '暂停',
     'tasks.filter.finished': '已结束',
     'tasks.filter.button': '筛选',
+    'tasks.pending_warning': '以下任务存在未确认的事务，请尽快确认：',
     'tasks.table_title': '任务标题',
     'tasks.table_start': '开始日期',
     'tasks.table_status': '状态',
@@ -813,6 +817,10 @@ function applyTranslations() {
     themeToggle.textContent = translations[lang][theme === 'light' ? 'theme.dark' : 'theme.light'];
   }
   applyTeamName?.();
+  const exportLink = document.getElementById('exportMembers');
+  if(exportLink) {
+    exportLink.href = `members_export.php?lang=${lang}`;
+  }
 }
 
 function applyTheme() {

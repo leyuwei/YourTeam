@@ -209,9 +209,9 @@ if($is_manager){
   <?php endforeach; ?>
 </ul>
 <?php endif; ?>
-<form method="post" class="mt-3">
+<form method="post" class="mt-3" id="batchForm">
   <?php if($batch['status']=='open'): ?>
-  <button type="submit" name="lock" value="1" class="btn btn-warning" data-i18n="reimburse.batch.lock">Lock</button>
+  <button type="button" id="lockBtn" class="btn btn-warning" data-i18n="reimburse.batch.lock">Lock</button>
   <?php elseif($batch['status']=='locked'): ?>
   <button type="submit" name="complete" value="1" class="btn btn-success" data-i18n="reimburse.batch.complete">Complete</button>
   <button type="submit" name="unlock" value="1" class="btn btn-secondary" data-i18n="reimburse.batch.unlock">Unlock</button>
@@ -219,28 +219,63 @@ if($is_manager){
   <button type="submit" name="reopen" value="1" class="btn btn-secondary" data-i18n="reimburse.batch.reopen">Reopen</button>
   <?php endif; ?>
 </form>
+<div class="modal fade" id="lockModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" data-i18n="reimburse.batch.lock">Lock</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="fw-bold text-danger" data-i18n="reimburse.batch.check_warning">Warning</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmLock" data-i18n="reimburse.batch.lock">Lock</button>
+      </div>
+    </div>
+  </div>
+</div>
 <?php endif; ?>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
-  const btn=document.getElementById('auto-fill');
-  if(!btn) return;
-  btn.addEventListener('click',async()=>{
-    const file=document.getElementById('receipt-file');
-    if(!file.files.length){
-      alert(translations[document.documentElement.lang||'zh']['reimburse.batch.file_required']);
-      return;
-    }
-    const fd=new FormData();
-    fd.append('receipt',file.files[0]);
-    const res=await fetch('reimbursement_autofill.php',{method:'POST',body:fd});
-    const data=await res.json();
-    if(data.price){
-      document.querySelector('input[name="price"]').value=data.price;
-    }
-    if(data.category){
-      document.querySelector('select[name="category"]').value=data.category;
-    }
-  });
+  const autofillBtn=document.getElementById('auto-fill');
+  if(autofillBtn){
+    autofillBtn.addEventListener('click',async()=>{
+      const file=document.getElementById('receipt-file');
+      if(!file.files.length){
+        alert(translations[document.documentElement.lang||'zh']['reimburse.batch.file_required']);
+        return;
+      }
+      const fd=new FormData();
+      fd.append('receipt',file.files[0]);
+      const res=await fetch('reimbursement_autofill.php',{method:'POST',body:fd});
+      const data=await res.json();
+      if(data.price){
+        document.querySelector('input[name="price"]').value=data.price;
+      }
+      if(data.category){
+        document.querySelector('select[name="category"]').value=data.category;
+      }
+    });
+  }
+  const lockBtn=document.getElementById('lockBtn');
+  const confirmLock=document.getElementById('confirmLock');
+  const batchForm=document.getElementById('batchForm');
+  if(lockBtn && confirmLock && batchForm){
+    lockBtn.addEventListener('click',()=>{
+      const modal=new bootstrap.Modal(document.getElementById('lockModal'));
+      modal.show();
+    });
+    confirmLock.addEventListener('click',()=>{
+      const input=document.createElement('input');
+      input.type='hidden';
+      input.name='lock';
+      input.value='1';
+      batchForm.appendChild(input);
+      batchForm.submit();
+    });
+  }
 });
 </script>
 <?php include 'footer.php'; ?>
