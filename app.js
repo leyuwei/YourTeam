@@ -738,7 +738,7 @@ const translations = {
   'reimburse.batch.limit_exceed': '金额超过限额',
   'reimburse.batch.type_not_allowed': '类别不被允许',
   'reimburse.batch.prohibited': '发票包含禁用内容',
-  'reimburse.batch.check_warning': '请仔细检查每张发票内容并拒绝不合规发票再进行下一步',
+  'reimburse.batch.check_warning': '请仔细检查每张发票内容，并拒绝不合规发票，然后再进行下一步！',
   'reimburse.status.submitted': '已提交',
   'reimburse.status.locked': '已锁定',
   'reimburse.status.complete': '已报销',
