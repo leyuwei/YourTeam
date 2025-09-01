@@ -33,7 +33,7 @@ if($_SESSION['role'] === 'member') {
     }
     $dir = strtolower($_GET['dir'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
 
-    $statusFilter = $_GET['status'] ?? 'all';
+    $statusFilter = $_GET['status'] ?? 'in_work';
     $where = '';
     $params = [];
     if (in_array($statusFilter, ['in_work','exited'])) {
@@ -45,6 +45,20 @@ if($_SESSION['role'] === 'member') {
     $stmt->execute($params);
     $members = $stmt->fetchAll();
 }
+
+$summaryCounts = [];
+foreach($members as $m){
+    $key = ($m['degree_pursuing'] ?? '') . '-' . ($m['year_of_join'] ?? '');
+    if($key !== '-'){
+        if(!isset($summaryCounts[$key])){ $summaryCounts[$key] = 0; }
+        $summaryCounts[$key]++;
+    }
+}
+$summaryText = [];
+foreach($summaryCounts as $k=>$v){
+    $summaryText[] = $k . ': ' . $v;
+}
+$summaryDisplay = implode(', ', $summaryText);
 ?>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="members.title">团队成员</h2>
@@ -52,7 +66,7 @@ if($_SESSION['role'] === 'member') {
   <div>
     <a class="btn btn-success" href="member_edit.php" data-i18n="members.add">新增成员</a>
     <a class="btn btn-secondary" href="members_import.php" data-i18n="members.import">从表格导入</a>
-    <a class="btn btn-secondary" href="members_export.php" data-i18n="members.export">导出至表格</a>
+    <a class="btn btn-secondary" href="members_export.php" id="exportMembers" data-i18n="members.export">导出至表格</a>
     <button type="button" class="btn btn-warning qr-btn" data-url="member_self_update.php" data-i18n="members.request_update">请求信息更新</button>
   </div>
   <?php endif; ?>
@@ -63,6 +77,9 @@ if($_SESSION['role'] === 'member') {
   <a class="btn btn-sm <?= $statusFilter==='in_work'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=in_work&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.in_work">在岗</a>
   <a class="btn btn-sm <?= $statusFilter==='exited'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=exited&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.exited">已离退</a>
   <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleColor" data-i18n="members.toggle_color">Toggle Colors</button>
+</div>
+<div class="mb-3">
+  <span class="fw-bold" data-i18n="members.summary.title">Summary</span>: <?= htmlspecialchars($summaryDisplay); ?>
 </div>
 <?php endif; ?>
 <div class="table-responsive">
@@ -131,6 +148,10 @@ if($_SESSION['role'] === 'member') {
         });
       }
     });
+    const exportLink=document.getElementById('exportMembers');
+    if(exportLink){
+      exportLink.href=`members_export.php?lang=${document.documentElement.lang||'zh'}`;
+    }
     const toggleBtn=document.getElementById('toggleColor');
     if(toggleBtn){
       let colored=false;
