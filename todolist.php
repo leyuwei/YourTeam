@@ -275,8 +275,7 @@ function printTodoList(){
             'h3.longterm{background:#fff7e6;}' +
             'ul{list-style:none;padding-left:0;margin:0 0 2mm 0;}' +
             'li{margin:0;padding:0.2mm 1mm;font-size:'+(fontSize+1.5)+'pt;}' +
-            'label{display:flex;align-items:center;gap:2mm;font-size:'+(fontSize+1.5)+'pt;}' +
-            'input[type=checkbox]{margin-top:0;}' +
+            'li strong{margin-right:1mm;}' +
             'div.columns{display:flex;}' +
             'div.columns>.left,div.columns>.right{width:50%;box-sizing:border-box;}' +
             'div.columns>.left{padding-right:1mm;}' +
@@ -301,9 +300,12 @@ function printTodoList(){
       }
       catHtml+='<ul class="'+cat+'">';
       list.querySelectorAll('li').forEach(li=>{
-        const content=li.querySelector('.item-content').value;
+        const content=li.querySelector('.item-content').value
+          .replace(/&/g,'&amp;')
+          .replace(/</g,'&lt;')
+          .replace(/>/g,'&gt;');
         const done=li.querySelector('.item-done').checked;
-        catHtml+='<li><label><input type="checkbox"'+(done?' checked':'')+' disabled><span>'+content+'</span></label></li>';
+        catHtml+='<li>'+(done?'<strong>✓</strong> ':'')+content+'</li>';
       });
       catHtml+='</ul>';
     });
