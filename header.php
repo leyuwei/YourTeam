@@ -8,6 +8,8 @@
 <link href="./style/bootstrap.min.css" rel="stylesheet">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="shortcut icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="favicon.png">
 <style>
   body {
     min-height: 100vh;

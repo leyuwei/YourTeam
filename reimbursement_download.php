@@ -12,7 +12,7 @@ $is_manager = ($_SESSION['role'] === 'manager');
 if(!($is_manager || $batch['in_charge_member_id']==$member_id)){
     exit('No permission');
 }
-$receipts = $pdo->prepare("SELECT r.*, mb.name AS member_name FROM reimbursement_receipts r JOIN members mb ON r.member_id=mb.id WHERE r.batch_id=?");
+$receipts = $pdo->prepare("SELECT r.*, mb.name AS member_name FROM reimbursement_receipts r JOIN members mb ON r.member_id=mb.id WHERE r.batch_id=? AND r.status!='refused'");
 $receipts->execute([$id]);
 $items = $receipts->fetchAll();
 $zip = new ZipArchive();

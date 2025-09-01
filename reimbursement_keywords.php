@@ -1,6 +1,5 @@
 <?php
 include 'auth_manager.php';
-include 'header.php';
 if($_SERVER['REQUEST_METHOD']==='POST'){
     $kw=trim($_POST['keyword']??'');
     if($kw!==''){
@@ -15,6 +14,7 @@ if(isset($_GET['del'])){
     exit;
 }
 $keywords=$pdo->query("SELECT * FROM reimbursement_prohibited_keywords ORDER BY keyword")->fetchAll();
+include 'header.php';
 ?>
 <h2 data-i18n="reimburse.keywords.manage">Prohibited Keywords</h2>
 <form method="post" class="mb-3">
