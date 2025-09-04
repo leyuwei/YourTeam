@@ -64,6 +64,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                     $orig = $_FILES['receipt']['name'];
                     $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
                     $tmpPath = $_FILES['receipt']['tmp_name'];
+                    $orig_base = pathinfo($orig, PATHINFO_FILENAME);
+                    $suffix = mt_rand(1000,9999) . '-' . time();
+                    $orig = $orig_base . '-' . $suffix . '.' . $ext;
                     if($ext==='pdf'){
                         $keywords=$pdo->query("SELECT keyword FROM reimbursement_prohibited_keywords")->fetchAll(PDO::FETCH_COLUMN);
                         $content=@shell_exec('pdftotext '.escapeshellarg($tmpPath).' -');
@@ -76,7 +79,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                         }
                     }
                     if(!$error){
-                        $stored = $base.'.'.$ext;
+                        $stored = $base . '-' . $suffix . '.' . $ext;
                         $dir = __DIR__.'/reimburse_uploads/'.$target_batch_id;
                         if(!is_dir($dir)) mkdir($dir,0777,true);
                         move_uploaded_file($tmpPath, $dir.'/'.$stored);
@@ -85,8 +88,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                 }
             } else {
                 $ext = pathinfo($stored, PATHINFO_EXTENSION);
-                    $newname = $base.'.'.$ext;
-                    if($target_batch_id != $rec['batch_id'] || $newname != $stored){
+                    $storedBase = pathinfo($stored, PATHINFO_FILENAME);
+                    if($target_batch_id != $rec['batch_id'] || strpos($storedBase, $base . '-') !== 0){
+                        $newname = $base . '-' . mt_rand(1000,9999) . '-' . time() . '.' . $ext;
                         $src = __DIR__.'/reimburse_uploads/'.$rec['batch_id'].'/'.$stored;
                         $dir = __DIR__.'/reimburse_uploads/'.$target_batch_id;
                         if(!is_dir($dir)) mkdir($dir,0777,true);
