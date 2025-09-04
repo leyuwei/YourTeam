@@ -62,6 +62,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                     $orig = $_FILES['receipt']['name'];
                     $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
                     $tmpPath = $_FILES['receipt']['tmp_name'];
+                    $orig_base = pathinfo($orig, PATHINFO_FILENAME);
+                    $suffix = mt_rand(1000,9999) . '-' . time();
+                    $orig = $orig_base . '-' . $suffix . '.' . $ext;
                     if($ext === 'pdf'){
                         $keywords=$pdo->query("SELECT keyword FROM reimbursement_prohibited_keywords")->fetchAll(PDO::FETCH_COLUMN);
                         $content=@shell_exec('pdftotext '.escapeshellarg($tmpPath).' -');
@@ -81,7 +84,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                         $countStmt->execute([$id,$member_id]);
                         $index = $countStmt->fetchColumn()+1;
                         $base = $mi['name'].'-'.$mi['campus_id'].'-'.$batch['title'].'-'.$index;
-                        $newname = $base.'.'.$ext;
+                        $newname = $base . '-' . $suffix . '.' . $ext;
                         $dir = __DIR__.'/reimburse_uploads/'.$id;
                         if(!is_dir($dir)) mkdir($dir,0777,true);
                         move_uploaded_file($tmpPath, $dir.'/'.$newname);
