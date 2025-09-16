@@ -17,11 +17,48 @@ $affairs_stmt->execute([$task_id]);
 $affairs = $affairs_stmt->fetchAll();
 
 $is_manager = ($_SESSION['role'] === 'manager');
+$workload_ranking = [];
 if($is_manager){
     $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
+    $ranking_stmt = $pdo->prepare("SELECT m.id, m.name, m.campus_id, SUM(TIMESTAMPDIFF(DAY, a.start_time, a.end_time)) AS total_days FROM task_affairs a JOIN task_affair_members am ON a.id = am.affair_id JOIN members m ON am.member_id = m.id WHERE a.task_id = ? AND a.status = 'confirmed' AND m.status = 'in_work' GROUP BY m.id, m.name, m.campus_id HAVING total_days > 0 ORDER BY total_days DESC, m.name ASC");
+    $ranking_stmt->execute([$task_id]);
+    $workload_ranking = $ranking_stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 <h2><span data-i18n="task_affairs.title_prefix">Task Affairs - </span><?php echo htmlspecialchars($task['title']); ?></h2>
+<?php if($is_manager): ?>
+<div class="card mb-4">
+  <div class="card-header" data-i18n="task_affairs.ranking.title">Task Workload Ranking</div>
+  <div class="card-body p-0">
+    <?php if($workload_ranking): ?>
+    <div class="table-responsive">
+      <table class="table table-bordered mb-0">
+        <thead>
+          <tr>
+            <th data-i18n="task_affairs.ranking.rank">Rank</th>
+            <th data-i18n="task_affairs.ranking.campus_id">Campus ID</th>
+            <th data-i18n="task_affairs.ranking.member">Member</th>
+            <th data-i18n="task_affairs.ranking.workload">Total Workload (days)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach($workload_ranking as $index => $row): ?>
+          <tr>
+            <td><?= $index + 1; ?></td>
+            <td><?= htmlspecialchars($row['campus_id']); ?></td>
+            <td><?= htmlspecialchars($row['name']); ?></td>
+            <td><?= htmlspecialchars(round($row['total_days'], 2)); ?></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <?php else: ?>
+    <p class="mb-0 p-3" data-i18n="task_affairs.ranking.empty">No workload records yet.</p>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 <?php if($is_manager): ?>
 <form method="post" action="affair_merge.php" id="mergeForm">
 <input type="hidden" name="task_id" value="<?= $task_id; ?>">
