@@ -25,6 +25,8 @@ if($_SESSION['role'] === 'member') {
     $sort = 'sort_order';
     $dir = 'ASC';
     $statusFilter = 'all';
+    $inWorkTotal = 0;
+    $inWorkByDegree = [];
 } else {
     // Determine sorting column and direction from query parameters
     $sort = $_GET['sort'] ?? 'sort_order';
@@ -44,6 +46,21 @@ if($_SESSION['role'] === 'member') {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $members = $stmt->fetchAll();
+
+    $inWorkTotalStmt = $pdo->query("SELECT COUNT(*) FROM members WHERE status = 'in_work'");
+    $inWorkTotal = (int)($inWorkTotalStmt->fetchColumn() ?: 0);
+
+    $degreeStmt = $pdo->query("SELECT COALESCE(NULLIF(TRIM(degree_pursuing), ''), '') AS degree_label, COUNT(*) AS total
+      FROM members
+      WHERE status = 'in_work'
+      GROUP BY degree_label
+      ORDER BY degree_label");
+    $inWorkByDegree = [];
+    while ($row = $degreeStmt->fetch()) {
+        $degreeKey = (string)($row['degree_label'] ?? '');
+        $inWorkByDegree[$degreeKey] = (int)($row['total'] ?? 0);
+    }
+    arsort($inWorkByDegree);
 }
 
 $summaryCounts = [];
@@ -77,6 +94,36 @@ $summaryDisplay = implode(', ', $summaryText);
   <a class="btn btn-sm <?= $statusFilter==='in_work'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=in_work&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.in_work">在岗</a>
   <a class="btn btn-sm <?= $statusFilter==='exited'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=exited&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.exited">已离退</a>
   <button type="button" class="btn btn-sm btn-outline-secondary" id="toggleColor" data-i18n="members.toggle_color">Toggle Colors</button>
+</div>
+<div class="mb-3">
+  <div class="card shadow-sm">
+    <div class="card-body d-flex flex-column flex-lg-row gap-4 align-items-start align-items-lg-center">
+      <div>
+        <div class="text-uppercase text-muted small" data-i18n="members.summary.in_work_total">Current Active Members</div>
+        <div class="display-6 fw-bold text-primary mb-0"><?= $inWorkTotal; ?></div>
+      </div>
+      <div class="vr d-none d-lg-block"></div>
+      <div class="flex-grow-1 w-100">
+        <div class="text-uppercase text-muted small" data-i18n="members.summary.by_degree">Active Members by Current Degree</div>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <?php if(!empty($inWorkByDegree)): ?>
+            <?php foreach($inWorkByDegree as $degree => $count): ?>
+              <span class="badge bg-info text-dark fs-6 px-3 py-2">
+                <?php if(trim($degree) === ''): ?>
+                  <span data-i18n="members.summary.degree.unknown">Unspecified</span>
+                <?php else: ?>
+                  <?= htmlspecialchars($degree); ?>
+                <?php endif; ?>
+                <span class="ms-2 fw-semibold"><?= $count; ?></span>
+              </span>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <span class="text-muted" data-i18n="members.summary.none">No active members currently.</span>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 <div class="mb-3">
   <span class="fw-bold" data-i18n="members.summary.title">Summary</span>: <?= htmlspecialchars($summaryDisplay); ?>
