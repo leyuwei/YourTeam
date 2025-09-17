@@ -15,6 +15,7 @@
 - 待确认事务仍可被其他成员加入、编辑或删除
 - 财务报销流程与单据上传
 - 管理员发布定向通知/单位规章制度
+- 办公地点管理：管理员配置办公室布局与工位，成员自助选择或释放办公位置
 - 生成工作量报表并支持导出为 Excel
 - 默认中文界面，可切换中英语言
 
@@ -78,6 +79,7 @@ A responsive web application for managing research team members, projects, tasks
 - Pending affairs can still be joined, edited or deleted by members
 - Expense reimbursement workflow with receipt uploads
 - Targeted notifications for team members (manager only)
+- Office management: managers configure office layouts and desks while members pick or release their seats
 - Workload report generation and Excel export
 - Language toggle (Chinese by default)
 
