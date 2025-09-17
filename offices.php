@@ -57,12 +57,40 @@ foreach ($memberSeatStmt as $seat) {
     $labelParts[] = $seatLabel;
     $memberSeatAssignments[$memberId][$officeName][] = implode('-', $labelParts);
 }
+
+$totalSeats = 0;
+$totalAvailableSeats = 0;
+foreach ($offices as $office) {
+    $totalSeats += (int)($office['seat_count'] ?? 0);
+    $totalAvailableSeats += (int)($office['available_count'] ?? 0);
+}
+$activeMemberCountStmt = $pdo->query("SELECT COUNT(*) FROM members WHERE status = 'in_work'");
+$activeMemberCount = (int)($activeMemberCountStmt->fetchColumn() ?: 0);
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="bold-target" data-i18n="offices.title">Offices</h2>
   <?php if($_SESSION['role'] === 'manager'): ?>
     <a class="btn btn-success" href="office_edit.php" data-i18n="offices.add">Add Office</a>
   <?php endif; ?>
+</div>
+<div class="card mb-4 shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title text-uppercase text-muted small" data-i18n="offices.summary.title">Seat Overview</h5>
+    <div class="d-flex flex-column flex-md-row gap-4 mt-2">
+      <div class="d-flex flex-column">
+        <span class="text-muted" data-i18n="offices.summary.total_seats">Total Seats</span>
+        <span class="badge bg-primary fs-5 px-3 py-2 align-self-start"><?= $totalSeats; ?></span>
+      </div>
+      <div class="d-flex flex-column">
+        <span class="text-muted" data-i18n="offices.summary.available_seats">Unassigned Seats</span>
+        <span class="badge bg-success fs-5 px-3 py-2 align-self-start"><?= $totalAvailableSeats; ?></span>
+      </div>
+      <div class="d-flex flex-column">
+        <span class="text-muted" data-i18n="offices.summary.active_members">Active Members</span>
+        <span class="badge bg-info text-dark fs-5 px-3 py-2 align-self-start"><?= $activeMemberCount; ?></span>
+      </div>
+    </div>
+  </div>
 </div>
 <div class="table-responsive">
   <table class="table table-bordered align-middle">
