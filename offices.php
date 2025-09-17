@@ -1,12 +1,15 @@
 <?php
 include 'header.php';
 
-$officeStmt = $pdo->query("SELECT o.*, COUNT(s.id) AS seat_count, SUM(CASE WHEN s.member_id IS NULL THEN 1 ELSE 0 END) AS available_count
+$officeStmt = $pdo->query("SELECT o.*,
+    COALESCE(SUM(CASE WHEN s.id IS NOT NULL THEN 1 ELSE 0 END), 0) AS seat_count,
+    COALESCE(SUM(CASE WHEN s.id IS NOT NULL AND s.member_id IS NULL THEN 1 ELSE 0 END), 0) AS available_count
   FROM offices o
   LEFT JOIN office_seats s ON o.id = s.office_id
   GROUP BY o.id
   ORDER BY o.sort_order, o.name");
 $offices = $officeStmt->fetchAll();
+$canManageOffices = ($_SESSION['role'] ?? '') === 'manager';
 $seatAssignments = [];
 if ($offices) {
     $ids = array_column($offices, 'id');
@@ -23,7 +26,7 @@ if ($offices) {
 }
 $memberStmt = $pdo->query("SELECT id, name FROM members WHERE status != 'exited' ORDER BY sort_order, name");
 $members = $memberStmt->fetchAll();
-$memberSeatStmt = $pdo->query("SELECT s.member_id, o.name AS office_name, s.label
+$memberSeatStmt = $pdo->query("SELECT s.member_id, o.name AS office_name, o.region, o.location_description, s.label
   FROM office_seats s
   INNER JOIN offices o ON s.office_id = o.id
   WHERE s.member_id IS NOT NULL
@@ -38,10 +41,21 @@ foreach ($memberSeatStmt as $seat) {
     if (!isset($memberSeatAssignments[$memberId][$officeName])) {
         $memberSeatAssignments[$memberId][$officeName] = [];
     }
-    $label = $seat['label'] ?? '';
-    if ($label !== '') {
-        $memberSeatAssignments[$memberId][$officeName][] = $label;
+    $seatLabel = trim($seat['label'] ?? '');
+    if ($seatLabel === '') {
+        continue;
     }
+    $labelParts = [];
+    $region = trim($seat['region'] ?? '');
+    if ($region !== '') {
+        $labelParts[] = $region;
+    }
+    $location = trim($seat['location_description'] ?? '');
+    if ($location !== '') {
+        $labelParts[] = $location;
+    }
+    $labelParts[] = $seatLabel;
+    $memberSeatAssignments[$memberId][$officeName][] = implode('-', $labelParts);
 }
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -54,6 +68,9 @@ foreach ($memberSeatStmt as $seat) {
   <table class="table table-bordered align-middle">
     <thead class="table-light">
       <tr>
+        <?php if($canManageOffices): ?>
+        <th style="width: 2.5rem;"></th>
+        <?php endif; ?>
         <th data-i18n="offices.table.name">Office Name</th>
         <th data-i18n="offices.table.location">Location Description</th>
         <th data-i18n="offices.table.region">Region</th>
@@ -63,13 +80,16 @@ foreach ($memberSeatStmt as $seat) {
         <th class="text-center" data-i18n="directions.table_actions">Actions</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="officeList">
       <?php foreach($offices as $office):
         $seatCount = (int)($office['seat_count'] ?? 0);
         $availableCount = (int)($office['available_count'] ?? 0);
         $assignments = $seatAssignments[$office['id']] ?? [];
       ?>
-      <tr>
+      <tr data-id="<?= (int)$office['id']; ?>">
+        <?php if($canManageOffices): ?>
+        <td class="drag-handle text-center">&#9776;</td>
+        <?php endif; ?>
         <td class="fw-bold">
           <a href="office_view.php?id=<?= (int)$office['id']; ?>" class="text-decoration-none">
             <?= htmlspecialchars($office['name']); ?>
@@ -116,6 +136,32 @@ foreach ($memberSeatStmt as $seat) {
     </tbody>
   </table>
 </div>
+<?php if($canManageOffices): ?>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const officeList = document.getElementById('officeList');
+  if(!officeList){
+    return;
+  }
+  Sortable.create(officeList, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: function(){
+      const order = Array.from(officeList.querySelectorAll('tr[data-id]')).map((row, index) => ({
+        id: row.dataset.id,
+        position: index
+      }));
+      fetch('office_order.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order: order})
+      });
+    }
+  });
+});
+</script>
+<?php endif; ?>
 <div class="card mt-4">
   <div class="card-header" data-i18n="offices.members_overview.title">Member Office Assignments</div>
   <div class="card-body p-0">
