@@ -24,7 +24,7 @@ if ($offices) {
         $seatAssignments[$row['office_id']][] = $row;
     }
 }
-$memberStmt = $pdo->query("SELECT id, name FROM members WHERE status != 'exited' ORDER BY sort_order, name");
+$memberStmt = $pdo->query("SELECT id, name, year_of_join, degree_pursuing FROM members WHERE status != 'exited' ORDER BY sort_order, name");
 $members = $memberStmt->fetchAll();
 $memberSeatStmt = $pdo->query("SELECT s.member_id, o.name AS office_name, o.region, o.location_description, s.label
   FROM office_seats s
@@ -60,13 +60,34 @@ foreach ($memberSeatStmt as $seat) {
 
 $totalSeats = 0;
 $totalAvailableSeats = 0;
+$membersWithoutSeat = 0;
 foreach ($offices as $office) {
     $totalSeats += (int)($office['seat_count'] ?? 0);
     $totalAvailableSeats += (int)($office['available_count'] ?? 0);
 }
 $activeMemberCountStmt = $pdo->query("SELECT COUNT(*) FROM members WHERE status = 'in_work'");
 $activeMemberCount = (int)($activeMemberCountStmt->fetchColumn() ?: 0);
+foreach ($members as $member) {
+    $memberId = (int)($member['id'] ?? 0);
+    if (!$memberId) {
+        continue;
+    }
+    if (empty($memberSeatAssignments[$memberId])) {
+        $membersWithoutSeat++;
+    }
+}
 ?>
+<style>
+  .office-summary-title { white-space: nowrap; letter-spacing: .08em; }
+  .badge-slim { display: inline-flex; align-items: center; justify-content: center; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 1rem; font-weight: 600; min-width: 3rem; }
+  .badge-seat-count { background-color: rgba(255, 193, 7, 0.15); color: #7a5a00; border: 1px solid rgba(255, 193, 7, 0.35); }
+  .badge-available { background-color: rgba(25, 135, 84, 0.15); color: #146c43; border: 1px solid rgba(25, 135, 84, 0.35); }
+  .badge-available-zero { background-color: rgba(220, 53, 69, 0.15); color: #842029; border: 1px solid rgba(220, 53, 69, 0.35); }
+  .badge-missing { background-color: rgba(13, 110, 253, 0.12); color: #0d6efd; border: 1px solid rgba(13, 110, 253, 0.3); }
+  .member-distribution-header[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
+  .member-distribution-header.sorting-asc::after { content: '\2191'; font-size: 0.75rem; margin-left: 0.25rem; }
+  .member-distribution-header.sorting-desc::after { content: '\2193'; font-size: 0.75rem; margin-left: 0.25rem; }
+</style>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="bold-target" data-i18n="offices.title">Offices</h2>
   <?php if($_SESSION['role'] === 'manager'): ?>
@@ -78,16 +99,20 @@ $activeMemberCount = (int)($activeMemberCountStmt->fetchColumn() ?: 0);
     <h5 class="card-title text-uppercase text-muted small" data-i18n="offices.summary.title">Seat Overview</h5>
     <div class="d-flex flex-column flex-md-row gap-4 mt-2">
       <div class="d-flex flex-column">
-        <span class="text-muted" data-i18n="offices.summary.total_seats">Total Seats</span>
-        <span class="badge bg-primary fs-5 px-3 py-2 align-self-start"><?= $totalSeats; ?></span>
+        <span class="text-muted office-summary-title" data-i18n="offices.summary.total_seats">Total Seats</span>
+        <span class="badge-slim badge-seat-count align-self-start"><?= $totalSeats; ?></span>
       </div>
       <div class="d-flex flex-column">
-        <span class="text-muted" data-i18n="offices.summary.available_seats">Unassigned Seats</span>
-        <span class="badge bg-success fs-5 px-3 py-2 align-self-start"><?= $totalAvailableSeats; ?></span>
+        <span class="text-muted office-summary-title" data-i18n="offices.summary.available_seats">Unassigned Seats</span>
+        <span class="badge-slim <?= $totalAvailableSeats > 0 ? 'badge-available' : 'badge-available-zero'; ?> align-self-start"><?= $totalAvailableSeats; ?></span>
       </div>
       <div class="d-flex flex-column">
-        <span class="text-muted" data-i18n="offices.summary.active_members">Active Members</span>
-        <span class="badge bg-info text-dark fs-5 px-3 py-2 align-self-start"><?= $activeMemberCount; ?></span>
+        <span class="text-muted office-summary-title" data-i18n="offices.summary.active_members">Active Members</span>
+        <span class="badge-slim badge-missing align-self-start"><?= $activeMemberCount; ?></span>
+      </div>
+      <div class="d-flex flex-column">
+        <span class="text-muted office-summary-title" data-i18n="offices.summary.unassigned_members">Members Without Seats</span>
+        <span class="badge-slim badge-available-zero align-self-start"><?= $membersWithoutSeat; ?></span>
       </div>
     </div>
   </div>
@@ -125,11 +150,11 @@ $activeMemberCount = (int)($activeMemberCountStmt->fetchColumn() ?: 0);
         </td>
         <td><?= htmlspecialchars($office['location_description'] ?? ''); ?></td>
         <td><?= htmlspecialchars($office['region'] ?? ''); ?></td>
-        <td class="text-center fw-semibold"><?= $seatCount; ?></td>
         <td class="text-center">
-          <span class="badge <?= $availableCount > 0 ? 'bg-success' : 'bg-danger'; ?> fs-6 px-3 py-2">
-            <?= $availableCount; ?>
-          </span>
+          <span class="badge-slim badge-seat-count"><?= $seatCount; ?></span>
+        </td>
+        <td class="text-center">
+          <span class="badge-slim <?= $availableCount > 0 ? 'badge-available' : 'badge-available-zero'; ?>"><?= $availableCount; ?></span>
         </td>
         <td>
           <?php if($assignments): ?>
@@ -194,10 +219,12 @@ document.addEventListener('DOMContentLoaded', function(){
   <div class="card-header" data-i18n="offices.members_overview.title">Member Office Assignments</div>
   <div class="card-body p-0">
     <div class="table-responsive mb-0">
-      <table class="table table-bordered table-sm mb-0 align-middle">
+      <table class="table table-bordered table-sm mb-0 align-middle" id="memberDistributionTable">
         <thead class="table-light">
           <tr>
-            <th data-i18n="offices.members_overview.member">Member</th>
+            <th class="member-distribution-header" data-sort="name" data-i18n="offices.members_overview.member">Member</th>
+            <th class="member-distribution-header text-center" data-sort="year" data-i18n="offices.members_overview.year_of_join">Year of Join</th>
+            <th class="member-distribution-header" data-sort="degree" data-i18n="offices.members_overview.degree">Degree Pursuing</th>
             <th data-i18n="offices.members_overview.offices">Office &amp; Seats</th>
           </tr>
         </thead>
@@ -205,9 +232,26 @@ document.addEventListener('DOMContentLoaded', function(){
           <?php foreach($members as $member):
             $memberId = (int)$member['id'];
             $assignments = $memberSeatAssignments[$memberId] ?? [];
+            $nameValue = trim((string)($member['name'] ?? ''));
+            $yearValue = trim((string)($member['year_of_join'] ?? ''));
+            $degreeValue = trim((string)($member['degree_pursuing'] ?? ''));
           ?>
-          <tr>
-            <td class="fw-semibold"><?= htmlspecialchars($member['name']); ?></td>
+          <tr data-name="<?= htmlspecialchars($nameValue, ENT_QUOTES); ?>" data-year="<?= htmlspecialchars($yearValue, ENT_QUOTES); ?>" data-degree="<?= htmlspecialchars($degreeValue, ENT_QUOTES); ?>">
+            <td class="fw-semibold text-nowrap"><?= htmlspecialchars($nameValue); ?></td>
+            <td class="text-center text-nowrap">
+              <?php if($yearValue !== ''): ?>
+                <?= htmlspecialchars($yearValue); ?>
+              <?php else: ?>
+                <span class="text-muted">-</span>
+              <?php endif; ?>
+            </td>
+            <td class="text-nowrap">
+              <?php if($degreeValue !== ''): ?>
+                <?= htmlspecialchars($degreeValue); ?>
+              <?php else: ?>
+                <span class="text-muted">-</span>
+              <?php endif; ?>
+            </td>
             <td>
               <?php if($assignments): ?>
                 <ul class="list-unstyled mb-0">
@@ -243,4 +287,44 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
   </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const distributionTable = document.getElementById('memberDistributionTable');
+  if(!distributionTable){
+    return;
+  }
+  const tbody = distributionTable.querySelector('tbody');
+  const headers = distributionTable.querySelectorAll('.member-distribution-header[data-sort]');
+  let currentSortKey = null;
+  let currentSortDir = 'asc';
+
+  headers.forEach((header) => {
+    header.addEventListener('click', () => {
+      const key = header.dataset.sort;
+      if(currentSortKey === key){
+        currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSortKey = key;
+        currentSortDir = 'asc';
+      }
+      headers.forEach(h => h.classList.remove('sorting-asc', 'sorting-desc'));
+      header.classList.add(currentSortDir === 'asc' ? 'sorting-asc' : 'sorting-desc');
+
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const isNumeric = (value) => value !== '' && !Number.isNaN(Number(value));
+      rows.sort((a, b) => {
+        const aVal = (a.dataset[key] || '').trim();
+        const bVal = (b.dataset[key] || '').trim();
+        if(isNumeric(aVal) && isNumeric(bVal)){
+          return currentSortDir === 'asc' ? Number(aVal) - Number(bVal) : Number(bVal) - Number(aVal);
+        }
+        return currentSortDir === 'asc'
+          ? aVal.localeCompare(bVal, undefined, {numeric: true, sensitivity: 'base'})
+          : bVal.localeCompare(aVal, undefined, {numeric: true, sensitivity: 'base'});
+      });
+      rows.forEach(row => tbody.appendChild(row));
+    });
+  });
+});
+</script>
 <?php include 'footer.php'; ?>

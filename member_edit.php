@@ -1,5 +1,7 @@
 <?php
-include 'header.php';
+require_once 'config.php';
+include_once 'auth.php';
+
 $id = $_GET['id'] ?? null;
 $member = ['campus_id'=>'','name'=>'','email'=>'','identity_number'=>'','year_of_join'=>'','current_degree'=>'','degree_pursuing'=>'','phone'=>'','wechat'=>'','department'=>'','workplace'=>'','homeplace'=>'','status'=>'in_work'];
 if($id){
@@ -33,6 +35,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     header('Location: members.php');
     exit();
 }
+
+include 'header.php';
 ?>
 <h2 data-i18n="<?php echo $id? 'member_edit.title_edit':'member_edit.title_add'; ?>">
   <?php echo $id? 'Edit Member':'Add Member'; ?>
