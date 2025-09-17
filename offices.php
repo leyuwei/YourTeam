@@ -87,6 +87,47 @@ foreach ($members as $member) {
   .member-distribution-header[data-sort] { cursor: pointer; user-select: none; white-space: nowrap; }
   .member-distribution-header.sorting-asc::after { content: '\2191'; font-size: 0.75rem; margin-left: 0.25rem; }
   .member-distribution-header.sorting-desc::after { content: '\2193'; font-size: 0.75rem; margin-left: 0.25rem; }
+  .seat-occupant-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .seat-occupant-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.75rem;
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.12), rgba(13, 110, 253, 0.25));
+    border: 1px solid rgba(13, 110, 253, 0.2);
+    color: #0b3d91;
+    min-height: 1.5rem;
+    box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .seat-occupant-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.35rem 0.65rem rgba(13, 110, 253, 0.18);
+  }
+  .seat-occupant-seat {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.45rem;
+    background-color: #0d6efd;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    min-width: 2.3rem;
+    line-height: 1.05;
+    letter-spacing: 0.03em;
+  }
+  .seat-occupant-name {
+    font-weight: 600;
+    line-height: 1.2;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .seat-occupant-name.text-muted {
+    font-weight: 500;
+  }
 </style>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="bold-target" data-i18n="offices.title">Offices</h2>
@@ -158,14 +199,19 @@ foreach ($members as $member) {
         </td>
         <td>
           <?php if($assignments): ?>
-            <div class="d-flex flex-wrap gap-2">
-              <?php foreach($assignments as $assignment): ?>
-                <span class="badge bg-primary text-wrap">
-                  <?= htmlspecialchars($assignment['label']); ?>
-                  <?php if(!empty($assignment['name'])): ?>
-                    - <?= htmlspecialchars($assignment['name']); ?>
+            <div class="seat-occupant-grid">
+              <?php foreach($assignments as $assignment):
+                $seatLabel = trim($assignment['label'] ?? '');
+                $memberName = trim($assignment['name'] ?? '');
+              ?>
+                <div class="seat-occupant-card">
+                  <span class="seat-occupant-seat"><?= htmlspecialchars($seatLabel); ?></span>
+                  <?php if($memberName !== ''): ?>
+                    <span class="seat-occupant-name"><?= htmlspecialchars($memberName); ?></span>
+                  <?php else: ?>
+                    <span class="seat-occupant-name text-muted">-</span>
                   <?php endif; ?>
-                </span>
+                </div>
               <?php endforeach; ?>
             </div>
           <?php else: ?>
