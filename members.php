@@ -65,18 +65,46 @@ if($_SESSION['role'] === 'member') {
 
 $summaryCounts = [];
 foreach($members as $m){
-    $key = ($m['degree_pursuing'] ?? '') . '-' . ($m['year_of_join'] ?? '');
-    if($key !== '-'){
-        if(!isset($summaryCounts[$key])){ $summaryCounts[$key] = 0; }
-        $summaryCounts[$key]++;
+    $degree = trim((string)($m['degree_pursuing'] ?? ''));
+    $year = trim((string)($m['year_of_join'] ?? ''));
+    if($degree === '' && $year === ''){
+        $key = '__unknown__';
+    } else {
+        $key = $degree . '||' . $year;
     }
+    if(!isset($summaryCounts[$key])){
+        $summaryCounts[$key] = 0;
+    }
+    $summaryCounts[$key]++;
 }
-$summaryText = [];
-foreach($summaryCounts as $k=>$v){
-    $summaryText[] = $k . ': ' . $v;
+$summaryItems = [];
+foreach($summaryCounts as $key => $count){
+    if($key === '__unknown__'){
+        $summaryItems[] = [
+            'degree' => '',
+            'year' => '',
+            'count' => $count
+        ];
+        continue;
+    }
+    $parts = explode('||', $key);
+    $summaryItems[] = [
+        'degree' => trim($parts[0] ?? ''),
+        'year' => trim($parts[1] ?? ''),
+        'count' => $count
+    ];
 }
-$summaryDisplay = implode(', ', $summaryText);
 ?>
+<style>
+  .summary-stat-title { white-space: nowrap; letter-spacing: .08em; }
+  .summary-scroll-wrapper { overflow-x: auto; }
+  .summary-scroll-inner { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.75rem; min-height: 2.5rem; }
+  .summary-scroll-inner::-webkit-scrollbar { height: 6px; }
+  .summary-scroll-inner::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.2); border-radius: 3px; }
+  .summary-label { flex-shrink: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: #6c757d; white-space: nowrap; }
+  .summary-pill { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.75rem; border-radius: 999px; border: 1px solid rgba(13,110,253,0.35); background-color: rgba(13,110,253,0.08); color: #0d6efd; font-weight: 600; white-space: nowrap; }
+  .summary-pill-count { font-size: 1rem; color: #0b5ed7; }
+</style>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="members.title">团队成员</h2>
   <?php if($_SESSION['role'] === 'manager'): ?>
@@ -99,12 +127,12 @@ $summaryDisplay = implode(', ', $summaryText);
   <div class="card shadow-sm">
     <div class="card-body d-flex flex-column flex-lg-row gap-4 align-items-start align-items-lg-center">
       <div>
-        <div class="text-uppercase text-muted small" data-i18n="members.summary.in_work_total">Current Active Members</div>
+        <div class="text-uppercase text-muted small summary-stat-title" data-i18n="members.summary.in_work_total">Current Active Members</div>
         <div class="display-6 fw-bold text-primary mb-0"><?= $inWorkTotal; ?></div>
       </div>
       <div class="vr d-none d-lg-block"></div>
       <div class="flex-grow-1 w-100">
-        <div class="text-uppercase text-muted small" data-i18n="members.summary.by_degree">Active Members by Current Degree</div>
+        <div class="text-uppercase text-muted small summary-stat-title" data-i18n="members.summary.by_degree">Active Members by Current Degree</div>
         <div class="d-flex flex-wrap gap-2 mt-2">
           <?php if(!empty($inWorkByDegree)): ?>
             <?php foreach($inWorkByDegree as $degree => $count): ?>
@@ -125,8 +153,36 @@ $summaryDisplay = implode(', ', $summaryText);
     </div>
   </div>
 </div>
-<div class="mb-3">
-  <span class="fw-bold" data-i18n="members.summary.title">Summary</span>: <?= htmlspecialchars($summaryDisplay); ?>
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-3">
+    <div class="summary-scroll-wrapper">
+      <div class="summary-scroll-inner">
+        <span class="summary-label" data-i18n="members.summary.title">Summary</span>
+        <?php if(!empty($summaryItems)): ?>
+          <?php foreach($summaryItems as $item): ?>
+            <span class="summary-pill">
+              <?php if($item['degree'] === '' && $item['year'] === ''): ?>
+                <span data-i18n="members.summary.degree.unknown">Unspecified</span>
+              <?php else: ?>
+                <?php if($item['degree'] !== ''): ?>
+                  <?= htmlspecialchars($item['degree']); ?>
+                <?php endif; ?>
+                <?php if($item['year'] !== ''): ?>
+                  <?php if($item['degree'] !== ''): ?>
+                    <span class="text-muted">·</span>
+                  <?php endif; ?>
+                  <?= htmlspecialchars($item['year']); ?>
+                <?php endif; ?>
+              <?php endif; ?>
+              <span class="summary-pill-count"><?= (int)$item['count']; ?></span>
+            </span>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <span class="text-muted" data-i18n="members.summary.none">No active members currently.</span>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
 </div>
 <?php endif; ?>
 <div class="table-responsive">
