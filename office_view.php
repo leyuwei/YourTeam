@@ -146,11 +146,11 @@ include 'header.php';
   const currentMemberId = <?= $currentMemberId ? (int)$currentMemberId : 'null'; ?>;
 
   function t(key) {
-    const lang = document.documentElement.lang || 'zh';
-    if (window.translations && translations[lang] && translations[lang][key]) {
-      return translations[lang][key];
-    }
-    return key;
+    const langAttr = document.documentElement.lang || 'zh';
+    const fallbackLang = langAttr.split('-')[0] || 'zh';
+    const tableSource = typeof translations !== 'undefined' ? translations : (window.translations || {});
+    const table = tableSource[langAttr] || tableSource[fallbackLang] || {};
+    return table[key] || key;
   }
 
   function safeApplyTranslations() {

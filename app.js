@@ -889,6 +889,10 @@ const translations = {
   }
 };
 
+if (typeof window !== 'undefined') {
+  window.translations = translations;
+}
+
 function doubleConfirm(message) {
   return confirm(message) && confirm('Please confirm again to proceed.');
 }
