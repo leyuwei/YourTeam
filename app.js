@@ -11,7 +11,6 @@ const translations = {
     'nav.tasks': 'Tasks',
     'nav.workload': 'Workload',
     'nav.account': 'Account',
-    'nav.more': 'More',
     'welcome': 'Welcome',
     'logout': 'Logout',
     'header.title': 'Team Management Platform',
@@ -485,7 +484,6 @@ const translations = {
     'nav.tasks': '任务指派',
     'nav.workload': '工作量统计',
     'nav.account': '管理账户',
-    'nav.more': '更多',
     'welcome': '欢迎',
     'logout': '退出登录',
     'header.title': '团队管理平台',
@@ -949,6 +947,8 @@ const translations = {
   }
 };
 
+let forceMobileNav = false;
+
 if (typeof window !== 'undefined') {
   window.translations = translations;
 }
@@ -987,68 +987,59 @@ function debounce(fn, wait = 100) {
 }
 
 function setupResponsiveNav(nav, onUpdate) {
-  const moreMenu = document.getElementById('moreMenu');
-  if (!moreMenu) return () => {};
-  const dropdownMenu = moreMenu.querySelector('.dropdown-menu');
-  const moreToggle = moreMenu.querySelector('.nav-link');
-  const elementNodeType = typeof Node === 'undefined' ? 1 : Node.ELEMENT_NODE;
-  const navItems = Array.from(nav.children).filter(
-    item => item.nodeType === elementNodeType && item.id !== 'moreMenu'
-  );
-
-  function resetNav() {
-    navItems.forEach(item => item.classList.remove('d-none'));
-    dropdownMenu.innerHTML = '';
-    moreMenu.classList.add('d-none');
-    moreToggle.classList.remove('active');
-  }
-
-  function createDropdownItem(item) {
-    const link = item.querySelector('a.nav-link');
-    if (!link) return null;
-    const dropdownItem = document.createElement('li');
-    const dropdownLink = document.createElement('a');
-    dropdownLink.className = 'dropdown-item';
-    dropdownLink.href = link.getAttribute('href');
-    dropdownLink.textContent = link.textContent.trim();
-    const i18nKey = link.getAttribute('data-i18n');
-    if (i18nKey) {
-      dropdownLink.setAttribute('data-i18n', i18nKey);
-    }
-    if (link.classList.contains('active')) {
-      dropdownLink.classList.add('active');
-      moreToggle.classList.add('active');
-    }
-    dropdownItem.appendChild(dropdownLink);
-    return dropdownItem;
-  }
+  if (!nav) return () => {};
+  const collapseElement = nav.closest('.navbar-collapse');
 
   function adjustNav() {
-    resetNav();
-    if (window.matchMedia('(max-width: 991.98px)').matches) {
+    const isDesktop = window.matchMedia('(min-width: 992px)').matches;
+
+    if (!isDesktop) {
+      if (forceMobileNav) {
+        forceMobileNav = false;
+      }
+      updateMobileViewClass();
       onUpdate?.();
       return;
     }
 
-    const availableWidth = nav.clientWidth;
-    while (nav.scrollWidth > availableWidth) {
-      const visibleItems = navItems.filter(item => !item.classList.contains('d-none'));
-      if (!visibleItems.length) break;
-      const itemToHide = visibleItems[visibleItems.length - 1];
-      itemToHide.classList.add('d-none');
-      const dropdownItem = createDropdownItem(itemToHide);
-      if (dropdownItem) {
-        dropdownMenu.prepend(dropdownItem);
-        moreMenu.classList.remove('d-none');
-      }
-      if (visibleItems.length <= 1) {
-        break;
-      }
+    const wasForced = forceMobileNav;
+    if (wasForced) {
+      forceMobileNav = false;
+      updateMobileViewClass();
     }
 
-    if (!dropdownMenu.children.length) {
-      moreMenu.classList.add('d-none');
-      moreToggle.classList.remove('active');
+    let availableWidth = nav.clientWidth;
+    if (collapseElement) {
+      const previousDisplay = collapseElement.style.display;
+      const previousVisibility = collapseElement.style.visibility;
+      const previousPosition = collapseElement.style.position;
+      const previousPointerEvents = collapseElement.style.pointerEvents;
+      const previousWidth = collapseElement.style.width;
+
+      const computed = window.getComputedStyle(collapseElement);
+      if (computed.display === 'none') {
+        collapseElement.style.display = 'block';
+        collapseElement.style.visibility = 'hidden';
+        collapseElement.style.position = 'absolute';
+        collapseElement.style.pointerEvents = 'none';
+        collapseElement.style.width = '100%';
+      }
+
+      availableWidth = collapseElement.clientWidth || collapseElement.getBoundingClientRect().width;
+
+      collapseElement.style.display = previousDisplay;
+      collapseElement.style.visibility = previousVisibility;
+      collapseElement.style.position = previousPosition;
+      collapseElement.style.pointerEvents = previousPointerEvents;
+      collapseElement.style.width = previousWidth;
+    }
+
+    const isOverflowing = nav.scrollWidth > availableWidth;
+    if (isOverflowing !== forceMobileNav) {
+      forceMobileNav = isOverflowing;
+      updateMobileViewClass();
+    } else if (isOverflowing && !wasForced) {
+      updateMobileViewClass();
     }
 
     onUpdate?.();
@@ -1066,16 +1057,22 @@ function isMobileDevice() {
 }
 
 function shouldUseMobileLayout() {
-  return isMobileDevice() || window.innerWidth <= 768;
+  return forceMobileNav || isMobileDevice() || window.innerWidth <= 768;
 }
 
 function updateMobileViewClass() {
   const body = document.body;
   if (!body) return;
-  if (shouldUseMobileLayout()) {
+  const useMobile = shouldUseMobileLayout();
+  if (useMobile) {
     body.classList.add('mobile-view');
   } else {
     body.classList.remove('mobile-view');
+  }
+
+  if (!useMobile) {
+    const collapseElement = document.getElementById('navbarNav');
+    collapseElement?.classList.remove('show');
   }
 }
 
