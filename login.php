@@ -48,7 +48,83 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 <title data-i18n="login.title">Login</title>
 <link href="./style/bootstrap.min.css" rel="stylesheet">
 <style>
-  .container { max-width: 80%; }
+  :root {
+    color-scheme: light;
+    --login-body-bg: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    --login-text-color: #212529;
+    --login-card-bg: rgba(255, 255, 255, 0.92);
+    --login-card-border: rgba(0, 0, 0, 0.05);
+    --login-input-bg: #ffffff;
+    --login-input-border: rgba(0, 0, 0, 0.15);
+    --login-warning-bg: rgba(255, 193, 7, 0.2);
+    --login-warning-text: #725200;
+  }
+  :root[data-bs-theme='dark'] {
+    color-scheme: dark;
+    --login-body-bg: radial-gradient(circle at top, #1a1f2b, #0b0d13 55%, #000000);
+    --login-text-color: #e2e8f0;
+    --login-card-bg: rgba(15, 20, 28, 0.92);
+    --login-card-border: rgba(148, 163, 184, 0.2);
+    --login-input-bg: #0f172a;
+    --login-input-border: rgba(148, 163, 184, 0.25);
+    --login-warning-bg: rgba(234, 179, 8, 0.18);
+    --login-warning-text: #facc15;
+  }
+  body {
+    min-height: 100vh;
+    background: var(--login-body-bg);
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+    color: var(--login-text-color);
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+  .container {
+    max-width: 80%;
+  }
+  .card {
+    background-color: var(--login-card-bg);
+    border: 1px solid var(--login-card-border);
+    box-shadow: 0 0 25px rgba(15, 23, 42, 0.1);
+    transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+  }
+  .card-header {
+    background: transparent;
+    color: var(--login-text-color);
+    border-bottom: 1px solid var(--login-card-border);
+  }
+  .form-label,
+  .form-check-label {
+    color: var(--login-text-color);
+  }
+  .form-control {
+    background-color: var(--login-input-bg);
+    color: var(--login-text-color);
+    border-color: var(--login-input-border);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+  .form-control:focus {
+    border-color: rgba(255, 221, 87, 0.4);
+    box-shadow: 0 0 0 0.25rem rgba(255, 221, 87, 0.25);
+  }
+  .alert-warning {
+    background-color: var(--login-warning-bg);
+    color: var(--login-warning-text);
+    border-color: rgba(250, 204, 21, 0.35);
+  }
+  body.theme-dark .btn-outline-secondary {
+    color: #e2e8f0;
+    border-color: rgba(226, 232, 240, 0.4);
+  }
+  body.theme-dark .btn-outline-secondary:hover,
+  body.theme-dark .btn-outline-secondary:focus {
+    background-color: rgba(226, 232, 240, 0.1);
+    color: #f8fafc;
+  }
+  @keyframes gradientBG {
+    0% {background-position: 0% 50%;}
+    50% {background-position: 100% 50%;}
+    100% {background-position: 0% 50%;}
+  }
 </style>
 </head>
 <body>
