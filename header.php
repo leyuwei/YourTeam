@@ -31,37 +31,64 @@
     background-size: 200% 200%;
     animation: navGradient 15s ease infinite;
   }
-  .navbar-nav .nav-link {
-    position: relative;
-    z-index: 1;
-    color: #fff;
-    transition: color 0.3s ease;
+  .navbar-brand,
+  .navbar-text,
+  .navbar .btn,
+  .dropdown-item {
     white-space: nowrap;
+  }
+  .navbar-brand {
+    font-weight: 600;
+  }
+  .navbar-brand.active {
+    color: #1f1f1f !important;
+    background-color: rgba(255, 221, 87, 0.9);
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.5rem;
   }
   .navbar-nav {
     position: relative;
   }
+  .navbar-nav .nav-link {
+    position: relative;
+    z-index: 1;
+    color: #fff;
+    white-space: nowrap;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
   @media (min-width: 992px) {
     .navbar-nav {
       flex-wrap: nowrap;
-      overflow: hidden;
+      overflow: visible;
       column-gap: 0.5rem;
     }
     .navbar-nav .nav-item {
       flex: 0 0 auto;
     }
   }
-  .navbar-nav .nav-link:hover { color: #ffdd57; }
-  .nav-indicator {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    background-color: rgba(255, 255, 255, 0.15);
-    border-radius: 0.25rem;
-    transition: all 0.3s ease;
-    pointer-events: none;
-    z-index: 0;
+  .navbar-nav .nav-link:hover,
+  .navbar-nav .nav-link:focus {
+    color: #ffdd57;
+    text-decoration: none;
+  }
+  .navbar-nav .nav-link.active,
+  .navbar-nav .nav-link.active:hover,
+  .navbar-nav .nav-link.active:focus {
+    background-color: rgba(255, 221, 87, 0.9);
+    color: #1f1f1f;
+    box-shadow: 0 0 0 1px rgba(255, 221, 87, 0.6);
+  }
+  #moreMenu .nav-link.active,
+  #moreMenu .nav-link.active:hover,
+  #moreMenu .nav-link.active:focus {
+    color: #1f1f1f;
+  }
+  .dropdown-menu .dropdown-item.active,
+  .dropdown-menu .dropdown-item.active:hover,
+  .dropdown-menu .dropdown-item.active:focus {
+    background-color: rgba(255, 221, 87, 0.9);
+    color: #1f1f1f;
   }
   @keyframes navGradient {
     0% {background-position: 0% 50%;}
