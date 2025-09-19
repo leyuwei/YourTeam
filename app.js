@@ -1119,6 +1119,8 @@ function applyTranslations() {
 function applyTheme() {
   const theme = localStorage.getItem('theme') || 'light';
   document.documentElement.setAttribute('data-bs-theme', theme);
+  document.body.classList.toggle('theme-dark', theme === 'dark');
+  document.body.classList.toggle('theme-light', theme !== 'dark');
 }
 
 function initApp() {

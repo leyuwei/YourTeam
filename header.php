@@ -11,25 +11,76 @@
 <link rel="icon" href="favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="favicon.png">
 <style>
+  :root {
+    color-scheme: light;
+    --app-body-bg: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    --app-surface-bg: rgba(255, 255, 255, 0.85);
+    --app-surface-border: rgba(0, 0, 0, 0.05);
+    --app-text-color: #212529;
+    --app-muted-text: rgba(33, 37, 41, 0.65);
+    --app-navbar-gradient: linear-gradient(90deg, #1f1f1f, #343a40, #212529);
+    --app-nav-link-color: #ffffff;
+    --app-nav-link-hover: #ffdd57;
+    --app-nav-link-active-bg: rgba(255, 221, 87, 0.9);
+    --app-nav-link-active-color: #1f1f1f;
+    --app-nav-brand-active-bg: rgba(255, 221, 87, 0.9);
+    --app-nav-brand-active-color: #1f1f1f;
+    --app-card-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    --app-hero-overlay-bg: rgba(0, 0, 0, 0.4);
+    --app-form-control-bg: #ffffff;
+    --app-form-control-border: rgba(0, 0, 0, 0.15);
+    --app-table-row-hover: rgba(0, 0, 0, 0.05);
+  }
+  :root[data-bs-theme='dark'] {
+    color-scheme: dark;
+    --app-body-bg: radial-gradient(circle at top, #1a1f2b, #0b0d13 55%, #000000);
+    --app-surface-bg: rgba(15, 20, 28, 0.88);
+    --app-surface-border: rgba(148, 163, 184, 0.2);
+    --app-text-color: #e2e8f0;
+    --app-muted-text: rgba(226, 232, 240, 0.65);
+    --app-navbar-gradient: linear-gradient(90deg, #050608, #111827, #050608);
+    --app-nav-link-color: #e2e8f0;
+    --app-nav-link-hover: #ffdd57;
+    --app-nav-link-active-bg: rgba(255, 221, 87, 0.18);
+    --app-nav-link-active-color: #ffdd57;
+    --app-nav-brand-active-bg: rgba(255, 221, 87, 0.18);
+    --app-nav-brand-active-color: #ffdd57;
+    --app-card-shadow: 0 0 25px rgba(2, 6, 23, 0.6);
+    --app-hero-overlay-bg: rgba(0, 0, 0, 0.65);
+    --app-form-control-bg: #0f172a;
+    --app-form-control-border: rgba(148, 163, 184, 0.25);
+    --app-table-row-hover: rgba(148, 163, 184, 0.1);
+  }
   body {
     min-height: 100vh;
-    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    background: var(--app-body-bg);
     background-size: 400% 400%;
     animation: gradientBG 15s ease infinite;
+    color: var(--app-text-color);
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+  body.theme-dark {
+    background-attachment: fixed;
   }
   .main-container {
     max-width: 80%;
-    background-color: rgba(255, 255, 255, 0.85);
+    background-color: var(--app-surface-bg);
     border-radius: 0.5rem;
     padding: 2rem;
-    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--app-card-shadow);
+    border: 1px solid var(--app-surface-border);
+    transition: background-color 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
   }
-  .member-detail { color: #CCCCCC !important; font-weight: normal !important; }
+  .member-detail {
+    color: var(--app-muted-text) !important;
+    font-weight: normal !important;
+  }
   .navbar {
     position: relative;
-    background: linear-gradient(90deg, #1f1f1f, #343a40, #212529);
+    background: var(--app-navbar-gradient);
     background-size: 200% 200%;
     animation: navGradient 15s ease infinite;
+    transition: background 0.4s ease;
   }
   .navbar-brand,
   .navbar-text,
@@ -39,10 +90,11 @@
   }
   .navbar-brand {
     font-weight: 600;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
   .navbar-brand.active {
-    color: #1f1f1f !important;
-    background-color: rgba(255, 221, 87, 0.9);
+    color: var(--app-nav-brand-active-color) !important;
+    background-color: var(--app-nav-brand-active-bg);
     padding: 0.375rem 0.75rem;
     border-radius: 0.5rem;
   }
@@ -52,10 +104,11 @@
   .navbar-nav .nav-link {
     position: relative;
     z-index: 1;
-    color: #fff;
+    color: var(--app-nav-link-color);
     white-space: nowrap;
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem;
+    transition: color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
   }
   @media (min-width: 992px) {
     .navbar-nav {
@@ -69,35 +122,50 @@
   }
   .navbar-nav .nav-link:hover,
   .navbar-nav .nav-link:focus {
-    color: #ffdd57;
+    color: var(--app-nav-link-hover);
     text-decoration: none;
   }
   .navbar-nav .nav-link.active,
   .navbar-nav .nav-link.active:hover,
   .navbar-nav .nav-link.active:focus {
-    background-color: rgba(255, 221, 87, 0.9);
-    color: #1f1f1f;
-    box-shadow: 0 0 0 1px rgba(255, 221, 87, 0.6);
+    background-color: var(--app-nav-link-active-bg);
+    color: var(--app-nav-link-active-color);
+    box-shadow: 0 0 0 1px rgba(255, 221, 87, 0.35);
+  }
+  .dropdown-menu {
+    background-color: var(--app-surface-bg);
+    border: 1px solid var(--app-surface-border);
+    box-shadow: var(--app-card-shadow);
   }
   .dropdown-menu .dropdown-item.active,
   .dropdown-menu .dropdown-item.active:hover,
   .dropdown-menu .dropdown-item.active:focus {
-    background-color: rgba(255, 221, 87, 0.9);
-    color: #1f1f1f;
+    background-color: var(--app-nav-link-active-bg);
+    color: var(--app-nav-link-active-color);
   }
-  @keyframes navGradient {
-    0% {background-position: 0% 50%;}
-    50% {background-position: 100% 50%;}
-    100% {background-position: 0% 50%;}
+  .navbar .btn {
+    transition: color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
   }
-  tr[style*="background-color"] > * { background-color: inherit !important; }
+  :root[data-bs-theme='dark'] .navbar .btn.btn-outline-light {
+    color: #e2e8f0;
+    border-color: rgba(226, 232, 240, 0.4);
+  }
+  :root[data-bs-theme='dark'] .navbar .btn.btn-outline-light:hover {
+    background-color: rgba(226, 232, 240, 0.1);
+    color: #f8fafc;
+  }
   .hero-banner {
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--app-hero-overlay-bg);
     border-radius: 1rem;
     padding: 4rem 2rem;
     color: #fff;
     text-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
     animation: fadeIn 2s ease;
+  }
+  @keyframes navGradient {
+    0% {background-position: 0% 50%;}
+    50% {background-position: 100% 50%;}
+    100% {background-position: 0% 50%;}
   }
   @keyframes gradientBG {
     0% {background-position: 0% 50%;}
@@ -107,6 +175,40 @@
   @keyframes fadeIn {
     from {opacity: 0; transform: translateY(-20px);}
     to {opacity: 1; transform: translateY(0);}
+  }
+  tr[style*="background-color"] > * { background-color: inherit !important; }
+  .card,
+  .modal-content,
+  .list-group-item {
+    background-color: var(--app-surface-bg);
+    color: var(--app-text-color);
+    border-color: var(--app-surface-border);
+    transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+  }
+  .form-control,
+  .form-select,
+  .input-group-text,
+  .form-control:focus,
+  .form-select:focus {
+    background-color: var(--app-form-control-bg);
+    color: var(--app-text-color);
+    border-color: var(--app-form-control-border);
+  }
+  .form-control:focus,
+  .form-select:focus {
+    box-shadow: 0 0 0 0.25rem rgba(255, 221, 87, 0.2);
+  }
+  .table tbody tr:hover {
+    background-color: var(--app-table-row-hover);
+  }
+  body.theme-dark .btn-outline-secondary {
+    color: #e2e8f0;
+    border-color: rgba(226, 232, 240, 0.4);
+  }
+  body.theme-dark .btn-outline-secondary:hover,
+  body.theme-dark .btn-outline-secondary:focus {
+    background-color: rgba(226, 232, 240, 0.1);
+    color: #f8fafc;
   }
   body.mobile-view {
     background-size: cover;
