@@ -11,6 +11,7 @@ const translations = {
     'nav.tasks': 'Tasks',
     'nav.workload': 'Workload',
     'nav.account': 'Account',
+    'nav.more': 'More',
     'welcome': 'Welcome',
     'logout': 'Logout',
     'header.title': 'Team Management Platform',
@@ -484,6 +485,7 @@ const translations = {
     'nav.tasks': '任务指派',
     'nav.workload': '工作量统计',
     'nav.account': '管理账户',
+    'nav.more': '更多',
     'welcome': '欢迎',
     'logout': '退出登录',
     'header.title': '团队管理平台',
@@ -976,6 +978,150 @@ function copyText(text) {
   }
 }
 
+function debounce(fn, wait = 100) {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(null, args), wait);
+  };
+}
+
+function setupNavIndicator(nav) {
+  const indicator = document.createElement('span');
+  indicator.className = 'nav-indicator';
+  nav.appendChild(indicator);
+
+  function getVisibleLinks() {
+    return Array.from(nav.querySelectorAll('.nav-link')).filter(link => link.offsetParent !== null);
+  }
+
+  function moveIndicator(el) {
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const navRect = nav.getBoundingClientRect();
+    indicator.style.width = `${rect.width}px`;
+    indicator.style.transform = `translateX(${rect.left - navRect.left}px)`;
+  }
+
+  function updateIndicator() {
+    const visibleLinks = getVisibleLinks();
+    if (!visibleLinks.length) return;
+    const activeLink = visibleLinks.find(link => link.classList.contains('active'));
+    const storedHref = sessionStorage.getItem('navActiveHref');
+    const storedLink = storedHref ? visibleLinks.find(link => link.getAttribute('href') === storedHref) : null;
+    moveIndicator(activeLink || storedLink || visibleLinks[0]);
+  }
+
+  const debouncedUpdate = debounce(updateIndicator, 150);
+  window.addEventListener('resize', debouncedUpdate);
+  nav.addEventListener('shown.bs.dropdown', updateIndicator);
+  nav.addEventListener('hidden.bs.dropdown', updateIndicator);
+  nav.addEventListener('click', event => {
+    const target = event.target.closest('a');
+    if (target && target.getAttribute('href')) {
+      sessionStorage.setItem('navActiveHref', target.getAttribute('href'));
+    }
+  });
+
+  return updateIndicator;
+}
+
+function setupResponsiveNav(nav, onUpdate) {
+  const moreMenu = document.getElementById('moreMenu');
+  if (!moreMenu) return () => {};
+  const dropdownMenu = moreMenu.querySelector('.dropdown-menu');
+  const moreToggle = moreMenu.querySelector('.nav-link');
+  const elementNodeType = typeof Node === 'undefined' ? 1 : Node.ELEMENT_NODE;
+  const navItems = Array.from(nav.children).filter(
+    item => item.nodeType === elementNodeType && item.id !== 'moreMenu'
+  );
+
+  function resetNav() {
+    navItems.forEach(item => item.classList.remove('d-none'));
+    dropdownMenu.innerHTML = '';
+    moreMenu.classList.add('d-none');
+    moreToggle.classList.remove('active');
+  }
+
+  function createDropdownItem(item) {
+    const link = item.querySelector('a.nav-link');
+    if (!link) return null;
+    const dropdownItem = document.createElement('li');
+    const dropdownLink = document.createElement('a');
+    dropdownLink.className = 'dropdown-item';
+    dropdownLink.href = link.getAttribute('href');
+    dropdownLink.textContent = link.textContent.trim();
+    const i18nKey = link.getAttribute('data-i18n');
+    if (i18nKey) {
+      dropdownLink.setAttribute('data-i18n', i18nKey);
+    }
+    if (link.classList.contains('active')) {
+      dropdownLink.classList.add('active');
+      moreToggle.classList.add('active');
+    }
+    dropdownLink.addEventListener('click', () => {
+      sessionStorage.setItem('navActiveHref', dropdownLink.getAttribute('href'));
+    });
+    dropdownItem.appendChild(dropdownLink);
+    return dropdownItem;
+  }
+
+  function adjustNav() {
+    resetNav();
+    if (window.matchMedia('(max-width: 991.98px)').matches) {
+      onUpdate?.();
+      return;
+    }
+
+    const availableWidth = nav.clientWidth;
+    while (nav.scrollWidth > availableWidth) {
+      const visibleItems = navItems.filter(item => !item.classList.contains('d-none'));
+      if (!visibleItems.length) break;
+      const itemToHide = visibleItems[visibleItems.length - 1];
+      itemToHide.classList.add('d-none');
+      const dropdownItem = createDropdownItem(itemToHide);
+      if (dropdownItem) {
+        dropdownMenu.prepend(dropdownItem);
+        moreMenu.classList.remove('d-none');
+      }
+      if (visibleItems.length <= 1) {
+        break;
+      }
+    }
+
+    if (!dropdownMenu.children.length) {
+      moreMenu.classList.add('d-none');
+      moreToggle.classList.remove('active');
+    }
+
+    onUpdate?.();
+  }
+
+  const debouncedAdjustNav = debounce(adjustNav, 150);
+  window.addEventListener('resize', debouncedAdjustNav);
+  adjustNav();
+  return adjustNav;
+}
+
+function isMobileDevice() {
+  const ua = navigator.userAgent || '';
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+}
+
+function shouldUseMobileLayout() {
+  return isMobileDevice() || window.innerWidth <= 768;
+}
+
+function updateMobileViewClass() {
+  const body = document.body;
+  if (!body) return;
+  if (shouldUseMobileLayout()) {
+    body.classList.add('mobile-view');
+  } else {
+    body.classList.remove('mobile-view');
+  }
+}
+
 function applyTranslations() {
   const lang = localStorage.getItem('lang') || 'zh';
   document.documentElement.lang = lang;
@@ -1025,13 +1171,25 @@ function initApp() {
   applyTheme();
   applyTranslations();
 
+  let refreshNavOverflow = null;
+  let updateIndicator = null;
+
+  updateMobileViewClass();
+  const debouncedMobileUpdate = debounce(() => {
+    updateMobileViewClass();
+    refreshNavOverflow?.();
+  }, 150);
+  window.addEventListener('resize', debouncedMobileUpdate);
+
   const langBtn = document.getElementById('langToggle');
+
   if (langBtn) {
     langBtn.addEventListener('click', () => {
       const current = localStorage.getItem('lang') || 'zh';
       const next = current === 'en' ? 'zh' : 'en';
       localStorage.setItem('lang', next);
       applyTranslations();
+      refreshNavOverflow?.();
     });
   }
 
@@ -1043,6 +1201,7 @@ function initApp() {
       localStorage.setItem('theme', next);
       applyTheme();
       applyTranslations();
+      refreshNavOverflow?.();
     });
   }
 
@@ -1075,45 +1234,11 @@ function initApp() {
 
   const nav = document.querySelector('.navbar-nav');
   if(nav){
-    const indicator = document.createElement('span');
-    indicator.className = 'nav-indicator';
-    nav.appendChild(indicator);
-    const links = Array.from(nav.querySelectorAll('.nav-link'));
-    function moveIndicator(el){
-      if(!el) return;
-      const rect = el.getBoundingClientRect();
-      const navRect = nav.getBoundingClientRect();
-      indicator.style.width = rect.width + 'px';
-      indicator.style.transform = `translateX(${rect.left - navRect.left}px)`;
-    }
-    const active = nav.querySelector('.nav-link.active');
-    const activeIdx = links.indexOf(active || links[0]);
-    const prevIndex = parseInt(sessionStorage.getItem('navActiveIndex'), 10);
-
-    if(!isNaN(prevIndex) && links[prevIndex]){
-      // Place indicator at the previous location without animation so it
-      // doesn't slide in from the left-most position on initial load.
-      const prev = links[prevIndex];
-      indicator.style.transition = 'none';
-      moveIndicator(prev);
-      // Force reflow to ensure the styles above are applied before restoring
-      // the transition for the animated move to the current page.
-      indicator.offsetWidth; // eslint-disable-line no-unused-expressions
-      indicator.style.transition = '';
-      requestAnimationFrame(()=>moveIndicator(active || links[0]));
-    } else {
-      moveIndicator(active || links[0]);
-    }
-
-    // Remember the currently active navigation index so the indicator can
-    // animate from the previous page's position on the next load. We store
-    // the index of the page being left rather than the destination page.
-    sessionStorage.setItem('navActiveIndex', activeIdx);
-    links.forEach(link => {
-      link.addEventListener('click', () => {
-        sessionStorage.setItem('navActiveIndex', activeIdx);
-      });
+    updateIndicator = setupNavIndicator(nav);
+    refreshNavOverflow = setupResponsiveNav(nav, () => {
+      updateIndicator?.();
     });
+    updateIndicator();
   }
 }
 
