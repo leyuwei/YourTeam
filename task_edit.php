@@ -1,28 +1,40 @@
 <?php
 include 'auth_manager.php';
-include 'header.php';
+
 $id = $_GET['id'] ?? null;
 $task = ['title'=>'','description'=>'','start_date'=>'','status'=>'active'];
 if($id){
     $stmt = $pdo->prepare('SELECT * FROM tasks WHERE id=?');
     $stmt->execute([$id]);
     $task = $stmt->fetch();
+    if(!$task){
+        header('Location: tasks.php');
+        exit();
+    }
 }
+
 if($_SERVER['REQUEST_METHOD']==='POST'){
     $title = $_POST['title'];
     $description = $_POST['description'];
     $start_date = $_POST['start_date'];
     $status = $_POST['status'];
+    $redirectUrl = 'tasks.php';
     if($id){
         $stmt = $pdo->prepare('UPDATE tasks SET title=?, description=?, start_date=?, status=? WHERE id=?');
         $stmt->execute([$title,$description,$start_date,$status,$id]);
     } else {
         $stmt = $pdo->prepare('INSERT INTO tasks(title,description,start_date,status) VALUES (?,?,?,?)');
         $stmt->execute([$title,$description,$start_date,$status]);
+        $newTaskId = $pdo->lastInsertId();
+        if($newTaskId){
+            $redirectUrl = 'task_affairs.php?id=' . $newTaskId;
+        }
     }
-    header('Location: tasks.php');
+    header('Location: ' . $redirectUrl);
     exit();
 }
+
+include 'header.php';
 ?>
 <h2 data-i18n="<?php echo $id? 'task_edit.title_edit':'task_edit.title_add'; ?>">
   <?php echo $id? 'Edit Task':'Add Task'; ?>

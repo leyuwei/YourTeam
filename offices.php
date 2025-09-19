@@ -79,6 +79,14 @@ foreach ($members as $member) {
 ?>
 <style>
   .office-summary-title { white-space: nowrap; letter-spacing: .08em; }
+  .office-summary-heading {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #495057;
+    margin-bottom: 0;
+  }
   .badge-slim { display: inline-flex; align-items: center; justify-content: center; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 1rem; font-weight: 600; min-width: 3rem; }
   .badge-seat-count { background-color: rgba(255, 193, 7, 0.15); color: #7a5a00; border: 1px solid rgba(255, 193, 7, 0.35); }
   .badge-available { background-color: rgba(25, 135, 84, 0.15); color: #146c43; border: 1px solid rgba(25, 135, 84, 0.35); }
@@ -128,6 +136,24 @@ foreach ($members as $member) {
   .seat-occupant-name.text-muted {
     font-weight: 500;
   }
+  .office-table th {
+    white-space: nowrap;
+  }
+  .office-table td {
+    vertical-align: middle;
+  }
+  .office-table td:not(.office-members-col) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .office-table .office-name-col,
+  .office-table .office-actions-col {
+    white-space: nowrap;
+  }
+  .office-table .office-info-col {
+    max-width: 240px;
+  }
 </style>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="bold-target" data-i18n="offices.title">Offices</h2>
@@ -137,7 +163,7 @@ foreach ($members as $member) {
 </div>
 <div class="card mb-4 shadow-sm">
   <div class="card-body">
-    <h5 class="card-title text-uppercase text-muted small" data-i18n="offices.summary.title">Seat Overview</h5>
+    <h5 class="office-summary-heading" data-i18n="offices.summary.title">Seat Overview</h5>
     <div class="d-flex flex-column flex-md-row gap-4 mt-2">
       <div class="d-flex flex-column">
         <span class="text-muted office-summary-title" data-i18n="offices.summary.total_seats">Total Seats</span>
@@ -159,7 +185,7 @@ foreach ($members as $member) {
   </div>
 </div>
 <div class="table-responsive">
-  <table class="table table-bordered align-middle">
+  <table class="table table-bordered align-middle office-table">
     <thead class="table-light">
       <tr>
         <?php if($canManageOffices): ?>
@@ -184,20 +210,20 @@ foreach ($members as $member) {
         <?php if($canManageOffices): ?>
         <td class="drag-handle text-center">&#9776;</td>
         <?php endif; ?>
-        <td class="fw-bold">
+        <td class="fw-bold office-name-col">
           <a href="office_view.php?id=<?= (int)$office['id']; ?>" class="text-decoration-none">
             <?= htmlspecialchars($office['name']); ?>
           </a>
         </td>
-        <td><?= htmlspecialchars($office['location_description'] ?? ''); ?></td>
-        <td><?= htmlspecialchars($office['region'] ?? ''); ?></td>
-        <td class="text-center">
+        <td class="office-info-col"><?= htmlspecialchars($office['location_description'] ?? ''); ?></td>
+        <td class="office-info-col"><?= htmlspecialchars($office['region'] ?? ''); ?></td>
+        <td class="text-center office-info-col">
           <span class="badge-slim badge-seat-count"><?= $seatCount; ?></span>
         </td>
-        <td class="text-center">
+        <td class="text-center office-info-col">
           <span class="badge-slim <?= $availableCount > 0 ? 'badge-available' : 'badge-available-zero'; ?>"><?= $availableCount; ?></span>
         </td>
-        <td>
+        <td class="office-members-col">
           <?php if($assignments): ?>
             <div class="seat-occupant-grid">
               <?php foreach($assignments as $assignment):
@@ -218,7 +244,7 @@ foreach ($members as $member) {
             <span class="text-muted" data-i18n="offices.none">None</span>
           <?php endif; ?>
         </td>
-        <td class="text-center">
+        <td class="text-center office-actions-col">
           <a class="btn btn-sm btn-info mb-1" href="office_view.php?id=<?= (int)$office['id']; ?>" data-i18n="offices.action.view">View Layout</a>
           <?php if($_SESSION['role'] === 'manager'): ?>
             <a class="btn btn-sm btn-primary mb-1" href="office_edit.php?id=<?= (int)$office['id']; ?>" data-i18n="offices.action.edit">Edit</a>
