@@ -986,46 +986,6 @@ function debounce(fn, wait = 100) {
   };
 }
 
-function setupNavIndicator(nav) {
-  const indicator = document.createElement('span');
-  indicator.className = 'nav-indicator';
-  nav.appendChild(indicator);
-
-  function getVisibleLinks() {
-    return Array.from(nav.querySelectorAll('.nav-link')).filter(link => link.offsetParent !== null);
-  }
-
-  function moveIndicator(el) {
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const navRect = nav.getBoundingClientRect();
-    indicator.style.width = `${rect.width}px`;
-    indicator.style.transform = `translateX(${rect.left - navRect.left}px)`;
-  }
-
-  function updateIndicator() {
-    const visibleLinks = getVisibleLinks();
-    if (!visibleLinks.length) return;
-    const activeLink = visibleLinks.find(link => link.classList.contains('active'));
-    const storedHref = sessionStorage.getItem('navActiveHref');
-    const storedLink = storedHref ? visibleLinks.find(link => link.getAttribute('href') === storedHref) : null;
-    moveIndicator(activeLink || storedLink || visibleLinks[0]);
-  }
-
-  const debouncedUpdate = debounce(updateIndicator, 150);
-  window.addEventListener('resize', debouncedUpdate);
-  nav.addEventListener('shown.bs.dropdown', updateIndicator);
-  nav.addEventListener('hidden.bs.dropdown', updateIndicator);
-  nav.addEventListener('click', event => {
-    const target = event.target.closest('a');
-    if (target && target.getAttribute('href')) {
-      sessionStorage.setItem('navActiveHref', target.getAttribute('href'));
-    }
-  });
-
-  return updateIndicator;
-}
-
 function setupResponsiveNav(nav, onUpdate) {
   const moreMenu = document.getElementById('moreMenu');
   if (!moreMenu) return () => {};
@@ -1059,9 +1019,6 @@ function setupResponsiveNav(nav, onUpdate) {
       dropdownLink.classList.add('active');
       moreToggle.classList.add('active');
     }
-    dropdownLink.addEventListener('click', () => {
-      sessionStorage.setItem('navActiveHref', dropdownLink.getAttribute('href'));
-    });
     dropdownItem.appendChild(dropdownLink);
     return dropdownItem;
   }
@@ -1172,7 +1129,6 @@ function initApp() {
   applyTranslations();
 
   let refreshNavOverflow = null;
-  let updateIndicator = null;
 
   updateMobileViewClass();
   const debouncedMobileUpdate = debounce(() => {
@@ -1234,11 +1190,7 @@ function initApp() {
 
   const nav = document.querySelector('.navbar-nav');
   if(nav){
-    updateIndicator = setupNavIndicator(nav);
-    refreshNavOverflow = setupResponsiveNav(nav, () => {
-      updateIndicator?.();
-    });
-    updateIndicator();
+    refreshNavOverflow = setupResponsiveNav(nav);
   }
 }
 
