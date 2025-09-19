@@ -15,24 +15,45 @@ if ($seatId <= 0) {
     echo json_encode(['success' => false, 'message' => 'office_view.message.error']);
     exit();
 }
-$seatStmt = $pdo->prepare('SELECT s.id, s.member_id FROM office_seats s WHERE s.id = ?');
+$seatStmt = $pdo->prepare('SELECT s.id, s.member_id, s.office_id, o.open_for_selection FROM office_seats s JOIN offices o ON s.office_id = o.id WHERE s.id = ?');
 $seatStmt->execute([$seatId]);
 $seat = $seatStmt->fetch();
 if (!$seat) {
     echo json_encode(['success' => false, 'message' => 'office_view.message.error']);
     exit();
 }
+$officeId = (int)($seat['office_id'] ?? 0);
+$isManager = ($_SESSION['role'] ?? '') === 'manager';
+$currentMemberId = $_SESSION['member_id'] ?? null;
+$isSelectionOpen = (int)($seat['open_for_selection'] ?? 1) === 1;
+
+if (!$isManager) {
+    if (!$isSelectionOpen) {
+        echo json_encode(['success' => false, 'message' => 'office_view.message.closed']);
+        exit();
+    }
+    if (!$currentMemberId) {
+        echo json_encode(['success' => false, 'message' => 'office_view.message.not_allowed']);
+        exit();
+    }
+    $whitelistCheck = $pdo->prepare('SELECT 1 FROM office_selection_whitelist WHERE office_id = ? AND member_id = ?');
+    $whitelistCheck->execute([$officeId, $currentMemberId]);
+    if (!$whitelistCheck->fetchColumn()) {
+        echo json_encode(['success' => false, 'message' => 'office_view.message.not_allowed']);
+        exit();
+    }
+}
 
 try {
     if ($action === 'assign') {
-        if ($_SESSION['role'] === 'member') {
-            $targetMemberId = $_SESSION['member_id'];
+        if (!$isManager) {
+            $targetMemberId = $currentMemberId;
         }
         if (!$targetMemberId) {
             echo json_encode(['success' => false, 'message' => 'office_view.message.select_member']);
             exit();
         }
-        if ($_SESSION['role'] === 'member' && $seat['member_id'] && (int)$seat['member_id'] !== (int)$targetMemberId) {
+        if (!$isManager && $seat['member_id'] && (int)$seat['member_id'] !== (int)$targetMemberId) {
             echo json_encode(['success' => false, 'message' => 'office_view.message.unavailable']);
             exit();
         }
@@ -56,7 +77,7 @@ try {
         exit();
     }
     if ($action === 'release') {
-        if ($_SESSION['role'] === 'member' && (int)$seat['member_id'] !== (int)($_SESSION['member_id'] ?? 0)) {
+        if (!$isManager && (int)$seat['member_id'] !== (int)($currentMemberId ?? 0)) {
             echo json_encode(['success' => false, 'message' => 'office_view.message.no_permission']);
             exit();
         }

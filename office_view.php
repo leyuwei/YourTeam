@@ -24,10 +24,22 @@ foreach ($seats as $seat) {
     }
 }
 $membersList = [];
-if ($_SESSION['role'] === 'manager') {
+if (($_SESSION['role'] ?? '') === 'manager') {
     $membersList = $pdo->query("SELECT id, name FROM members WHERE status != 'exited' ORDER BY sort_order, name")->fetchAll();
 }
 $currentMemberId = $_SESSION['member_id'] ?? null;
+$isManager = ($_SESSION['role'] ?? '') === 'manager';
+$isSelectionOpen = (int)($office['open_for_selection'] ?? 1) === 1;
+$isWhitelisted = true;
+if (!$isManager) {
+    $isWhitelisted = false;
+    if ($currentMemberId) {
+        $whitelistCheck = $pdo->prepare('SELECT 1 FROM office_selection_whitelist WHERE office_id = ? AND member_id = ?');
+        $whitelistCheck->execute([$id, $currentMemberId]);
+        $isWhitelisted = (bool)$whitelistCheck->fetchColumn();
+    }
+}
+$canInteract = $isManager || ($isSelectionOpen && $isWhitelisted);
 
 include 'header.php';
 ?>
@@ -59,8 +71,19 @@ include 'header.php';
           <li><strong data-i18n="office_view.info.region">Region</strong>: <?= htmlspecialchars($office['region'] ?? ''); ?></li>
           <li><strong data-i18n="office_view.info.total">Total Seats</strong>: <span id="totalCount"><?= $seatCount; ?></span></li>
           <li><strong data-i18n="office_view.info.available">Remaining Seats</strong>: <span id="availableCount"><?= $availableSeats; ?></span></li>
+          <li>
+            <strong data-i18n="office_view.info.selection">Seat Selection</strong>:
+            <?php if($isSelectionOpen): ?>
+              <span class="badge bg-success" data-i18n="office_view.selection.open">Open</span>
+            <?php else: ?>
+              <span class="badge bg-secondary" data-i18n="office_view.selection.closed">Closed</span>
+            <?php endif; ?>
+            <?php if(!$isManager && !$isWhitelisted): ?>
+              <span class="badge bg-warning text-dark ms-2" data-i18n="office_view.selection.not_whitelisted">Whitelist Only</span>
+            <?php endif; ?>
+          </li>
         </ul>
-        <?php if($_SESSION['role'] === 'manager'): ?>
+        <?php if($isManager): ?>
           <div class="alert alert-info" data-i18n="office_view.instructions.manager">Choose a member and click a seat to assign it. Select Clear Seat to free a seat.</div>
           <select class="form-select form-select-sm mb-3" id="memberSelect">
             <option value="" data-i18n="office_view.select.member">Select member</option>
@@ -70,7 +93,13 @@ include 'header.php';
             <?php endforeach; ?>
           </select>
         <?php else: ?>
-          <div class="alert alert-info" data-i18n="office_view.instructions.member">Click an available seat to claim it, or click your seat to release it.</div>
+          <?php if(!$isSelectionOpen): ?>
+            <div class="alert alert-warning" data-i18n="office_view.instructions.closed">Seat selection is currently closed. Please contact an administrator if you need changes.</div>
+          <?php elseif(!$isWhitelisted): ?>
+            <div class="alert alert-warning" data-i18n="office_view.instructions.not_allowed">You are not on the whitelist for this office.</div>
+          <?php else: ?>
+            <div class="alert alert-info" data-i18n="office_view.instructions.member">Click an available seat to claim it, or click your seat to release it.</div>
+          <?php endif; ?>
         <?php endif; ?>
       </div>
     </div>
@@ -142,8 +171,10 @@ include 'header.php';
   const totalCountEl = document.getElementById('totalCount');
   const availableCountEl = document.getElementById('availableCount');
   const memberSelect = document.getElementById('memberSelect');
-  const isManager = <?= $_SESSION['role'] === 'manager' ? 'true' : 'false'; ?>;
+  const isManager = <?= $isManager ? 'true' : 'false'; ?>;
   const currentMemberId = <?= $currentMemberId ? (int)$currentMemberId : 'null'; ?>;
+  const canInteract = <?= $canInteract ? 'true' : 'false'; ?>;
+  const selectionOpen = <?= $isSelectionOpen ? 'true' : 'false'; ?>;
 
   function t(key) {
     const langAttr = document.documentElement.lang || 'zh';
@@ -207,6 +238,7 @@ include 'header.php';
     marker.classList.toggle('occupied', !!seat.member_id);
     marker.classList.toggle('available', !seat.member_id);
     marker.classList.toggle('mine', !!seat.member_id && currentMemberId && seat.member_id === currentMemberId);
+    marker.classList.toggle('disabled', !canInteract);
     const occupantEl = marker.querySelector('.seat-marker-occupant');
     if (occupantEl) {
       if (seat.member_name) {
@@ -286,6 +318,10 @@ include 'header.php';
   function handleSeatClick(seatId) {
     const seat = seatData.get(seatId);
     if (!seat) {
+      return;
+    }
+    if (!canInteract) {
+      showMessage(selectionOpen ? 'office_view.message.not_allowed' : 'office_view.message.closed');
       return;
     }
     if (isManager) {
@@ -399,6 +435,13 @@ include 'header.php';
   }
   .seat-marker-view:hover {
     transform: translate(-50%, -50%) scale(1.05);
+  }
+  .seat-marker-view.disabled {
+    cursor: not-allowed;
+    opacity: 0.8;
+  }
+  .seat-marker-view.disabled:hover {
+    transform: translate(-50%, -50%);
   }
 </style>
 <?php include 'footer.php'; ?>

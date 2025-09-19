@@ -192,6 +192,7 @@ CREATE TABLE offices (
   name VARCHAR(100) NOT NULL,
   location_description VARCHAR(255),
   region VARCHAR(100),
+  open_for_selection TINYINT(1) NOT NULL DEFAULT 1,
   layout_image VARCHAR(255) NOT NULL
 );
 
@@ -204,5 +205,13 @@ CREATE TABLE office_seats (
   member_id INT DEFAULT NULL,
   FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE CASCADE,
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE TABLE office_selection_whitelist (
+  office_id INT NOT NULL,
+  member_id INT NOT NULL,
+  PRIMARY KEY (office_id, member_id),
+  FOREIGN KEY (office_id) REFERENCES offices(id) ON DELETE CASCADE,
+  FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
 
