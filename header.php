@@ -36,6 +36,20 @@
     z-index: 1;
     color: #fff;
     transition: color 0.3s ease;
+    white-space: nowrap;
+  }
+  .navbar-nav {
+    position: relative;
+  }
+  @media (min-width: 992px) {
+    .navbar-nav {
+      flex-wrap: nowrap;
+      overflow: hidden;
+      column-gap: 0.5rem;
+    }
+    .navbar-nav .nav-item {
+      flex: 0 0 auto;
+    }
   }
   .navbar-nav .nav-link:hover { color: #ffdd57; }
   .nav-indicator {
@@ -55,7 +69,6 @@
     100% {background-position: 0% 50%;}
   }
   tr[style*="background-color"] > * { background-color: inherit !important; }
-  .navbar-nav { position: relative; }
   .hero-banner {
     background: rgba(0, 0, 0, 0.4);
     border-radius: 1rem;
@@ -72,6 +85,38 @@
   @keyframes fadeIn {
     from {opacity: 0; transform: translateY(-20px);}
     to {opacity: 1; transform: translateY(0);}
+  }
+  body.mobile-view {
+    background-size: cover;
+    animation: none;
+  }
+  body.mobile-view .main-container {
+    max-width: 100%;
+    padding: 1.5rem 1rem;
+    border-radius: 0.25rem;
+    box-shadow: none;
+    margin: 1rem auto;
+  }
+  body.mobile-view .navbar-collapse {
+    align-items: stretch;
+  }
+  body.mobile-view .navbar-nav {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  body.mobile-view #moreMenu {
+    display: none !important;
+  }
+  body.mobile-view .navbar-text {
+    display: none;
+  }
+  body.mobile-view .navbar .btn {
+    width: 100%;
+    margin: 0.25rem 0;
+    margin-right: 0 !important;
+  }
+  body.mobile-view .navbar-nav .nav-item {
+    width: 100%;
   }
 </style>
 </head>
@@ -98,6 +143,10 @@
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'workload.php' ? 'active' : ''); ?>" href="workload.php" data-i18n="nav.workload">Workload</a></li>
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'account.php' ? 'active' : ''); ?>" href="account.php" data-i18n="nav.account">Account</a></li>
           <?php endif; ?>
+          <li class="nav-item dropdown d-none" id="moreMenu">
+            <a class="nav-link dropdown-toggle" href="#" id="moreDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" data-i18n="nav.more">更多</a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="moreDropdown"></ul>
+          </li>
         </ul>
       <span class="navbar-text me-3"><span data-i18n="welcome">Welcome</span>, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
       <button id="langToggle" class="btn btn-outline-light me-2">English</button>
