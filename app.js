@@ -104,6 +104,8 @@ const translations = {
     'offices.action.edit': 'Edit',
     'offices.action.delete': 'Delete',
     'offices.none': 'None',
+    'offices.selection.closed': 'Selection Closed',
+    'offices.selection.not_whitelisted': 'Whitelist Only',
     'offices.members_overview.title': 'Member Office Assignments',
     'offices.members_overview.member': 'Member',
     'offices.members_overview.year_of_join': 'Year of Join',
@@ -119,6 +121,14 @@ const translations = {
     'office_edit.label_region': 'Region',
     'office_edit.label_image': 'Layout Image',
     'office_edit.label_seats': 'Seat Layout',
+    'office_edit.label_open_selection': 'Allow seat selection',
+    'office_edit.open_selection_hint': 'When disabled, only managers can adjust seat assignments.',
+    'office_edit.whitelist.title': 'Seat Selection Whitelist',
+    'office_edit.whitelist.description': 'Only selected on-duty members can pick seats in this office.',
+    'office_edit.whitelist.search_placeholder': 'Search members…',
+    'office_edit.whitelist.select_all': 'Select All',
+    'office_edit.whitelist.clear': 'Clear',
+    'office_edit.whitelist.empty': 'No active members available.',
     'office_edit.instructions': 'Click the layout to add seats. Drag markers to fine-tune positions.',
     'office_edit.instructions_remove': 'Use the list below to rename or remove seats.',
     'office_edit.table.label': 'Seat Label',
@@ -135,8 +145,11 @@ const translations = {
     'office_view.info.region': 'Region',
     'office_view.info.total': 'Total Seats',
     'office_view.info.available': 'Remaining Seats',
+    'office_view.info.selection': 'Seat Selection',
     'office_view.instructions.member': 'Click an available seat to claim it, or click your seat to release it.',
     'office_view.instructions.manager': 'Choose a member and click a seat to assign it. Select Clear Seat to free a seat.',
+    'office_view.instructions.closed': 'Seat selection is currently closed. Please contact an administrator if you need changes.',
+    'office_view.instructions.not_allowed': 'You are not on the whitelist for this office.',
     'office_view.select.member': 'Select member',
     'office_view.select.clear': 'Clear Seat',
     'office_view.table.seat': 'Seat',
@@ -149,6 +162,11 @@ const translations = {
     'office_view.message.unavailable': 'This seat is already occupied.',
     'office_view.message.no_permission': 'You can only manage your own seats.',
     'office_view.message.error': 'Operation failed, please try again.',
+    'office_view.message.closed': 'Seat selection is currently closed.',
+    'office_view.message.not_allowed': 'You are not allowed to manage seats in this office.',
+    'office_view.selection.open': 'Open',
+    'office_view.selection.closed': 'Closed',
+    'office_view.selection.not_whitelisted': 'Whitelist Only',
     'project_members.title_prefix': 'Project Members -',
     'project_members.current_members': 'Current Members',
     'project_members.join_date': 'Join Date',
@@ -559,6 +577,8 @@ const translations = {
     'offices.action.edit': '编辑',
     'offices.action.delete': '删除',
     'offices.none': '暂无',
+    'offices.selection.closed': '选座已关闭',
+    'offices.selection.not_whitelisted': '仅限白名单',
     'offices.members_overview.title': '成员办公分布',
     'offices.members_overview.member': '成员',
     'offices.members_overview.year_of_join': '入学年份',
@@ -574,6 +594,14 @@ const translations = {
     'office_edit.label_region': '所属区域',
     'office_edit.label_image': '布局图片',
     'office_edit.label_seats': '工位布局',
+    'office_edit.label_open_selection': '允许成员自助选座',
+    'office_edit.open_selection_hint': '关闭后仅管理员可以调整座位。',
+    'office_edit.whitelist.title': '可选座位成员白名单',
+    'office_edit.whitelist.description': '仅白名单内的在岗成员可以在本办公室选座。',
+    'office_edit.whitelist.search_placeholder': '搜索成员…',
+    'office_edit.whitelist.select_all': '全选',
+    'office_edit.whitelist.clear': '清空',
+    'office_edit.whitelist.empty': '暂无在岗成员。',
     'office_edit.instructions': '在布局上点击添加工位，可拖动图标微调位置。',
     'office_edit.instructions_remove': '可在下方列表中重命名或删除工位。',
     'office_edit.table.label': '工位名称',
@@ -590,8 +618,11 @@ const translations = {
     'office_view.info.region': '区域',
     'office_view.info.total': '总工位',
     'office_view.info.available': '剩余工位',
+    'office_view.info.selection': '选座状态',
     'office_view.instructions.member': '点击空闲工位即可认领，再次点击自己的工位可释放。',
     'office_view.instructions.manager': '选择成员后点击工位即可指定，选择“清空工位”可释放。',
+    'office_view.instructions.closed': '当前选座已关闭，如需调整请联系管理员。',
+    'office_view.instructions.not_allowed': '您不在该办公室的可选座位白名单内。',
     'office_view.select.member': '选择成员',
     'office_view.select.clear': '清空工位',
     'office_view.table.seat': '工位',
@@ -604,6 +635,11 @@ const translations = {
     'office_view.message.unavailable': '该工位已被占用。',
     'office_view.message.no_permission': '您只能管理自己的工位。',
     'office_view.message.error': '操作失败，请重试。',
+    'office_view.message.closed': '当前选座已关闭。',
+    'office_view.message.not_allowed': '您无权管理该办公室的座位。',
+    'office_view.selection.open': '开放',
+    'office_view.selection.closed': '关闭',
+    'office_view.selection.not_whitelisted': '仅限白名单',
     'project_members.title_prefix': '项目成员 -',
     'project_members.current_members': '当前成员',
     'project_members.join_date': '入项日期',
@@ -955,6 +991,13 @@ function applyTranslations() {
     const text = translations[lang][key];
     if(text) {
       el.setAttribute('title', text);
+    }
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    const text = translations[lang][key];
+    if(text) {
+      el.setAttribute('placeholder', text);
     }
   });
   const langToggle = document.getElementById('langToggle');

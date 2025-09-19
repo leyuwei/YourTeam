@@ -6,10 +6,19 @@ $office = [
     'name' => '',
     'location_description' => '',
     'region' => '',
-    'layout_image' => ''
+    'layout_image' => '',
+    'open_for_selection' => 1
 ];
 $existingSeats = [];
+$selectedWhitelist = [];
+$existingWhitelist = [];
 $error = '';
+
+$activeMembersStmt = $pdo->query("SELECT id, name, campus_id, degree_pursuing, year_of_join FROM members WHERE status = 'in_work' ORDER BY sort_order, name");
+$activeMembers = $activeMembersStmt->fetchAll();
+if ($activeMembers) {
+    $selectedWhitelist = array_map('intval', array_column($activeMembers, 'id'));
+}
 
 if ($id) {
     $stmt = $pdo->prepare('SELECT * FROM offices WHERE id = ?');
@@ -23,14 +32,30 @@ if ($id) {
     $seatStmt = $pdo->prepare('SELECT id, label, pos_x, pos_y FROM office_seats WHERE office_id = ? ORDER BY id');
     $seatStmt->execute([$id]);
     $existingSeats = $seatStmt->fetchAll();
+    $whitelistStmt = $pdo->prepare('SELECT member_id FROM office_selection_whitelist WHERE office_id = ?');
+    $whitelistStmt->execute([$id]);
+    $existingWhitelist = array_map('intval', $whitelistStmt->fetchAll(PDO::FETCH_COLUMN));
+    if ($existingWhitelist) {
+        $selectedWhitelist = $existingWhitelist;
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $office['name'] = trim($_POST['name'] ?? '');
     $office['location_description'] = trim($_POST['location_description'] ?? '');
     $office['region'] = trim($_POST['region'] ?? '');
+    $office['open_for_selection'] = isset($_POST['open_for_selection']) ? 1 : 0;
     if ($office['name'] === '') {
         $error = 'Office name is required (办公地点名称不能为空)。';
+    }
+    $selectedWhitelist = [];
+    if (isset($_POST['whitelist']) && is_array($_POST['whitelist'])) {
+        foreach ($_POST['whitelist'] as $memberId) {
+            if (is_numeric($memberId)) {
+                $selectedWhitelist[] = (int)$memberId;
+            }
+        }
+        $selectedWhitelist = array_values(array_unique(array_filter($selectedWhitelist, fn($v) => $v > 0)));
     }
     $seatsJson = $_POST['seats_json'] ?? '[]';
     $seatsData = json_decode($seatsJson, true);
@@ -105,24 +130,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo->beginTransaction();
             if ($id) {
-                $update = $pdo->prepare('UPDATE offices SET name = ?, location_description = ?, region = ?, layout_image = ? WHERE id = ?');
+                $update = $pdo->prepare('UPDATE offices SET name = ?, location_description = ?, region = ?, layout_image = ?, open_for_selection = ? WHERE id = ?');
                 $update->execute([
                     $office['name'],
                     $office['location_description'],
                     $office['region'],
                     $layoutImagePath,
+                    $office['open_for_selection'],
                     $id
                 ]);
                 $officeId = $id;
             } else {
                 $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order), -1) + 1 FROM offices');
                 $nextOrder = (int)$orderStmt->fetchColumn();
-                $insert = $pdo->prepare('INSERT INTO offices (name, location_description, region, layout_image, sort_order) VALUES (?,?,?,?,?)');
+                $insert = $pdo->prepare('INSERT INTO offices (name, location_description, region, layout_image, open_for_selection, sort_order) VALUES (?,?,?,?,?,?)');
                 $insert->execute([
                     $office['name'],
                     $office['location_description'],
                     $office['region'],
                     $layoutImagePath,
+                    $office['open_for_selection'],
                     $nextOrder
                 ]);
                 $officeId = (int)$pdo->lastInsertId();
@@ -152,6 +179,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $placeholders = implode(',', array_fill(0, count($idsToDelete), '?'));
                     $delete = $pdo->prepare("DELETE FROM office_seats WHERE office_id = ? AND id IN ($placeholders)");
                     $delete->execute(array_merge([$officeId], array_values($idsToDelete)));
+                }
+            }
+
+            $deleteWhitelist = $pdo->prepare('DELETE FROM office_selection_whitelist WHERE office_id = ?');
+            $deleteWhitelist->execute([$officeId]);
+            if (!empty($selectedWhitelist)) {
+                $insertWhitelist = $pdo->prepare('INSERT INTO office_selection_whitelist (office_id, member_id) VALUES (?, ?)');
+                foreach ($selectedWhitelist as $memberId) {
+                    $insertWhitelist->execute([$officeId, $memberId]);
                 }
             }
 
@@ -188,6 +224,64 @@ include 'header.php';
     <div class="col-md-4">
       <label class="form-label" data-i18n="office_edit.label_region">Region</label>
       <input type="text" name="region" class="form-control" value="<?= htmlspecialchars($office['region']); ?>">
+    </div>
+  </div>
+  <div class="form-check form-switch mt-3">
+    <input class="form-check-input" type="checkbox" role="switch" id="openSelectionSwitch" name="open_for_selection" value="1" <?= $office['open_for_selection'] ? 'checked' : ''; ?>>
+    <label class="form-check-label" for="openSelectionSwitch" data-i18n="office_edit.label_open_selection">Allow members to select seats</label>
+    <div class="form-text" data-i18n="office_edit.open_selection_hint">When disabled, only managers can adjust seat assignments.</div>
+  </div>
+  <div class="mt-4">
+    <label class="form-label fw-semibold" data-i18n="office_edit.whitelist.title">Seat Selection Whitelist</label>
+    <div class="text-muted small mb-2" data-i18n="office_edit.whitelist.description">Only selected on-duty members can pick seats in this office.</div>
+    <div class="row g-2 align-items-center mb-2">
+      <div class="col-md-6">
+        <input type="text" class="form-control" id="whitelistSearch" data-i18n-placeholder="office_edit.whitelist.search_placeholder" placeholder="Search members">
+      </div>
+      <div class="col-md-6 text-md-end">
+        <button type="button" class="btn btn-sm btn-outline-primary me-2" id="whitelistSelectAll" data-i18n="office_edit.whitelist.select_all">Select All</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="whitelistClearAll" data-i18n="office_edit.whitelist.clear">Clear</button>
+      </div>
+    </div>
+    <div id="whitelistContainer" class="whitelist-container border rounded p-3 bg-light">
+      <?php if($activeMembers): ?>
+        <div class="row row-cols-1 row-cols-md-2 g-2">
+          <?php foreach($activeMembers as $member):
+            $memberId = (int)$member['id'];
+            $isChecked = in_array($memberId, $selectedWhitelist, true);
+            $searchParts = array_filter([
+              $member['name'] ?? '',
+              $member['campus_id'] ?? '',
+              $member['degree_pursuing'] ?? '',
+              $member['year_of_join'] ?? ''
+            ]);
+            $searchTextRaw = trim(implode(' ', $searchParts));
+            $searchText = function_exists('mb_strtolower') ? mb_strtolower($searchTextRaw) : strtolower($searchTextRaw);
+            $inputId = 'whitelist_' . $memberId;
+          ?>
+          <div class="col whitelist-item" data-search="<?= htmlspecialchars($searchText, ENT_QUOTES); ?>">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="whitelist[]" value="<?= $memberId; ?>" id="<?= htmlspecialchars($inputId); ?>" <?= $isChecked ? 'checked' : ''; ?>>
+              <label class="form-check-label" for="<?= htmlspecialchars($inputId); ?>">
+                <span class="fw-semibold"><?= htmlspecialchars($member['name']); ?></span>
+                <?php if(!empty($member['campus_id'])): ?>
+                  <span class="text-muted ms-1">(<?= htmlspecialchars($member['campus_id']); ?>)</span>
+                <?php endif; ?>
+                <?php if(!empty($member['degree_pursuing']) || !empty($member['year_of_join'])): ?>
+                  <small class="d-block text-muted">
+                    <?php if(!empty($member['degree_pursuing'])): ?><?= htmlspecialchars($member['degree_pursuing']); ?><?php endif; ?>
+                    <?php if(!empty($member['degree_pursuing']) && !empty($member['year_of_join'])): ?> · <?php endif; ?>
+                    <?php if(!empty($member['year_of_join'])): ?><?= htmlspecialchars($member['year_of_join']); ?><?php endif; ?>
+                  </small>
+                <?php endif; ?>
+              </label>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      <?php else: ?>
+        <div class="text-muted" data-i18n="office_edit.whitelist.empty">No active members available.</div>
+      <?php endif; ?>
     </div>
   </div>
   <div class="mb-3 mt-4">
@@ -247,6 +341,10 @@ include 'header.php';
   const emptySeatHint = document.getElementById('emptySeatHint');
   const layoutPlaceholder = document.getElementById('layoutPlaceholder');
   const defaultLabelSpan = document.getElementById('defaultSeatLabel');
+  const whitelistContainer = document.getElementById('whitelistContainer');
+  const whitelistSearch = document.getElementById('whitelistSearch');
+  const whitelistSelectAllBtn = document.getElementById('whitelistSelectAll');
+  const whitelistClearAllBtn = document.getElementById('whitelistClearAll');
   let seatCounter = 0;
   let seatData = <?= json_encode($existingSeats, JSON_UNESCAPED_UNICODE); ?> || [];
   seatCounter = seatData.length;
@@ -277,6 +375,58 @@ include 'header.php';
       applyTranslations();
     }
   }
+
+  function getFilterTerm() {
+    if (!whitelistSearch) {
+      return '';
+    }
+    const value = whitelistSearch.value || '';
+    return value.toLowerCase().trim();
+  }
+
+  function filterWhitelist() {
+    if (!whitelistContainer) {
+      return;
+    }
+    const term = getFilterTerm();
+    const items = whitelistContainer.querySelectorAll('.whitelist-item');
+    items.forEach(item => {
+      const searchValue = (item.getAttribute('data-search') || '').toLowerCase();
+      if (!term || searchValue.includes(term)) {
+        item.classList.remove('d-none');
+      } else {
+        item.classList.add('d-none');
+      }
+    });
+  }
+
+  if (whitelistSearch) {
+    whitelistSearch.addEventListener('input', filterWhitelist);
+  }
+
+  if (whitelistSelectAllBtn) {
+    whitelistSelectAllBtn.addEventListener('click', () => {
+      if (!whitelistContainer) {
+        return;
+      }
+      whitelistContainer.querySelectorAll('.whitelist-item:not(.d-none) input[type="checkbox"]').forEach(cb => {
+        cb.checked = true;
+      });
+    });
+  }
+
+  if (whitelistClearAllBtn) {
+    whitelistClearAllBtn.addEventListener('click', () => {
+      if (!whitelistContainer) {
+        return;
+      }
+      whitelistContainer.querySelectorAll('.whitelist-item:not(.d-none) input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+      });
+    });
+  }
+
+  filterWhitelist();
 
   function handleFileChange(event) {
     const file = event.target.files[0];
@@ -433,6 +583,9 @@ include 'header.php';
   function enableDrag(marker, seat) {
     let dragging = false;
     marker.addEventListener('pointerdown', e => {
+      if (e.target && e.target.closest('.seat-remove')) {
+        return;
+      }
       dragging = true;
       marker.setPointerCapture(e.pointerId);
     });
@@ -507,6 +660,22 @@ include 'header.php';
   }
   .seat-marker:active {
     cursor: grabbing;
+  }
+  .whitelist-container {
+    max-height: 320px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+  }
+  .whitelist-item .form-check {
+    background-color: #fff;
+    border-radius: 0.75rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .whitelist-item .form-check:hover {
+    box-shadow: 0 0.35rem 0.75rem rgba(0, 0, 0, 0.08);
+    border-color: rgba(13, 110, 253, 0.4);
   }
 </style>
 <?php include 'footer.php'; ?>

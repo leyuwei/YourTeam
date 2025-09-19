@@ -10,6 +10,13 @@ $officeStmt = $pdo->query("SELECT o.*,
   ORDER BY o.sort_order, o.name");
 $offices = $officeStmt->fetchAll();
 $canManageOffices = ($_SESSION['role'] ?? '') === 'manager';
+$currentMemberId = $_SESSION['member_id'] ?? null;
+$allowedOfficeIds = [];
+if (!$canManageOffices && $currentMemberId) {
+    $whitelistStmt = $pdo->prepare('SELECT office_id FROM office_selection_whitelist WHERE member_id = ?');
+    $whitelistStmt->execute([$currentMemberId]);
+    $allowedOfficeIds = array_map('intval', $whitelistStmt->fetchAll(PDO::FETCH_COLUMN));
+}
 $seatAssignments = [];
 if ($offices) {
     $ids = array_column($offices, 'id');
@@ -154,6 +161,25 @@ foreach ($members as $member) {
   .office-table .office-info-col {
     max-width: 240px;
   }
+  .office-row-disabled {
+    background-color: #f1f3f5;
+  }
+  .office-row-disabled td {
+    background-color: inherit !important;
+    color: #6c757d;
+  }
+  .office-row-disabled .seat-occupant-card {
+    opacity: 0.7;
+  }
+  .office-row-disabled .btn {
+    pointer-events: none;
+    opacity: 0.65;
+  }
+  .badge-status {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
 </style>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="bold-target" data-i18n="offices.title">Offices</h2>
@@ -205,15 +231,27 @@ foreach ($members as $member) {
         $seatCount = (int)($office['seat_count'] ?? 0);
         $availableCount = (int)($office['available_count'] ?? 0);
         $assignments = $seatAssignments[$office['id']] ?? [];
+        $isSelectionOpen = (int)($office['open_for_selection'] ?? 1) === 1;
+        $isWhitelisted = $canManageOffices ? true : in_array((int)$office['id'], $allowedOfficeIds, true);
+        $isRestricted = !$canManageOffices && (!$isSelectionOpen || !$isWhitelisted);
       ?>
-      <tr data-id="<?= (int)$office['id']; ?>">
+      <tr data-id="<?= (int)$office['id']; ?>"<?php if($isRestricted) echo ' class="office-row-disabled"'; ?>>
         <?php if($canManageOffices): ?>
         <td class="drag-handle text-center">&#9776;</td>
         <?php endif; ?>
         <td class="fw-bold office-name-col">
-          <a href="office_view.php?id=<?= (int)$office['id']; ?>" class="text-decoration-none">
-            <?= htmlspecialchars($office['name']); ?>
-          </a>
+          <?php if($isRestricted): ?>
+            <span class="text-muted"><?= htmlspecialchars($office['name']); ?></span>
+          <?php else: ?>
+            <a href="office_view.php?id=<?= (int)$office['id']; ?>" class="text-decoration-none">
+              <?= htmlspecialchars($office['name']); ?>
+            </a>
+          <?php endif; ?>
+          <?php if(!$isSelectionOpen): ?>
+            <span class="badge bg-secondary ms-2 badge-status" data-i18n="offices.selection.closed">Selection Closed</span>
+          <?php elseif(!$canManageOffices && !$isWhitelisted): ?>
+            <span class="badge bg-warning text-dark ms-2 badge-status" data-i18n="offices.selection.not_whitelisted">Whitelist Only</span>
+          <?php endif; ?>
         </td>
         <td class="office-info-col"><?= htmlspecialchars($office['location_description'] ?? ''); ?></td>
         <td class="office-info-col"><?= htmlspecialchars($office['region'] ?? ''); ?></td>
@@ -245,8 +283,12 @@ foreach ($members as $member) {
           <?php endif; ?>
         </td>
         <td class="text-center office-actions-col">
-          <a class="btn btn-sm btn-info mb-1" href="office_view.php?id=<?= (int)$office['id']; ?>" data-i18n="offices.action.view">View Layout</a>
-          <?php if($_SESSION['role'] === 'manager'): ?>
+          <?php if($isRestricted): ?>
+            <span class="btn btn-sm btn-info mb-1 disabled" role="button" aria-disabled="true" data-i18n="offices.action.view">View Layout</span>
+          <?php else: ?>
+            <a class="btn btn-sm btn-info mb-1" href="office_view.php?id=<?= (int)$office['id']; ?>" data-i18n="offices.action.view">View Layout</a>
+          <?php endif; ?>
+          <?php if($canManageOffices): ?>
             <a class="btn btn-sm btn-primary mb-1" href="office_edit.php?id=<?= (int)$office['id']; ?>" data-i18n="offices.action.edit">Edit</a>
             <a class="btn btn-sm btn-danger mb-1" href="office_delete.php?id=<?= (int)$office['id']; ?>" onclick="return doubleConfirm('Delete office? / 确认删除办公地点？');" data-i18n="offices.action.delete">Delete</a>
           <?php endif; ?>
@@ -255,7 +297,7 @@ foreach ($members as $member) {
       <?php endforeach; ?>
       <?php if(empty($offices)): ?>
       <tr>
-        <td colspan="7" class="text-center text-muted" data-i18n="offices.none">None</td>
+        <td colspan="<?= $canManageOffices ? 8 : 7; ?>" class="text-center text-muted" data-i18n="offices.none">None</td>
       </tr>
       <?php endif; ?>
     </tbody>
