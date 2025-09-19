@@ -79,11 +79,6 @@
     color: #1f1f1f;
     box-shadow: 0 0 0 1px rgba(255, 221, 87, 0.6);
   }
-  #moreMenu .nav-link.active,
-  #moreMenu .nav-link.active:hover,
-  #moreMenu .nav-link.active:focus {
-    color: #1f1f1f;
-  }
   .dropdown-menu .dropdown-item.active,
   .dropdown-menu .dropdown-item.active:hover,
   .dropdown-menu .dropdown-item.active:focus {
@@ -131,9 +126,6 @@
     flex-wrap: wrap;
     overflow: visible;
   }
-  body.mobile-view #moreMenu {
-    display: none !important;
-  }
   body.mobile-view .navbar-text {
     display: none;
   }
@@ -144,6 +136,15 @@
   }
   body.mobile-view .navbar-nav .nav-item {
     width: 100%;
+  }
+  body.mobile-view .navbar-toggler {
+    display: block;
+  }
+  body.mobile-view .navbar-collapse.collapse {
+    display: none !important;
+  }
+  body.mobile-view .navbar-collapse.collapse.show {
+    display: block !important;
   }
 </style>
 </head>
@@ -170,10 +171,6 @@
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'workload.php' ? 'active' : ''); ?>" href="workload.php" data-i18n="nav.workload">Workload</a></li>
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'account.php' ? 'active' : ''); ?>" href="account.php" data-i18n="nav.account">Account</a></li>
           <?php endif; ?>
-          <li class="nav-item dropdown d-none" id="moreMenu">
-            <a class="nav-link dropdown-toggle" href="#" id="moreDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false" data-i18n="nav.more">更多</a>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="moreDropdown"></ul>
-          </li>
         </ul>
       <span class="navbar-text me-3"><span data-i18n="welcome">Welcome</span>, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
       <button id="langToggle" class="btn btn-outline-light me-2">English</button>
