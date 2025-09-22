@@ -82,8 +82,9 @@ if($status){
             $memberList[] = ['id'=>$mid,'name'=>$mname,'degree'=>$mdegree,'year'=>$myear];
         }
     }
+    $rowColor = $p['bg_color'] ? htmlspecialchars($p['bg_color']) : '';
   ?>
-  <tr data-id="<?= $p['id']; ?>"<?= $p['bg_color'] ? ' style="background-color:'.htmlspecialchars($p['bg_color']).';"' : ''; ?>>
+  <tr data-id="<?= $p['id']; ?>"<?= $rowColor ? ' data-custom-bg="'.$rowColor.'" style="background-color:'.$rowColor.';"' : ''; ?>>
     <td class="drag-handle">&#9776;</td>
     <td class="bold-target"><?= htmlspecialchars($p['title']); ?></td>
     <td>

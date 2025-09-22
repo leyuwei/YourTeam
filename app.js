@@ -1116,11 +1116,161 @@ function applyTranslations() {
   }
 }
 
+function clampChannel(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function parseColorValue(value) {
+  if (!value) return null;
+  let color = value.trim();
+  const hexMatch = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hexMatch) {
+    let hex = hexMatch[1];
+    if (hex.length === 3) {
+      hex = hex.split('').map(ch => ch + ch).join('');
+    }
+    const num = parseInt(hex, 16);
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255,
+    };
+  }
+  const rgbMatch = color.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i);
+  if (rgbMatch) {
+    return {
+      r: clampChannel(parseInt(rgbMatch[1], 10)),
+      g: clampChannel(parseInt(rgbMatch[2], 10)),
+      b: clampChannel(parseInt(rgbMatch[3], 10)),
+    };
+  }
+  return null;
+}
+
+function rgbToCss({ r, g, b }) {
+  return `rgb(${clampChannel(r)}, ${clampChannel(g)}, ${clampChannel(b)})`;
+}
+
+function rgbaToCss({ r, g, b }, alpha) {
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${clampChannel(r)}, ${clampChannel(g)}, ${clampChannel(b)}, ${a})`;
+}
+
+function rgbToHsl({ r, g, b }) {
+  const nr = clampChannel(r) / 255;
+  const ng = clampChannel(g) / 255;
+  const nb = clampChannel(b) / 255;
+  const max = Math.max(nr, ng, nb);
+  const min = Math.min(nr, ng, nb);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case nr:
+        h = (ng - nb) / d + (ng < nb ? 6 : 0);
+        break;
+      case ng:
+        h = (nb - nr) / d + 2;
+        break;
+      default:
+        h = (nr - ng) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+
+  return { h, s, l };
+}
+
+function hslToRgb({ h, s, l }) {
+  let r;
+  let g;
+  let b;
+
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+
+  return {
+    r: Math.round(r * 255),
+    g: Math.round(g * 255),
+    b: Math.round(b * 255),
+  };
+}
+
+function createDarkVariant(rgb) {
+  const hsl = rgbToHsl(rgb);
+  const adjustedLightness = Math.max(0.18, Math.min(0.55, hsl.l * 0.45 + 0.08));
+  const adjustedSaturation = Math.min(1, hsl.s * 0.9 + 0.05);
+  return hslToRgb({ h: hsl.h, s: adjustedSaturation, l: adjustedLightness });
+}
+
+function relativeLuminance({ r, g, b }) {
+  const channel = value => {
+    const normalized = clampChannel(value) / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  };
+  return (
+    0.2126 * channel(r) +
+    0.7152 * channel(g) +
+    0.0722 * channel(b)
+  );
+}
+
+function pickTextRgb(bgRgb) {
+  const lum = relativeLuminance(bgRgb);
+  if (lum > 0.55) {
+    return { r: 30, g: 41, b: 59 };
+  }
+  return { r: 241, g: 245, b: 249 };
+}
+
+function updateCustomRowColors(theme) {
+  const rows = document.querySelectorAll('tr[data-custom-bg]');
+  rows.forEach(row => {
+    const baseColor = parseColorValue(row.dataset.customBg);
+    if (!baseColor) {
+      row.style.removeProperty('--custom-row-text-color');
+      row.style.removeProperty('--custom-row-muted-color');
+      return;
+    }
+
+    const appliedColor = theme === 'dark' ? createDarkVariant(baseColor) : baseColor;
+    const textRgb = pickTextRgb(appliedColor);
+    const mutedAlpha = theme === 'dark' ? 0.78 : 0.65;
+
+    row.style.backgroundColor = rgbToCss(appliedColor);
+    row.style.setProperty('--custom-row-text-color', rgbToCss(textRgb));
+    row.style.setProperty('--custom-row-muted-color', rgbaToCss(textRgb, mutedAlpha));
+  });
+}
+
 function applyTheme() {
   const theme = localStorage.getItem('theme') || 'light';
   document.documentElement.setAttribute('data-bs-theme', theme);
   document.body.classList.toggle('theme-dark', theme === 'dark');
   document.body.classList.toggle('theme-light', theme !== 'dark');
+  updateCustomRowColors(theme);
 }
 
 function initApp() {
