@@ -45,7 +45,8 @@ $directions = $stmt->fetchAll();
   </thead>
   <tbody id="directionList">
   <?php foreach($directions as $d): ?>
-  <tr data-id="<?= $d['id']; ?>"<?= $d['bg_color'] ? ' style="background-color:'.htmlspecialchars($d['bg_color']).';"' : ''; ?>>
+  <?php $rowColor = $d['bg_color'] ? htmlspecialchars($d['bg_color']) : ''; ?>
+  <tr data-id="<?= $d['id']; ?>"<?= $rowColor ? ' data-custom-bg="'.$rowColor.'" style="background-color:'.$rowColor.';"' : ''; ?>>
     <td class="drag-handle">&#9776;</td>
     <td class="bold-target"><?= htmlspecialchars($d['title']); ?></td>
     <td>

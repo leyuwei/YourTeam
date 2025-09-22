@@ -193,6 +193,16 @@
     to {opacity: 1; transform: translateY(0);}
   }
   tr[style*="background-color"] > * { background-color: inherit !important; }
+  tr[data-custom-bg] {
+    transition: background-color 0.3s ease, color 0.3s ease;
+    color: var(--custom-row-text-color, inherit);
+  }
+  tr[data-custom-bg] > * {
+    background-color: inherit !important;
+  }
+  tr[data-custom-bg] .member-detail {
+    color: var(--custom-row-muted-color, inherit) !important;
+  }
   .card,
   .modal-content,
   .list-group-item {
