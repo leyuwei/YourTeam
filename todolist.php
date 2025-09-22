@@ -54,8 +54,10 @@ $today_key = strtolower(date('D'));
 .todolist li .copy-item{margin-left:auto;}
 .todolist li .copy-item,
 .todolist li .next-week-item{white-space:nowrap;}
-.today-heading{background:#fff3cd;padding:2px 4px;border-radius:4px;}
-.todolist.today{border-left:4px solid #ffc107;padding-left:4px;background:#fffdf3;}
+.today-heading{background:var(--app-highlight-bg);color:var(--app-highlight-text);padding:2px 4px;border-radius:4px;}
+.today-heading .btn{color:inherit;border-color:var(--app-highlight-border);}
+.today-heading .btn:hover,.today-heading .btn:focus{background-color:var(--app-highlight-button-hover);color:var(--app-text-color);}
+.todolist.today{border-left:4px solid var(--app-highlight-border);padding-left:4px;background:var(--app-highlight-surface);}
 @media print {
   @page { size: A4; margin: 10mm; }
   body { font-size: 12pt; }
