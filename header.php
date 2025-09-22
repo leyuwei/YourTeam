@@ -18,6 +18,9 @@
     --app-surface-border: rgba(0, 0, 0, 0.05);
     --app-text-color: #212529;
     --app-muted-text: rgba(33, 37, 41, 0.65);
+    --app-table-border: rgba(0, 0, 0, 0.08);
+    --app-table-striped-bg: rgba(0, 0, 0, 0.02);
+    --app-table-head-bg: rgba(0, 0, 0, 0.03);
     --app-navbar-gradient: linear-gradient(90deg, #1f1f1f, #343a40, #212529);
     --app-nav-link-color: #ffffff;
     --app-nav-link-hover: #ffdd57;
@@ -30,6 +33,11 @@
     --app-form-control-bg: #ffffff;
     --app-form-control-border: rgba(0, 0, 0, 0.15);
     --app-table-row-hover: rgba(0, 0, 0, 0.05);
+    --app-highlight-bg: #fff3cd;
+    --app-highlight-surface: #fffdf3;
+    --app-highlight-text: #856404;
+    --app-highlight-border: #ffc107;
+    --app-highlight-button-hover: rgba(255, 193, 7, 0.25);
   }
   :root[data-bs-theme='dark'] {
     color-scheme: dark;
@@ -38,6 +46,9 @@
     --app-surface-border: rgba(148, 163, 184, 0.2);
     --app-text-color: #e2e8f0;
     --app-muted-text: rgba(226, 232, 240, 0.65);
+    --app-table-border: rgba(148, 163, 184, 0.35);
+    --app-table-striped-bg: rgba(148, 163, 184, 0.12);
+    --app-table-head-bg: rgba(148, 163, 184, 0.18);
     --app-navbar-gradient: linear-gradient(90deg, #050608, #111827, #050608);
     --app-nav-link-color: #e2e8f0;
     --app-nav-link-hover: #ffdd57;
@@ -50,6 +61,11 @@
     --app-form-control-bg: #0f172a;
     --app-form-control-border: rgba(148, 163, 184, 0.25);
     --app-table-row-hover: rgba(148, 163, 184, 0.1);
+    --app-highlight-bg: rgba(250, 204, 21, 0.25);
+    --app-highlight-surface: rgba(250, 204, 21, 0.12);
+    --app-highlight-text: #facc15;
+    --app-highlight-border: #facc15;
+    --app-highlight-button-hover: rgba(250, 204, 21, 0.3);
   }
   body {
     min-height: 100vh;
@@ -200,6 +216,24 @@
   }
   .table tbody tr:hover {
     background-color: var(--app-table-row-hover);
+  }
+  .table {
+    --bs-table-bg: var(--app-surface-bg);
+    --bs-table-color: var(--app-text-color);
+    --bs-table-border-color: var(--app-table-border);
+    --bs-table-striped-bg: var(--app-table-striped-bg);
+    --bs-table-striped-color: var(--app-text-color);
+    --bs-table-hover-bg: var(--app-table-row-hover);
+    --bs-table-hover-color: var(--app-text-color);
+    color: var(--app-text-color);
+  }
+  .table thead th {
+    background-color: var(--app-table-head-bg);
+    color: var(--app-text-color);
+    border-color: var(--app-table-border);
+  }
+  .table.table-bordered {
+    border-color: var(--app-table-border);
   }
   body.theme-dark .btn-outline-secondary {
     color: #e2e8f0;
