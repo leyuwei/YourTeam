@@ -18,7 +18,8 @@ unset($r);
 <table class="table table-bordered">
   <tr><th data-i18n="notifications.table_content">Content</th><th data-i18n="notifications.table_begin">Begin</th><th data-i18n="notifications.table_end">End</th><th data-i18n="notifications.table_actions">Actions</th></tr>
   <?php foreach($notifications as $n): ?>
-  <tr>
+  <?php $isExpired = !empty($n['valid_end_date']) && strtotime($n['valid_end_date']) < strtotime('today'); ?>
+  <tr<?= $isExpired ? ' class="notification-expired"' : ''; ?>>
     <td>
       <?= nl2br(htmlspecialchars($n['content'])); ?>
       <?php

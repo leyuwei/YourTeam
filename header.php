@@ -40,6 +40,10 @@
     --app-highlight-button-hover: rgba(255, 193, 7, 0.25);
     --reimburse-batch-completed-bg: rgba(108, 117, 125, 0.12);
     --reimburse-batch-locked-bg: rgba(255, 214, 102, 0.2);
+    --notification-expired-bg: rgba(220, 53, 69, 0.08);
+    --notification-expired-border: rgba(220, 53, 69, 0.4);
+    --task-pending-bg: rgba(255, 193, 7, 0.22);
+    --task-pending-border: rgba(255, 193, 7, 0.5);
   }
   :root[data-bs-theme='dark'] {
     color-scheme: dark;
@@ -70,6 +74,10 @@
     --app-highlight-button-hover: rgba(250, 204, 21, 0.3);
     --reimburse-batch-completed-bg: rgba(148, 163, 184, 0.22);
     --reimburse-batch-locked-bg: rgba(250, 204, 21, 0.3);
+    --notification-expired-bg: rgba(248, 113, 113, 0.2);
+    --notification-expired-border: rgba(248, 113, 113, 0.45);
+    --task-pending-bg: rgba(250, 204, 21, 0.3);
+    --task-pending-border: rgba(250, 204, 21, 0.55);
   }
   body {
     min-height: 100vh;
@@ -206,6 +214,28 @@
   }
   tr[data-custom-bg] .member-detail {
     color: var(--custom-row-muted-color, inherit) !important;
+  }
+  .notification-expired,
+  .task-row-pending {
+    position: relative;
+  }
+  .notification-expired {
+    background-color: var(--notification-expired-bg) !important;
+    box-shadow: inset 0.35rem 0 0 var(--notification-expired-border);
+  }
+  .notification-expired > * {
+    background-color: inherit !important;
+  }
+  .task-row-pending {
+    background-color: var(--task-pending-bg) !important;
+    box-shadow: inset 0.35rem 0 0 var(--task-pending-border);
+  }
+  .task-row-pending > * {
+    background-color: inherit !important;
+  }
+  .list-group-item.notification-expired {
+    background-color: var(--notification-expired-bg) !important;
+    border-color: var(--notification-expired-border) !important;
   }
   .card,
   .modal-content,
