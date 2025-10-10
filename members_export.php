@@ -79,10 +79,10 @@ exit;
 function sortMembersForExport(array &$list): void
 {
     usort($list, function ($a, $b) {
-        $degreeA = normalizeSortValue($a['current_degree'] ?? '');
-        $degreeB = normalizeSortValue($b['current_degree'] ?? '');
-        if ($degreeA !== $degreeB) {
-            return strcmp($degreeA, $degreeB);
+        $pursuingA = normalizeSortValue($a['degree_pursuing'] ?? '');
+        $pursuingB = normalizeSortValue($b['degree_pursuing'] ?? '');
+        if ($pursuingA !== $pursuingB) {
+            return strcmp($pursuingA, $pursuingB);
         }
 
         $yearA = normalizeSortValue($a['year_of_join'] ?? '');
@@ -120,7 +120,7 @@ function buildSheetData(array $members, array $columns, array $statusDisplay): a
             $row[] = $value === null ? '' : (string)$value;
         }
         $rows[] = $row;
-        $groupKeys[] = ($member['current_degree'] ?? '') . '|' . ($member['year_of_join'] ?? '');
+        $groupKeys[] = ($member['degree_pursuing'] ?? '') . '|' . ($member['year_of_join'] ?? '');
     }
 
     return ['rows' => $rows, 'groupKeys' => $groupKeys];

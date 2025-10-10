@@ -10,10 +10,11 @@ if($status){
 } else {
     $tasks = $pdo->query('SELECT * FROM tasks ORDER BY id DESC')->fetchAll();
 }
-$pending_affairs = [];
-if($is_manager){
-    $pendStmt = $pdo->query("SELECT t.id,t.title,COUNT(a.id) cnt FROM tasks t JOIN task_affairs a ON t.id=a.task_id WHERE a.status='pending' GROUP BY t.id");
-    $pending_affairs = $pendStmt->fetchAll();
+$pendStmt = $pdo->query("SELECT t.id,t.title,COUNT(a.id) cnt FROM tasks t JOIN task_affairs a ON t.id=a.task_id WHERE a.status='pending' GROUP BY t.id");
+$pending_affairs = $pendStmt->fetchAll();
+$pendingTaskMap = [];
+foreach($pending_affairs as $pending){
+    $pendingTaskMap[$pending['id']] = (int)$pending['cnt'];
 }
 ?>
 <div class="d-flex justify-content-between mb-3">
@@ -52,7 +53,8 @@ if($is_manager){
 <table class="table table-bordered">
 <tr><th data-i18n="tasks.table_title">Title</th><th data-i18n="tasks.table_start">Start</th><th data-i18n="tasks.table_status">Status</th><th data-i18n="tasks.table_actions">Actions</th></tr>
 <?php foreach($tasks as $t): ?>
-<tr>
+<?php $hasPendingWorkload = !empty($pendingTaskMap[$t['id']]); ?>
+<tr<?= $hasPendingWorkload ? ' class="task-row-pending"' : ''; ?>>
   <td class="bold-target"><?= htmlspecialchars($t['title']); ?></td>
   <td><?= htmlspecialchars($t['start_date']); ?></td>
   <td data-i18n="tasks.status.<?= htmlspecialchars($t['status']); ?>"><?= htmlspecialchars($t['status']); ?></td>
