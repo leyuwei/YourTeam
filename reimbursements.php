@@ -69,10 +69,32 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
     <?php endif; ?>
   </div>
 </div>
+<style>
+  .table tr.reimbursement-row.batch-completed > * {
+    background-color: var(--reimburse-batch-completed-bg) !important;
+  }
+  .table tr.reimbursement-row.batch-locked > * {
+    background-color: var(--reimburse-batch-locked-bg) !important;
+  }
+  .table tr.reimbursement-row.batch-completed:hover > * {
+    background-color: color-mix(in srgb, var(--reimburse-batch-completed-bg) 60%, transparent) !important;
+  }
+  .table tr.reimbursement-row.batch-locked:hover > * {
+    background-color: color-mix(in srgb, var(--reimburse-batch-locked-bg) 65%, transparent) !important;
+  }
+</style>
 <table class="table table-bordered">
 <tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.limit">Limit</th><th data-i18n="reimburse.batch.allowed_types">Allowed Types</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
 <?php foreach($batches as $b): ?>
-<tr>
+<?php
+  $statusClass = '';
+  if ($b['status'] === 'completed') {
+      $statusClass = 'batch-completed';
+  } elseif ($b['status'] === 'locked') {
+      $statusClass = 'batch-locked';
+  }
+?>
+<tr class="reimbursement-row <?= $statusClass; ?>">
   <td><?= htmlspecialchars($b['title']); ?></td>
   <td><?= htmlspecialchars($b['deadline']); ?></td>
   <td><?= htmlspecialchars($b['in_charge_name']); ?></td>
