@@ -38,6 +38,8 @@
     --app-highlight-text: #856404;
     --app-highlight-border: #ffc107;
     --app-highlight-button-hover: rgba(255, 193, 7, 0.25);
+    --reimburse-batch-completed-bg: rgba(108, 117, 125, 0.12);
+    --reimburse-batch-locked-bg: rgba(255, 214, 102, 0.2);
   }
   :root[data-bs-theme='dark'] {
     color-scheme: dark;
@@ -66,6 +68,8 @@
     --app-highlight-text: #facc15;
     --app-highlight-border: #facc15;
     --app-highlight-button-hover: rgba(250, 204, 21, 0.3);
+    --reimburse-batch-completed-bg: rgba(148, 163, 184, 0.22);
+    --reimburse-batch-locked-bg: rgba(250, 204, 21, 0.3);
   }
   body {
     min-height: 100vh;
