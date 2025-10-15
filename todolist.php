@@ -183,7 +183,32 @@ window.addEventListener('DOMContentLoaded',()=>{
     const done=li.querySelector('.item-done').checked;
     const list=li.parentElement;
     const data={action:'update',id:id,content:content,is_done:done,category:list.dataset.category,day:list.dataset.day,week_start:'<?= $week_start; ?>'};
-    postData(data).then(r=>r.json()).then(j=>{if(!id)li.dataset.id=j.id;}).then(()=>updateStats());
+    if(id){
+      postData(data).then(()=>updateStats());
+      return;
+    }
+    if(li.dataset.creating==='1'){
+      li.dataset.needsResave='1';
+      return;
+    }
+    li.dataset.creating='1';
+    postData(data)
+      .then(r=>r.json())
+      .then(j=>{
+        li.dataset.id=j.id;
+        const needsResave=li.dataset.needsResave==='1';
+        delete li.dataset.creating;
+        delete li.dataset.needsResave;
+        if(needsResave){
+          saveItem(li);
+        } else {
+          updateStats();
+        }
+      })
+      .catch(()=>{
+        delete li.dataset.creating;
+        delete li.dataset.needsResave;
+      });
   }
   function attach(li){
     const content=li.querySelector('.item-content');
