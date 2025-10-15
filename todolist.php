@@ -54,6 +54,8 @@ $today_key = strtolower(date('D'));
 .todolist li .copy-item{margin-left:auto;}
 .todolist li .copy-item,
 .todolist li .next-week-item{white-space:nowrap;}
+.todolist li .icon-btn{width:2rem;height:2rem;padding:0;display:inline-flex;align-items:center;justify-content:center;}
+.todolist li .icon-btn svg{width:1.1rem;height:1.1rem;}
 .today-heading{background:var(--app-highlight-bg);color:var(--app-highlight-text);padding:2px 4px;border-radius:4px;}
 .today-heading .btn{color:inherit;border-color:var(--app-highlight-border);}
 .today-heading .btn:hover,.today-heading .btn:focus{background-color:var(--app-highlight-button-hover);color:var(--app-text-color);}
@@ -99,9 +101,33 @@ $today_key = strtolower(date('D'));
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
-        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
-        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">鸽下周</button>
-        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap" data-i18n="todolist.cut_tomorrow">鸽明天</button>
+        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
+          <span class="visually-hidden" data-i18n="todolist.copy_item">复制</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="5.2" y="4.2" width="7.6" height="9.6" rx="1.3" ry="1.3" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <rect x="3.2" y="2.2" width="7.6" height="9.6" rx="1.3" ry="1.3" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <path d="M6.8 2.9h2.4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+          </svg>
+        </button>
+        <button class="btn btn-sm btn-secondary ms-2 next-week-item icon-btn" title="鸽下周" data-i18n-title="todolist.copy_next" aria-label="鸽下周">
+          <span class="visually-hidden" data-i18n="todolist.copy_next">鸽下周</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="2.6" y="3.6" width="10.8" height="8.8" rx="1.2" ry="1.2" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <path d="M5.3 2.5v2.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M10.7 2.5v2.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M4 6.8h8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M6.2 9.7h3.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M8.6 8.3l1.9 1.4-1.9 1.4" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap icon-btn" title="鸽明天" data-i18n-title="todolist.cut_tomorrow" aria-label="鸽明天">
+          <span class="visually-hidden" data-i18n="todolist.cut_tomorrow">鸽明天</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.1"></circle>
+            <path d="M6.5 8h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M8.5 6.4 10.2 8 8.5 9.6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
@@ -118,9 +144,33 @@ $today_key = strtolower(date('D'));
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
-        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
-        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">鸽下周</button>
-        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap" data-i18n="todolist.cut_tomorrow">鸽明天</button>
+        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
+          <span class="visually-hidden" data-i18n="todolist.copy_item">复制</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="5.2" y="4.2" width="7.6" height="9.6" rx="1.3" ry="1.3" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <rect x="3.2" y="2.2" width="7.6" height="9.6" rx="1.3" ry="1.3" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <path d="M6.8 2.9h2.4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+          </svg>
+        </button>
+        <button class="btn btn-sm btn-secondary ms-2 next-week-item icon-btn" title="鸽下周" data-i18n-title="todolist.copy_next" aria-label="鸽下周">
+          <span class="visually-hidden" data-i18n="todolist.copy_next">鸽下周</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="2.6" y="3.6" width="10.8" height="8.8" rx="1.2" ry="1.2" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <path d="M5.3 2.5v2.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M10.7 2.5v2.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M4 6.8h8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M6.2 9.7h3.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M8.6 8.3l1.9 1.4-1.9 1.4" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
+        <button class="btn btn-sm btn-outline-primary ms-2 tomorrow-item text-nowrap icon-btn" title="鸽明天" data-i18n-title="todolist.cut_tomorrow" aria-label="鸽明天">
+          <span class="visually-hidden" data-i18n="todolist.cut_tomorrow">鸽明天</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.1"></circle>
+            <path d="M6.5 8h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M8.5 6.4 10.2 8 8.5 9.6" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
@@ -132,8 +182,25 @@ $today_key = strtolower(date('D'));
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
-        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item" data-i18n="todolist.copy_item">复制</button>
-        <button class="btn btn-sm btn-secondary ms-2 next-week-item" data-i18n="todolist.copy_next">鸽下周</button>
+        <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
+          <span class="visually-hidden" data-i18n="todolist.copy_item">复制</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="5.2" y="4.2" width="7.6" height="9.6" rx="1.3" ry="1.3" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <rect x="3.2" y="2.2" width="7.6" height="9.6" rx="1.3" ry="1.3" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <path d="M6.8 2.9h2.4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+          </svg>
+        </button>
+        <button class="btn btn-sm btn-secondary ms-2 next-week-item icon-btn" title="鸽下周" data-i18n-title="todolist.copy_next" aria-label="鸽下周">
+          <span class="visually-hidden" data-i18n="todolist.copy_next">鸽下周</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="2.6" y="3.6" width="10.8" height="8.8" rx="1.2" ry="1.2" fill="none" stroke="currentColor" stroke-width="1.1"></rect>
+            <path d="M5.3 2.5v2.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M10.7 2.5v2.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M4 6.8h8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M6.2 9.7h3.2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path>
+            <path d="M8.6 8.3l1.9 1.4-1.9 1.4" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </button>
         <button class="btn btn-sm btn-danger ms-2 delete-item">&times;</button>
       </li>
       <?php endforeach; endif; ?>
