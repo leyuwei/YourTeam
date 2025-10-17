@@ -10,7 +10,7 @@ if (!function_exists('xlsx_write_workbook')) {
             throw new RuntimeException('Unable to create temporary file for XLSX export');
         }
         $zip = new ZipArchive();
-        if ($zip->open($tmpFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        if ($zip->open($tmpFile, ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Unable to open temporary XLSX file');
         }
         $normalizedSheets = [];
