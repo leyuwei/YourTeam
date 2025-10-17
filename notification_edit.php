@@ -1,84 +1,116 @@
 <?php
 include 'auth_manager.php';
 
-$id = $_GET['id'] ?? null;
-$notification = ['content'=>'','valid_begin_date'=>'','valid_end_date'=>''];
-$selected = [];
-if($id){
-    $stmt = $pdo->prepare('SELECT * FROM notifications WHERE id=?');
-    $stmt->execute([$id]);
-    $notification = $stmt->fetch();
-    $stmt = $pdo->prepare('SELECT member_id FROM notification_targets WHERE notification_id=?');
-    $stmt->execute([$id]);
-    $selected = $stmt->fetchAll(PDO::FETCH_COLUMN);
+$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+    || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json');
+
+function getNotificationMembers(PDO $pdo): array
+{
+    $stmt = $pdo->query("SELECT id, name FROM members WHERE status='in_work' ORDER BY name");
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 }
 
-if($_SERVER['REQUEST_METHOD']==='POST'){
-    $content = $_POST['content'];
-    $begin = $_POST['valid_begin_date'];
-    $end = $_POST['valid_end_date'];
-    $members_selected = $_POST['members'] ?? [];
-    if($id){
-        $stmt = $pdo->prepare('UPDATE notifications SET content=?, valid_begin_date=?, valid_end_date=? WHERE id=?');
-        $stmt->execute([$content,$begin,$end,$id]);
-        $pdo->prepare('DELETE FROM notification_targets WHERE notification_id=?')->execute([$id]);
-        foreach($members_selected as $m){
-            $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$id,$m]);
-        }
-    } else {
-        $stmt = $pdo->prepare('INSERT INTO notifications(content,valid_begin_date,valid_end_date) VALUES(?,?,?)');
-        $stmt->execute([$content,$begin,$end]);
-        $nid = $pdo->lastInsertId();
-        foreach($members_selected as $m){
-            $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$nid,$m]);
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $notification = [
+        'id' => null,
+        'content' => '',
+        'valid_begin_date' => date('Y-m-d'),
+        'valid_end_date' => date('Y-m-d', strtotime('+7 days')),
+        'members' => [],
+    ];
+    if ($id) {
+        $stmt = $pdo->prepare('SELECT * FROM notifications WHERE id=?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $notification = array_merge($notification, $row);
+            $targetsStmt = $pdo->prepare('SELECT member_id FROM notification_targets WHERE notification_id=?');
+            $targetsStmt->execute([$id]);
+            $notification['members'] = array_map('intval', $targetsStmt->fetchAll(PDO::FETCH_COLUMN));
         }
     }
-    header('Location: notifications.php');
-    exit();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => true,
+        'notification' => $notification,
+        'members' => getNotificationMembers($pdo),
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
-$members = $pdo->query("SELECT id,name FROM members WHERE status='in_work' ORDER BY name")->fetchAll();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    if ($isAjax) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Invalid request method.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Location: notifications.php');
+    exit;
+}
 
-include 'header.php';
-?>
-<h2 data-i18n="<?= $id? 'notification_edit.title_edit':'notification_edit.title_add'; ?>"><?= $id? 'Edit Notification':'Add Notification'; ?></h2>
-<form method="post">
-  <div class="mb-3">
-    <label class="form-label" data-i18n="notification_edit.label_content">Content</label>
-    <textarea name="content" class="form-control" rows="4" required><?= htmlspecialchars($notification['content']); ?></textarea>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="notification_edit.label_begin">Begin Date</label>
-    <input type="date" name="valid_begin_date" class="form-control" value="<?= htmlspecialchars($notification['valid_begin_date']); ?>" required>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="notification_edit.label_end">End Date</label>
-    <input type="date" name="valid_end_date" class="form-control" value="<?= htmlspecialchars($notification['valid_end_date']); ?>" required>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="notification_edit.label_members">Target Members</label>
-    <div class="mb-2">
-      <button type="button" id="select-all" class="btn btn-sm btn-secondary" data-i18n="notification_edit.select_all">Select All</button>
-    </div>
-    <div id="member-list" class="row row-cols-1 row-cols-sm-2 row-cols-md-3">
-    <?php foreach($members as $m): ?>
-      <div class="col">
-        <div class="form-check">
-          <input class="form-check-input member-checkbox" type="checkbox" name="members[]" value="<?= $m['id']; ?>" <?= in_array($m['id'],$selected)?'checked':''; ?>>
-          <label class="form-check-label"><?= htmlspecialchars($m['name']); ?></label>
-        </div>
-      </div>
-    <?php endforeach; ?>
-    </div>
-  </div>
-  <button type="submit" class="btn btn-primary" data-i18n="notification_edit.save">Save</button>
-  <a href="notifications.php" class="btn btn-secondary" data-i18n="notification_edit.cancel">Cancel</a>
-</form>
-<script>
-document.getElementById('select-all').addEventListener('click', () => {
-  const checkboxes = document.querySelectorAll('.member-checkbox');
-  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-  checkboxes.forEach(cb => { cb.checked = !allChecked; });
-});
-</script>
-<?php include 'footer.php'; ?>
+$payload = file_get_contents('php://input');
+$data = [];
+if ($payload !== false && trim($payload) !== '') {
+    $data = json_decode($payload, true) ?? [];
+}
+if (empty($data)) {
+    $data = $_POST;
+}
+
+$content = trim($data['content'] ?? '');
+$begin = trim($data['valid_begin_date'] ?? '');
+$end = trim($data['valid_end_date'] ?? '');
+$membersSelected = $data['members'] ?? [];
+if (!is_array($membersSelected)) {
+    $membersSelected = [];
+}
+$membersSelected = array_values(array_unique(array_map('intval', $membersSelected)));
+
+if ($content === '') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Content is required.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$beginDate = DateTime::createFromFormat('Y-m-d', $begin) ?: null;
+$endDate = DateTime::createFromFormat('Y-m-d', $end) ?: null;
+if (!$beginDate || !$endDate) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Invalid date format.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if ($beginDate > $endDate) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Begin date must not be after end date.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+try {
+    $pdo->beginTransaction();
+    if ($id) {
+        $stmt = $pdo->prepare('UPDATE notifications SET content=?, valid_begin_date=?, valid_end_date=? WHERE id=?');
+        $stmt->execute([$content, $beginDate->format('Y-m-d'), $endDate->format('Y-m-d'), $id]);
+        $pdo->prepare('DELETE FROM notification_targets WHERE notification_id=?')->execute([$id]);
+        $notificationId = $id;
+    } else {
+        $stmt = $pdo->prepare('INSERT INTO notifications(content, valid_begin_date, valid_end_date) VALUES (?,?,?)');
+        $stmt->execute([$content, $beginDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
+        $notificationId = (int)$pdo->lastInsertId();
+    }
+    if (!empty($membersSelected)) {
+        $insertStmt = $pdo->prepare('INSERT INTO notification_targets(notification_id, member_id) VALUES (?,?)');
+        foreach ($membersSelected as $memberId) {
+            $insertStmt->execute([$notificationId, $memberId]);
+        }
+    }
+    $pdo->commit();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => true, 'id' => $notificationId], JSON_UNESCAPED_UNICODE);
+    exit;
+} catch (Throwable $e) {
+    $pdo->rollBack();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Failed to save notification.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}

@@ -1,103 +1,117 @@
 <?php
-require_once 'config.php';
-include_once 'auth.php';
+require 'auth_manager.php';
+require_once 'member_attribute_helpers.php';
 
-$id = $_GET['id'] ?? null;
-$member = ['campus_id'=>'','name'=>'','email'=>'','identity_number'=>'','year_of_join'=>'','current_degree'=>'','degree_pursuing'=>'','phone'=>'','wechat'=>'','department'=>'','workplace'=>'','homeplace'=>'','status'=>'in_work'];
-if($id){
-    $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
-    $stmt->execute([$id]);
-    $member = $stmt->fetch();
-}
-if($_SERVER['REQUEST_METHOD']==='POST'){
-    $campus_id = $_POST['campus_id'];
-    $name = $_POST['name'];
-    $email = $_POST['email'];
-    $identity_number = $_POST['identity_number'];
-    $year_of_join = $_POST['year_of_join'];
-    $current_degree = $_POST['current_degree'];
-    $degree_pursuing = $_POST['degree_pursuing'];
-    $phone = $_POST['phone'];
-    $wechat = $_POST['wechat'];
-    $department = $_POST['department'];
-    $workplace = $_POST['workplace'];
-    $homeplace = $_POST['homeplace'];
-    $status = $_POST['status'] ?? 'in_work';
-    if($id){
-        $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=?, status=? WHERE id=?');
-        $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$status,$id]);
+$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+    || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json');
+
+function build_member_payload(PDO $pdo, ?int $id): array
+{
+    $member = [
+        'id' => null,
+        'campus_id' => '',
+        'name' => '',
+        'email' => '',
+        'identity_number' => '',
+        'year_of_join' => '',
+        'current_degree' => '',
+        'degree_pursuing' => '',
+        'phone' => '',
+        'wechat' => '',
+        'department' => '',
+        'workplace' => '',
+        'homeplace' => '',
+        'status' => 'in_work'
+    ];
+    if ($id) {
+        $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
+        $stmt->execute([$id]);
+        $found = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($found) {
+            $member = array_merge($member, $found);
+        }
+    }
+    $attributes = fetch_member_attributes($pdo);
+    $values = [];
+    if ($id) {
+        $map = fetch_member_attribute_map($pdo, [$id]);
+        $values = $map[$id] ?? [];
     } else {
-        $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM members');
-        $nextOrder = $orderStmt->fetchColumn();
-        $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-        $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$status,$nextOrder]);
+        foreach ($attributes as $attr) {
+            $values[$attr['id']] = $attr['default_value'];
+        }
+    }
+    return ['member' => $member, 'attributes' => $attributes, 'attribute_values' => $values];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => true] + build_member_payload($pdo, $id), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    if ($isAjax) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Invalid method'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
     header('Location: members.php');
-    exit();
+    exit;
 }
 
-include 'header.php';
-?>
-<h2 data-i18n="<?php echo $id? 'member_edit.title_edit':'member_edit.title_add'; ?>">
-  <?php echo $id? 'Edit Member':'Add Member'; ?>
-</h2>
-<form method="post">
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.campus_id">Campus ID</label>
-    <input type="text" name="campus_id" class="form-control" value="<?php echo htmlspecialchars($member['campus_id']); ?>" required>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.name">Name</label>
-    <input type="text" name="name" class="form-control" value="<?php echo htmlspecialchars($member['name']); ?>" required>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.email">Email</label>
-    <input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($member['email']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.identity_number">Identity Number</label>
-    <input type="text" name="identity_number" class="form-control" value="<?php echo htmlspecialchars($member['identity_number']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.year_of_join">Year of Join</label>
-    <input type="number" name="year_of_join" class="form-control" value="<?php echo htmlspecialchars($member['year_of_join']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.current_degree">Current Degree</label>
-    <input type="text" name="current_degree" class="form-control" value="<?php echo htmlspecialchars($member['current_degree']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.degree_pursuing">Degree Pursuing</label>
-    <input type="text" name="degree_pursuing" class="form-control" value="<?php echo htmlspecialchars($member['degree_pursuing']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.phone">Phone</label>
-    <input type="text" name="phone" class="form-control" value="<?php echo htmlspecialchars($member['phone']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.wechat">WeChat</label>
-    <input type="text" name="wechat" class="form-control" value="<?php echo htmlspecialchars($member['wechat']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.department">Department</label>
-    <input type="text" name="department" class="form-control" value="<?php echo htmlspecialchars($member['department']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.workplace">Workplace</label>
-    <input type="text" name="workplace" class="form-control" value="<?php echo htmlspecialchars($member['workplace']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.homeplace">Homeplace</label>
-    <input type="text" name="homeplace" class="form-control" value="<?php echo htmlspecialchars($member['homeplace']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="members.table.status">Status</label>
-    <select name="status" class="form-select">
-      <option value="in_work" <?php echo $member['status']==='in_work'?'selected':''; ?> data-i18n="members.status.in_work">In Work</option>
-      <option value="exited" <?php echo $member['status']==='exited'?'selected':''; ?> data-i18n="members.status.exited">Exited</option>
-    </select>
-  </div>
-  <button type="submit" class="btn btn-primary" data-i18n="member_edit.save">Save</button>
-  <a href="members.php" class="btn btn-secondary" data-i18n="member_edit.cancel">Cancel</a>
-</form>
-<?php include 'footer.php'; ?>
+$raw = file_get_contents('php://input');
+$data = [];
+if ($raw !== false && trim($raw) !== '') {
+    $data = json_decode($raw, true) ?? [];
+}
+if (empty($data)) {
+    $data = $_POST;
+}
+
+$campus_id = trim($data['campus_id'] ?? '');
+$name = trim($data['name'] ?? '');
+$email = trim($data['email'] ?? '');
+$identity_number = trim($data['identity_number'] ?? '');
+$year_of_join = trim($data['year_of_join'] ?? '');
+$current_degree = trim($data['current_degree'] ?? '');
+$degree_pursuing = trim($data['degree_pursuing'] ?? '');
+$phone = trim($data['phone'] ?? '');
+$wechat = trim($data['wechat'] ?? '');
+$department = trim($data['department'] ?? '');
+$workplace = trim($data['workplace'] ?? '');
+$homeplace = trim($data['homeplace'] ?? '');
+$status = $data['status'] ?? 'in_work';
+$attributesPayload = $data['attributes'] ?? [];
+
+if ($name === '' || $campus_id === '') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Name and campus id are required.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($id) {
+    $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=?, status=? WHERE id=?');
+    $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$status,$id]);
+    $memberId = $id;
+} else {
+    $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM members');
+    $nextOrder = $orderStmt->fetchColumn();
+    $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$status,$nextOrder]);
+    $memberId = (int)$pdo->lastInsertId();
+    assign_defaults_to_member($pdo, $memberId);
+}
+
+$attributes = fetch_member_attributes($pdo);
+$values = [];
+foreach ($attributes as $attr) {
+    $attrId = (int)$attr['id'];
+    $values[$attrId] = $attributesPayload[$attrId] ?? $attr['default_value'];
+}
+upsert_member_attribute_values($pdo, $memberId, $values);
+
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode(['success' => true, 'id' => $memberId], JSON_UNESCAPED_UNICODE);
+exit;

@@ -162,7 +162,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
   <td><?= htmlspecialchars($r['price']); ?></td>
   <td><?= htmlspecialchars($r['uploaded_at']); ?></td>
   <td><?= htmlspecialchars($r['batch_title']); ?></td>
-  <td><a class="btn btn-sm btn-secondary" href="reimbursement_receipt_edit.php?id=<?= $r['id']; ?>" data-i18n="reimburse.batch.edit">Edit</a></td>
+  <td><button type="button" class="btn btn-sm btn-secondary btn-edit-receipt" data-id="<?= $r['id']; ?>" data-i18n="reimburse.batch.edit">Edit</button></td>
 </tr>
 <?php endforeach; ?>
 </table>
@@ -246,4 +246,184 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
   });
 </script>
 <?php endif; ?>
+<div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" data-i18n="reimburse.batch.edit">Edit Receipt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-danger d-none" id="receiptError"></div>
+        <form id="receiptForm" enctype="multipart/form-data">
+          <input type="hidden" id="receiptId">
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.batch">Batch</label>
+            <select class="form-select" id="receiptBatch"></select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.category">Category</label>
+            <select class="form-select" id="receiptCategory"></select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.description">Description</label>
+            <input type="text" class="form-control" id="receiptDescription" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.price">Price</label>
+            <input type="number" step="0.01" class="form-control" id="receiptPrice" required>
+          </div>
+          <div class="mb-3 d-none" id="receiptFileGroup">
+            <label class="form-label" data-i18n="reimburse.batch.file">Receipt File</label>
+            <input type="file" class="form-control" id="receiptFile">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" form="receiptForm" data-i18n="reimburse.batch.save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const langKey = () => document.documentElement.lang || 'zh';
+  const t = (key, fallback = '') => {
+    try {
+      return translations?.[langKey()]?.[key] ?? fallback;
+    } catch (e) {
+      return fallback;
+    }
+  };
+  const receiptModalEl = document.getElementById('receiptModal');
+  const receiptModal = receiptModalEl ? new bootstrap.Modal(receiptModalEl) : null;
+  const receiptForm = document.getElementById('receiptForm');
+  const receiptError = document.getElementById('receiptError');
+  const receiptIdField = document.getElementById('receiptId');
+  const receiptBatch = document.getElementById('receiptBatch');
+  const receiptCategory = document.getElementById('receiptCategory');
+  const receiptDescription = document.getElementById('receiptDescription');
+  const receiptPrice = document.getElementById('receiptPrice');
+  const receiptFile = document.getElementById('receiptFile');
+  const receiptFileGroup = document.getElementById('receiptFileGroup');
+  const categoriesMap = new Map();
+  const defaultCategories = ['office','electronic','membership','book','trip'];
+
+  function resetReceiptForm(){
+    receiptForm.reset();
+    receiptIdField.value='';
+    categoriesMap.clear();
+    if(receiptError){
+      receiptError.classList.add('d-none');
+      receiptError.textContent='';
+    }
+    receiptCategory.innerHTML='';
+    receiptBatch.innerHTML='';
+    receiptFileGroup.classList.add('d-none');
+  }
+
+  function populateBatches(batches, selectedId){
+    receiptBatch.innerHTML='';
+    batches.forEach(batch=>{
+      categoriesMap.set(String(batch.id), batch.allowed_types || defaultCategories);
+      const option=document.createElement('option');
+      option.value=batch.id;
+      option.textContent=batch.title;
+      if(Number(selectedId)===Number(batch.id)) option.selected=true;
+      receiptBatch.appendChild(option);
+    });
+    if(!receiptBatch.value && batches.length){
+      receiptBatch.value=batches[0].id;
+    }
+  }
+
+  function updateCategories(selectedId, currentValue){
+    const allowed = categoriesMap.get(String(selectedId)) || defaultCategories;
+    receiptCategory.innerHTML='';
+    allowed.forEach(cat=>{
+      const option=document.createElement('option');
+      option.value=cat;
+      option.setAttribute('data-i18n','reimburse.category.'+cat);
+      option.textContent=t('reimburse.category.'+cat, cat);
+      if(cat===currentValue){ option.selected=true; }
+      receiptCategory.appendChild(option);
+    });
+    window.applyTranslations?.();
+  }
+
+  function openReceiptModal(id){
+    if(!receiptModal) return;
+    resetReceiptForm();
+    fetch(`reimbursement_receipt_edit.php?id=${id}`, {headers:{'Accept':'application/json'}})
+      .then(resp=>resp.json())
+      .then(data=>{
+        if(!data.success){throw new Error(data.message||'load');}
+        const info=data.receipt||{};
+        receiptIdField.value=info.id||'';
+        receiptDescription.value=info.description||'';
+        receiptPrice.value=info.price||'';
+        populateBatches(data.open_batches||[], info.batch_id);
+        updateCategories(receiptBatch.value, info.category);
+        if(info.status==='refused' && data.receipt.requires_file){
+          receiptFileGroup.classList.remove('d-none');
+          receiptFile.required=true;
+        } else {
+          receiptFileGroup.classList.add('d-none');
+          receiptFile.required=false;
+        }
+        receiptModal.show();
+      })
+      .catch(err=>{
+        if(receiptError){
+          receiptError.textContent = err.message==='load'?t('reimburse.batch.load_failed','Failed to load receipt.'):err.message;
+          receiptError.classList.remove('d-none');
+        }
+        receiptModal.show();
+      });
+  }
+
+  document.querySelectorAll('.btn-edit-receipt').forEach(btn=>{
+    btn.addEventListener('click',()=>openReceiptModal(btn.dataset.id));
+  });
+
+  receiptBatch?.addEventListener('change',()=>{
+    updateCategories(receiptBatch.value, receiptCategory.value);
+  });
+
+  receiptForm?.addEventListener('submit',ev=>{
+    ev.preventDefault();
+    if(receiptError){
+      receiptError.classList.add('d-none');
+      receiptError.textContent='';
+    }
+    const formData=new FormData();
+    formData.append('batch_id', receiptBatch.value);
+    formData.append('category', receiptCategory.value);
+    formData.append('description', receiptDescription.value);
+    formData.append('price', receiptPrice.value);
+    if(!receiptFileGroup.classList.contains('d-none') && receiptFile.files[0]){
+      formData.append('receipt', receiptFile.files[0]);
+    }
+    const receiptId=receiptIdField.value;
+    fetch(`reimbursement_receipt_edit.php?id=${receiptId}`,{
+      method:'POST',
+      body:formData
+    }).then(resp=>resp.json()).then(data=>{
+      if(!data.success){throw new Error(data.message||'save');}
+      receiptModal.hide();
+      if(data.redirect){
+        window.location.href=data.redirect;
+      } else {
+        window.location.reload();
+      }
+    }).catch(err=>{
+      if(!receiptError) return;
+      const message = err.message==='save'?t('reimburse.batch.save_error','Failed to save receipt.'):err.message;
+      receiptError.textContent=message;
+      receiptError.classList.remove('d-none');
+    });
+  });
+});
+</script>
 <?php include 'footer.php'; ?>

@@ -1,54 +1,67 @@
 <?php
-include 'header.php';
-$id = $_GET['id'] ?? null;
-$direction = ['title'=>'','description'=>'','bg_color'=>'#ffffff'];
-if($id){
-    $stmt = $pdo->prepare('SELECT * FROM research_directions WHERE id=?');
-    $stmt->execute([$id]);
-    $direction = $stmt->fetch();
+require 'auth.php';
+
+$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+    || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json');
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $default = ['id' => null, 'title' => '', 'description' => '', 'bg_color' => '#ffffff'];
+    if ($id) {
+        $stmt = $pdo->prepare('SELECT * FROM research_directions WHERE id=?');
+        $stmt->execute([$id]);
+        $direction = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($direction) {
+            $default = array_merge($default, $direction);
+        }
+    }
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'direction' => $default], JSON_UNESCAPED_UNICODE);
+    exit;
 }
-if($_SERVER['REQUEST_METHOD']==='POST'){
-    $title = $_POST['title'];
-    $description = $_POST['description'];
-    $bg_color = $_POST['bg_color'];
-    if($id){
-        $stmt = $pdo->prepare('UPDATE research_directions SET title=?, description=?, bg_color=? WHERE id=?');
-        $stmt->execute([$title,$description,$bg_color,$id]);
-    } else {
-        $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM research_directions');
-        $nextOrder = $orderStmt->fetchColumn();
-        $stmt = $pdo->prepare('INSERT INTO research_directions(title,description,bg_color,sort_order) VALUES (?,?,?,?)');
-        $stmt->execute([$title,$description,$bg_color,$nextOrder]);
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    if ($isAjax) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Invalid request method.'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
     header('Location: directions.php');
-    exit();
+    exit;
 }
-?>
-<h2 data-i18n="<?= $id ? 'direction_edit.title_edit' : 'direction_edit.title_add'; ?>">
-  <?= $id ? 'Edit Research Direction' : 'Add Research Direction'; ?>
-</h2>
-<form method="post">
-  <div class="mb-3">
-    <label class="form-label" data-i18n="direction_edit.label_title">Direction Title</label>
-    <input type="text" name="title" class="form-control" value="<?= htmlspecialchars($direction['title']); ?>" required>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="direction_edit.label_description">Description</label>
-    <textarea name="description" class="form-control" rows="3"><?= htmlspecialchars($direction['description']); ?></textarea>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="direction_edit.label_bg">Background Color</label>
-    <input type="color" name="bg_color" class="form-control form-control-color" value="<?= htmlspecialchars($direction['bg_color'] ?? '#ffffff'); ?>">
-    <div class="mt-2">
-      <?php
-      $suggestedColors = ['#f1f9f7','#fffffa','#ffffff','#f1f5f9','#fbf4f6'];
-      foreach ($suggestedColors as $color) {
-          echo "<button type=\"button\" class=\"btn btn-sm border me-1\" style=\"background-color:$color;\" title=\"$color\" onclick=\"document.querySelector('input[name=bg_color]').value='$color'\"></button>";
-      }
-      ?>
-    </div>
-  </div>
-  <button type="submit" class="btn btn-primary" data-i18n="direction_edit.save">Save</button>
-  <a href="directions.php" class="btn btn-secondary" data-i18n="direction_edit.cancel">Cancel</a>
-</form>
-<?php include 'footer.php'; ?>
+
+$data = $_POST;
+if (empty($data) && str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
+    $data = json_decode(file_get_contents('php://input'), true) ?? [];
+}
+
+$title = trim($data['title'] ?? '');
+$description = trim($data['description'] ?? '');
+$bg_color = trim($data['bg_color'] ?? '#ffffff');
+
+if ($title === '') {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'code' => 'title_required', 'message' => 'Title is required.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($bg_color && !preg_match('/^#[0-9a-fA-F]{6}$/', $bg_color)) {
+    $bg_color = '#ffffff';
+}
+
+if (!empty($data['id'])) {
+    $recordId = (int)$data['id'];
+    $stmt = $pdo->prepare('UPDATE research_directions SET title=?, description=?, bg_color=? WHERE id=?');
+    $stmt->execute([$title,$description,$bg_color,$recordId]);
+    $savedId = $recordId;
+} else {
+    $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM research_directions');
+    $nextOrder = (int)$orderStmt->fetchColumn();
+    $stmt = $pdo->prepare('INSERT INTO research_directions(title,description,bg_color,sort_order) VALUES (?,?,?,?)');
+    $stmt->execute([$title,$description,$bg_color,$nextOrder]);
+    $savedId = (int)$pdo->lastInsertId();
+}
+
+header('Content-Type: application/json');
+echo json_encode(['success' => true, 'id' => $savedId], JSON_UNESCAPED_UNICODE);
+exit;

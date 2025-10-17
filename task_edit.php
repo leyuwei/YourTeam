@@ -1,70 +1,89 @@
 <?php
 include 'auth_manager.php';
 
-$id = $_GET['id'] ?? null;
-$task = ['title'=>'','description'=>'','start_date'=>'','status'=>'active'];
-if($id){
-    $stmt = $pdo->prepare('SELECT * FROM tasks WHERE id=?');
-    $stmt->execute([$id]);
-    $task = $stmt->fetch();
-    if(!$task){
-        header('Location: tasks.php');
-        exit();
-    }
-}
+$id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest'
+    || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json');
 
-if($_SERVER['REQUEST_METHOD']==='POST'){
-    $title = $_POST['title'];
-    $description = $_POST['description'];
-    $start_date = $_POST['start_date'];
-    $status = $_POST['status'];
-    $redirectUrl = 'tasks.php';
-    if($id){
-        $stmt = $pdo->prepare('UPDATE tasks SET title=?, description=?, start_date=?, status=? WHERE id=?');
-        $stmt->execute([$title,$description,$start_date,$status,$id]);
-    } else {
-        $stmt = $pdo->prepare('INSERT INTO tasks(title,description,start_date,status) VALUES (?,?,?,?)');
-        $stmt->execute([$title,$description,$start_date,$status]);
-        $newTaskId = $pdo->lastInsertId();
-        if($newTaskId){
-            $redirectUrl = 'task_affairs.php?id=' . $newTaskId;
+function buildTaskPayload(PDO $pdo, ?int $id): array
+{
+    $task = [
+        'id' => null,
+        'title' => '',
+        'description' => '',
+        'start_date' => '',
+        'status' => 'active',
+    ];
+    if ($id) {
+        $stmt = $pdo->prepare('SELECT * FROM tasks WHERE id=?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $task = array_merge($task, $row);
         }
     }
-    header('Location: ' . $redirectUrl);
-    exit();
+    return $task;
 }
 
-include 'header.php';
-?>
-<h2 data-i18n="<?php echo $id? 'task_edit.title_edit':'task_edit.title_add'; ?>">
-  <?php echo $id? 'Edit Task':'Add Task'; ?>
-</h2>
-<form method="post">
-  <div class="mb-3">
-    <label class="form-label" data-i18n="tasks.table_title">Title</label>
-    <input type="text" name="title" class="form-control" value="<?php echo htmlspecialchars($task['title']); ?>" required>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="task_edit.label_description">Description</label>
-    <textarea name="description" class="form-control" rows="3"><?php echo htmlspecialchars($task['description']); ?></textarea>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="task_edit.label_start">Start Date</label>
-    <input type="date" name="start_date" class="form-control" value="<?php echo htmlspecialchars($task['start_date']); ?>">
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="task_edit.label_status">Status</label>
-    <select name="status" class="form-select">
-      <?php $statuses=['active'=>['key'=>'tasks.status.active','text'=>'Active'],
-                       'paused'=>['key'=>'tasks.status.paused','text'=>'Paused'],
-                       'finished'=>['key'=>'tasks.status.finished','text'=>'Finished']];
-      foreach($statuses as $k=>$v){
-        $sel = $task['status']==$k?'selected':'';
-        echo "<option value='$k' data-i18n='{$v['key']}' $sel>{$v['text']}</option>";
-      }?>
-    </select>
-  </div>
-  <button type="submit" class="btn btn-primary" data-i18n="task_edit.save">Save</button>
-  <a href="tasks.php" class="btn btn-secondary" data-i18n="task_edit.cancel">Cancel</a>
-</form>
-<?php include 'footer.php'; ?>
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => true, 'task' => buildTaskPayload($pdo, $id)], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    if ($isAjax) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Invalid request method.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Location: tasks.php');
+    exit;
+}
+
+$raw = file_get_contents('php://input');
+$data = [];
+if ($raw !== false && trim($raw) !== '') {
+    $data = json_decode($raw, true) ?? [];
+}
+if (empty($data)) {
+    $data = $_POST;
+}
+
+$title = trim($data['title'] ?? '');
+$description = trim($data['description'] ?? '');
+$start_date = trim($data['start_date'] ?? '');
+$status = trim($data['status'] ?? 'active');
+$status = in_array($status, ['active', 'paused', 'finished'], true) ? $status : 'active';
+
+if ($title === '') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Title is required.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($start_date !== '') {
+    $startDateObj = DateTime::createFromFormat('Y-m-d', $start_date);
+    if (!$startDateObj) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Invalid start date.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $start_date = $startDateObj->format('Y-m-d');
+}
+
+if ($id) {
+    $stmt = $pdo->prepare('UPDATE tasks SET title=?, description=?, start_date=?, status=? WHERE id=?');
+    $stmt->execute([$title, $description, $start_date ?: null, $status, $id]);
+    $savedId = $id;
+    $redirect = null;
+} else {
+    $stmt = $pdo->prepare('INSERT INTO tasks(title, description, start_date, status) VALUES (?,?,?,?)');
+    $stmt->execute([$title, $description, $start_date ?: null, $status]);
+    $savedId = (int)$pdo->lastInsertId();
+    $redirect = $savedId ? ('task_affairs.php?id=' . $savedId) : null;
+}
+
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode(['success' => true, 'id' => $savedId, 'redirect' => $redirect], JSON_UNESCAPED_UNICODE);
+exit;

@@ -207,8 +207,10 @@ $today_key = strtolower(date('D'));
     </ul>
   </div>
 </div>
-<div id="saveHint" class="position-fixed bottom-0 end-0 p-3 bg-success text-white rounded" style="display:none;z-index:1080;">已自动保存</div>
-<div id="unsavedWarning" class="position-fixed bottom-0 start-0 p-3 bg-warning text-dark rounded" style="display:none;z-index:1080;">有未保存内容</div>
+<div class="position-fixed bottom-0 end-0 p-3 d-flex flex-column align-items-end gap-2" style="z-index:1080;">
+  <div id="saveHint" class="bg-success text-white rounded px-3 py-2 shadow" style="display:none;" data-i18n="todolist.toast_saved">已自动保存</div>
+  <div id="unsavedWarning" class="bg-warning text-dark rounded px-3 py-2 shadow" style="display:none;" data-i18n="todolist.toast_unsaved">有未保存内容</div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
 window.addEventListener('DOMContentLoaded',()=>{

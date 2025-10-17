@@ -1,5 +1,6 @@
 <?php
 include 'auth.php';
+require_once 'member_attribute_helpers.php';
 
 if (!class_exists('ZipArchive')) {
     http_response_code(500);
@@ -16,13 +17,22 @@ $statusLabels = [
     'en' => ['in_work' => 'Active', 'exited' => 'Exited'],
     'zh' => ['in_work' => '在岗', 'exited' => '已离退'],
 ];
+$customAttributes = fetch_member_attributes($pdo);
+if (!empty($customAttributes)) {
+    foreach ($customAttributes as $attr) {
+        $headers['en'][] = $attr['label_en'] !== '' ? $attr['label_en'] : $attr['label_zh'];
+        $headers['zh'][] = $attr['label_zh'] !== '' ? $attr['label_zh'] : $attr['label_en'];
+    }
+}
 $selectedHeaders = $headers[$lang] ?? $headers['zh'];
 $statusDisplay = $statusLabels[$lang] ?? $statusLabels['zh'];
 
 $columns = ['campus_id','name','email','identity_number','year_of_join','current_degree','degree_pursuing','phone','wechat','department','workplace','homeplace','status'];
 
-$stmt = $pdo->query('SELECT campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status FROM members');
+$stmt = $pdo->query('SELECT id,campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status FROM members');
 $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$memberIds = array_column($members, 'id');
+$attributeValues = $memberIds ? fetch_member_attribute_map($pdo, $memberIds) : [];
 
 $activeMembers = array_values(array_filter($members, fn($m) => ($m['status'] ?? '') === 'in_work'));
 $exitedMembers = array_values(array_filter($members, fn($m) => ($m['status'] ?? '') !== 'in_work'));
@@ -33,10 +43,10 @@ sortMembersForExport($exitedMembers);
 $palette = ['FFF9F2', 'F2FAFF', 'F6FFF2', 'FFF7F2', 'F2FFF8', 'F8F2FF', 'FFF5F7', 'F3F7FF'];
 $styleRegistry = createStyleRegistry();
 
-$activeSheetData = buildSheetData($activeMembers, $columns, $statusDisplay);
+$activeSheetData = buildSheetData($activeMembers, $columns, $statusDisplay, $customAttributes, $attributeValues);
 [$activeRows, $activeRowStyles] = prepareSheetRows($activeSheetData, $selectedHeaders, $palette, $styleRegistry);
 
-$exitedSheetData = buildSheetData($exitedMembers, $columns, $statusDisplay);
+$exitedSheetData = buildSheetData($exitedMembers, $columns, $statusDisplay, $customAttributes, $attributeValues);
 [$exitedRows, $exitedRowStyles] = prepareSheetRows($exitedSheetData, $selectedHeaders, $palette, $styleRegistry);
 
 $sheets = [
@@ -106,7 +116,7 @@ function normalizeSortValue($value): string
     return $string;
 }
 
-function buildSheetData(array $members, array $columns, array $statusDisplay): array
+function buildSheetData(array $members, array $columns, array $statusDisplay, array $attributes, array $attributeValues): array
 {
     $rows = [];
     $groupKeys = [];
@@ -118,6 +128,15 @@ function buildSheetData(array $members, array $columns, array $statusDisplay): a
                 $value = $statusDisplay[$member['status'] ?? ''] ?? ($member['status'] ?? '');
             }
             $row[] = $value === null ? '' : (string)$value;
+        }
+        if (!empty($attributes)) {
+            $memberId = $member['id'] ?? null;
+            $values = ($memberId !== null && isset($attributeValues[$memberId])) ? $attributeValues[$memberId] : [];
+            foreach ($attributes as $attr) {
+                $attrId = (int)$attr['id'];
+                $attrValue = $values[$attrId] ?? $attr['default_value'];
+                $row[] = $attrValue === null ? '' : (string)$attrValue;
+            }
         }
         $rows[] = $row;
         $groupKeys[] = ($member['degree_pursuing'] ?? '') . '|' . ($member['year_of_join'] ?? '');
