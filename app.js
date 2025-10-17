@@ -40,6 +40,13 @@ const translations = {
     'account.add_manager_btn': 'Add Manager',
     'directions.title': 'Research Directions',
     'directions.add': 'Add Direction',
+    'directions.import': 'Import XLSX',
+    'directions.export': 'Export XLSX',
+    'directions.import_title': 'Import Research Directions',
+    'directions.import_hint': 'Upload an XLSX file with research direction information.',
+    'directions.import_submit': 'Import',
+    'directions.import_success': 'Import completed. Added {inserted}, Updated {updated}.',
+    'directions.import_error': 'Failed to import research directions.',
     'directions.table_title': 'Title',
     'directions.table_members': 'Members',
     'directions.table_actions': 'Actions',
@@ -58,9 +65,15 @@ const translations = {
     'direction_edit.label_bg': 'Background Color',
     'direction_edit.save': 'Save',
     'direction_edit.cancel': 'Cancel',
+    'direction_edit.error_title': 'Direction title is required.',
+    'direction_edit.error_generic': 'Failed to save direction.',
+    'direction_edit.load_failed': 'Unable to load research direction.',
     'project_edit.title_edit': 'Edit Project',
     'project_edit.title_add': 'Add Project',
     'project_edit.error_range': 'End date must be after begin date',
+    'project_edit.error_title': 'Project title is required.',
+    'project_edit.error_generic': 'Failed to save project.',
+    'project_edit.load_failed': 'Unable to load project details.',
     'project_edit.label_title': 'Project Title',
     'project_edit.label_description': 'Project Description',
     'project_edit.label_bg': 'Background Color',
@@ -186,6 +199,13 @@ const translations = {
     'members_import.cancel': 'Cancel',
     'projects.title': 'Projects',
     'projects.add': 'Add Project',
+    'projects.import': 'Import XLSX',
+    'projects.export': 'Export XLSX',
+    'projects.import_title': 'Import Projects',
+    'projects.import_hint': 'Upload an XLSX file containing project information.',
+    'projects.import_submit': 'Import',
+    'projects.import_success': 'Import completed. Added {inserted}, Updated {updated}.',
+    'projects.import_error': 'Failed to import projects.',
     'projects.filter_all': 'All Status',
     'projects.filter.todo': 'Todo',
     'projects.filter.ongoing': 'Ongoing',
@@ -259,6 +279,8 @@ const translations = {
     'todolist.cut_tomorrow': 'Cut to Tomorrow',
     'todolist.assessment': 'Assessment',
     'todolist.assessment.generate': 'Generate',
+    'todolist.toast_saved': 'Saved automatically',
+    'todolist.toast_unsaved': 'Changes pending save',
     'todolist.assessment.no_items': 'No todo items',
     'todolist.copy_next': 'Cut to Next Week',
     'todolist.copy_item': 'Copy',
@@ -513,6 +535,13 @@ const translations = {
     'account.add_manager_btn': '添加管理员',
     'directions.title': '研究方向',
     'directions.add': '添加研究方向',
+    'directions.import': '导入 XLSX',
+    'directions.export': '导出 XLSX',
+    'directions.import_title': '导入研究方向',
+    'directions.import_hint': '上传包含研究方向信息的 XLSX 文件。',
+    'directions.import_submit': '导入',
+    'directions.import_success': '导入完成：新增 {inserted} 项，更新 {updated} 项。',
+    'directions.import_error': '导入研究方向失败。',
     'directions.table_title': '标题',
     'directions.table_members': '成员',
     'directions.table_actions': '操作',
@@ -531,9 +560,15 @@ const translations = {
     'direction_edit.label_bg': '背景颜色',
     'direction_edit.save': '保存',
     'direction_edit.cancel': '取消',
+    'direction_edit.error_title': '请填写研究方向名称。',
+    'direction_edit.error_generic': '保存研究方向失败。',
+    'direction_edit.load_failed': '无法加载研究方向。',
     'project_edit.title_edit': '编辑项目',
     'project_edit.title_add': '添加项目',
     'project_edit.error_range': '结项时间必须晚于立项时间',
+    'project_edit.error_title': '请填写项目标题。',
+    'project_edit.error_generic': '保存项目失败。',
+    'project_edit.load_failed': '无法加载项目详情。',
     'project_edit.label_title': '项目标题',
     'project_edit.label_description': '项目描述',
     'project_edit.label_bg': '背景颜色',
@@ -659,6 +694,13 @@ const translations = {
     'members_import.cancel': '取消',
     'projects.title': '横纵项目',
     'projects.add': '添加项目',
+    'projects.import': '导入 XLSX',
+    'projects.export': '导出 XLSX',
+    'projects.import_title': '导入项目',
+    'projects.import_hint': '上传包含项目信息的 XLSX 文件。',
+    'projects.import_submit': '导入',
+    'projects.import_success': '导入完成：新增 {inserted} 项，更新 {updated} 项。',
+    'projects.import_error': '导入项目失败。',
     'projects.filter_all': '所有状态',
     'projects.filter.todo': '待办',
     'projects.filter.ongoing': '进行中',
@@ -732,6 +774,8 @@ const translations = {
     'todolist.cut_tomorrow': '鸽明天',
     'todolist.assessment': '待办统计',
     'todolist.assessment.generate': '统计',
+    'todolist.toast_saved': '已自动保存',
+    'todolist.toast_unsaved': '有未保存内容',
     'todolist.assessment.no_items': '无待办事项',
     'todolist.copy_next': '鸽下周',
     'todolist.copy_item': '复制',
@@ -1114,6 +1158,24 @@ function applyTranslations() {
   if(exportLink) {
     exportLink.href = `members_export.php?lang=${lang}`;
   }
+  const exportProjects = document.getElementById('exportProjects');
+  if (exportProjects) {
+    exportProjects.href = `projects_export.php?lang=${lang}`;
+  }
+  const exportDirections = document.getElementById('exportDirections');
+  if (exportDirections) {
+    exportDirections.href = `directions_export.php?lang=${lang}`;
+  }
+  document.querySelectorAll('[data-i18n-custom]').forEach(el => {
+    const zh = el.getAttribute('data-i18n-custom-zh') || '';
+    const en = el.getAttribute('data-i18n-custom-en') || '';
+    const value = lang === 'en' ? (en || zh) : (zh || en);
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      el.value = value;
+    } else {
+      el.textContent = value;
+    }
+  });
 }
 
 function clampChannel(value) {
