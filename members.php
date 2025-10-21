@@ -1,5 +1,74 @@
 <?php
-include 'header.php';
+require_once 'config.php';
+include_once 'auth.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') === 'save') {
+    if (($_SESSION['role'] ?? '') !== 'manager') {
+        header('Location: members.php');
+        exit();
+    }
+
+    $memberId = isset($_POST['member_id']) && $_POST['member_id'] !== ''
+        ? (int)$_POST['member_id']
+        : null;
+
+    $campus_id = trim($_POST['campus_id'] ?? '');
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $identity_number = trim($_POST['identity_number'] ?? '');
+    $year_of_join = trim($_POST['year_of_join'] ?? '');
+    $current_degree = trim($_POST['current_degree'] ?? '');
+    $degree_pursuing = trim($_POST['degree_pursuing'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $wechat = trim($_POST['wechat'] ?? '');
+    $department = trim($_POST['department'] ?? '');
+    $workplace = trim($_POST['workplace'] ?? '');
+    $homeplace = trim($_POST['homeplace'] ?? '');
+    $status = ($_POST['status'] ?? 'in_work') === 'exited' ? 'exited' : 'in_work';
+
+    if ($memberId) {
+        $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=?, status=? WHERE id=?');
+        $stmt->execute([
+            $campus_id,
+            $name,
+            $email,
+            $identity_number,
+            $year_of_join,
+            $current_degree,
+            $degree_pursuing,
+            $phone,
+            $wechat,
+            $department,
+            $workplace,
+            $homeplace,
+            $status,
+            $memberId
+        ]);
+    } else {
+        $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order), -1) + 1 FROM members');
+        $nextOrder = (int)($orderStmt->fetchColumn() ?? 0);
+        $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $stmt->execute([
+            $campus_id,
+            $name,
+            $email,
+            $identity_number,
+            $year_of_join,
+            $current_degree,
+            $degree_pursuing,
+            $phone,
+            $wechat,
+            $department,
+            $workplace,
+            $homeplace,
+            $status,
+            $nextOrder
+        ]);
+    }
+
+    header('Location: members.php');
+    exit();
+}
 
 // Column definitions used for both manager and member views
 $columns = [
@@ -94,6 +163,7 @@ foreach($summaryCounts as $key => $count){
         'count' => $count
     ];
 }
+include 'header.php';
 ?>
 <style>
   .summary-stat-title { white-space: nowrap; letter-spacing: .08em; }
@@ -109,7 +179,7 @@ foreach($summaryCounts as $key => $count){
   <h2 data-i18n="members.title">团队成员</h2>
   <?php if($_SESSION['role'] === 'manager'): ?>
   <div>
-    <a class="btn btn-success" href="member_edit.php" data-i18n="members.add">新增成员</a>
+    <button type="button" class="btn btn-success" id="addMemberBtn" data-i18n="members.add">新增成员</button>
     <a class="btn btn-secondary" href="members_import.php" data-i18n="members.import">从表格导入</a>
     <a class="btn btn-secondary" href="members_export.php" id="exportMembers" data-i18n="members.export">导出至表格</a>
     <button type="button" class="btn btn-warning qr-btn" data-url="member_self_update.php" data-i18n="members.request_update">请求信息更新</button>
@@ -225,7 +295,23 @@ foreach($summaryCounts as $key => $count){
     <td><?= htmlspecialchars($m['workplace']); ?></td>
     <td><?= htmlspecialchars($m['homeplace']); ?></td>
     <td>
-      <a class="btn btn-sm btn-primary" href="member_edit.php?id=<?= $m['id']; ?>" data-i18n="members.action.edit">编辑</a>
+      <button type="button"
+              class="btn btn-sm btn-primary member-edit-btn"
+              data-id="<?= $m['id']; ?>"
+              data-campus-id="<?= htmlspecialchars((string)($m['campus_id'] ?? ''), ENT_QUOTES); ?>"
+              data-name="<?= htmlspecialchars((string)($m['name'] ?? ''), ENT_QUOTES); ?>"
+              data-email="<?= htmlspecialchars((string)($m['email'] ?? ''), ENT_QUOTES); ?>"
+              data-identity-number="<?= htmlspecialchars((string)($m['identity_number'] ?? ''), ENT_QUOTES); ?>"
+              data-year-of-join="<?= htmlspecialchars((string)($m['year_of_join'] ?? ''), ENT_QUOTES); ?>"
+              data-current-degree="<?= htmlspecialchars((string)($m['current_degree'] ?? ''), ENT_QUOTES); ?>"
+              data-degree-pursuing="<?= htmlspecialchars((string)($m['degree_pursuing'] ?? ''), ENT_QUOTES); ?>"
+              data-phone="<?= htmlspecialchars((string)($m['phone'] ?? ''), ENT_QUOTES); ?>"
+              data-wechat="<?= htmlspecialchars((string)($m['wechat'] ?? ''), ENT_QUOTES); ?>"
+              data-department="<?= htmlspecialchars((string)($m['department'] ?? ''), ENT_QUOTES); ?>"
+              data-workplace="<?= htmlspecialchars((string)($m['workplace'] ?? ''), ENT_QUOTES); ?>"
+              data-homeplace="<?= htmlspecialchars((string)($m['homeplace'] ?? ''), ENT_QUOTES); ?>"
+              data-status="<?= htmlspecialchars((string)($m['status'] ?? 'in_work'), ENT_QUOTES); ?>"
+              data-i18n="members.action.edit">编辑</button>
       <?php if($_SESSION['role'] === 'manager'): ?>
       <a class="btn btn-sm btn-danger" href="member_delete.php?id=<?= $m['id']; ?>" onclick="return doubleConfirm(translations[document.documentElement.lang]['members.confirm.remove']);" data-i18n="members.action.remove">移除</a>
       <?php endif; ?>
@@ -236,6 +322,83 @@ foreach($summaryCounts as $key => $count){
 </table>
   </div>
   <?php if($_SESSION['role'] === 'manager'): ?>
+  <div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <form id="memberForm" method="post">
+          <input type="hidden" name="member_action" value="save">
+          <input type="hidden" name="member_id" value="">
+          <div class="modal-header">
+            <h5 class="modal-title" id="memberModalTitle" data-i18n="member_edit.title_add">Add Member</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.campus_id">Campus ID</label>
+                <input type="text" name="campus_id" class="form-control" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.name">Name</label>
+                <input type="text" name="name" class="form-control" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.email">Email</label>
+                <input type="email" name="email" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.identity_number">Identity Number</label>
+                <input type="text" name="identity_number" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.year_of_join">Year of Join</label>
+                <input type="number" name="year_of_join" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.current_degree">Current Degree</label>
+                <input type="text" name="current_degree" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.degree_pursuing">Degree Pursuing</label>
+                <input type="text" name="degree_pursuing" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.phone">Phone</label>
+                <input type="text" name="phone" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.wechat">WeChat</label>
+                <input type="text" name="wechat" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.department">Department</label>
+                <input type="text" name="department" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.workplace">Workplace</label>
+                <input type="text" name="workplace" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.homeplace">Homeplace</label>
+                <input type="text" name="homeplace" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="members.table.status">Status</label>
+                <select name="status" class="form-select">
+                  <option value="in_work" data-i18n="members.status.in_work" selected>In Work</option>
+                  <option value="exited" data-i18n="members.status.exited">Exited</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="member_edit.cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary" data-i18n="member_edit.save">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
   <script>
   document.addEventListener('DOMContentLoaded', function(){
@@ -279,6 +442,54 @@ foreach($summaryCounts as $key => $count){
         colored=!colored;
         if(colored){applyColors();toggleBtn.classList.add('btn-primary');}
         else{clearColors();toggleBtn.classList.remove('btn-primary');}
+      });
+    }
+    const memberModalElement = document.getElementById('memberModal');
+    const memberForm = document.getElementById('memberForm');
+    const addMemberBtn = document.getElementById('addMemberBtn');
+    const modalTitle = document.getElementById('memberModalTitle');
+    if(memberModalElement && memberForm){
+      if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+        console.warn('Bootstrap modal is not available.');
+        return;
+      }
+      const memberModal = new bootstrap.Modal(memberModalElement);
+      const fieldNames = ['campus_id','name','email','identity_number','year_of_join','current_degree','degree_pursuing','phone','wechat','department','workplace','homeplace'];
+      function translate(key){
+        const lang = document.documentElement.lang || 'zh';
+        return (translations?.[lang] && translations[lang][key]) || key;
+      }
+      function setModalTitle(key){
+        if(!modalTitle){
+          return;
+        }
+        modalTitle.setAttribute('data-i18n', key);
+        modalTitle.textContent = translate(key);
+      }
+      function resetForm(){
+        memberForm.reset();
+        memberForm.elements['member_id'].value = '';
+        memberForm.elements['status'].value = 'in_work';
+      }
+      addMemberBtn?.addEventListener('click', function(){
+        resetForm();
+        setModalTitle('member_edit.title_add');
+        memberModal.show();
+      });
+      document.querySelectorAll('.member-edit-btn').forEach(function(btn){
+        btn.addEventListener('click', function(event){
+          event.preventDefault();
+          const data = btn.dataset;
+          resetForm();
+          memberForm.elements['member_id'].value = data.id || '';
+          fieldNames.forEach(function(name){
+            const datasetKey = name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+            memberForm.elements[name].value = data[datasetKey] || '';
+          });
+          memberForm.elements['status'].value = data.status || 'in_work';
+          setModalTitle('member_edit.title_edit');
+          memberModal.show();
+        });
       });
     }
   });
