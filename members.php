@@ -211,6 +211,8 @@ include 'header.php';
   .summary-label { flex-shrink: 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: #6c757d; white-space: nowrap; }
   .summary-pill { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.75rem; border-radius: 999px; border: 1px solid rgba(13,110,253,0.35); background-color: rgba(13,110,253,0.08); color: #0d6efd; font-weight: 600; white-space: nowrap; }
   .summary-pill-count { font-size: 1rem; color: #0b5ed7; }
+  .members-table th,
+  .members-table td { white-space: nowrap; }
 </style>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="members.title">团队成员</h2>
@@ -294,7 +296,7 @@ include 'header.php';
 </div>
 <?php endif; ?>
 <div class="table-responsive">
-<table class="table table-bordered table-striped table-hover">
+<table class="table table-bordered table-striped table-hover members-table">
   <thead>
   <tr>
     <th></th>
