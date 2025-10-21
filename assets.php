@@ -10,9 +10,11 @@ function add_asset_log(PDO $pdo, string $targetType, int $targetId, string $oper
     $stmt->execute([$targetType, $targetId, $operatorName, $operatorRole, $action, $details]);
 }
 
-function generate_asset_code(PDO $pdo): string {
+function generate_asset_code(PDO $pdo, string $prefix = ''): string {
+    $defaultPrefix = 'ASSET-';
+    $prefixToUse = $prefix !== '' ? $prefix : $defaultPrefix;
     do {
-        $code = 'ASSET-' . strtoupper(bin2hex(random_bytes(3)));
+        $code = $prefixToUse . strtoupper(bin2hex(random_bytes(3)));
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM assets WHERE asset_code = ?');
         $stmt->execute([$code]);
     } while ($stmt->fetchColumn());
@@ -88,6 +90,25 @@ function remove_asset_files(array $paths): void {
     }
 }
 
+$assetCodePrefix = 'ASSET-';
+try {
+    $settingsStmt = $pdo->query('SELECT code_prefix FROM asset_settings WHERE id=1');
+    $settingsRow = $settingsStmt->fetch();
+    if ($settingsRow && array_key_exists('code_prefix', $settingsRow)) {
+        $retrievedPrefix = trim((string)$settingsRow['code_prefix']);
+        if ($retrievedPrefix !== '') {
+            $assetCodePrefix = $retrievedPrefix;
+        }
+    } else {
+        $ensureStmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix) VALUES (1, ?) ON DUPLICATE KEY UPDATE code_prefix = code_prefix');
+        $ensureStmt->execute([$assetCodePrefix]);
+    }
+} catch (PDOException $e) {
+    if ($e->getCode() !== '42S02') {
+        throw $e;
+    }
+}
+
 if (isset($_GET['asset_logs'])) {
     $assetId = (int)$_GET['asset_logs'];
     $stmt = $pdo->prepare('SELECT owner_member_id FROM assets WHERE id=?');
@@ -114,7 +135,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $errors = [];
     try {
-        if ($action === 'save_inbound') {
+        if ($action === 'save_settings') {
+            if (!$is_manager) {
+                throw new RuntimeException('assets.messages.permission_denied');
+            }
+            $prefixInput = isset($_POST['code_prefix']) ? trim((string)$_POST['code_prefix']) : '';
+            $prefixInput = str_replace(["\r", "\n"], '', $prefixInput);
+            if ($prefixInput === '') {
+                $prefixInput = 'ASSET-';
+            }
+            $maxLen = 30;
+            if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+                if (mb_strlen($prefixInput) > $maxLen) {
+                    $prefixInput = mb_substr($prefixInput, 0, $maxLen);
+                }
+            } else {
+                if (strlen($prefixInput) > $maxLen) {
+                    $prefixInput = substr($prefixInput, 0, $maxLen);
+                }
+            }
+            $stmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix) VALUES (1, ?) ON DUPLICATE KEY UPDATE code_prefix = VALUES(code_prefix), updated_at = CURRENT_TIMESTAMP');
+            $stmt->execute([$prefixInput]);
+            $assetCodePrefix = $prefixInput;
+            $_SESSION['asset_flash'] = ['type' => 'success', 'key' => 'assets.messages.settings_saved', 'default' => 'Settings updated successfully'];
+        } elseif ($action === 'save_inbound') {
             if (!$is_manager) {
                 throw new RuntimeException('assets.messages.permission_denied');
             }
@@ -206,6 +250,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($status, $allowedStatus, true)) {
                 $status = 'pending';
             }
+            $suffixInput = trim((string)($_POST['asset_code_suffix'] ?? ''));
+            $usePrefix = $assetCodePrefix !== '' && ($_POST['asset_code_use_prefix'] ?? '1') === '1';
             $stmt = $pdo->prepare('SELECT id FROM asset_inbound_orders WHERE id=?');
             $stmt->execute([$inboundId]);
             if (!$stmt->fetch()) {
@@ -242,9 +288,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$is_manager && (int)$existing['owner_member_id'] !== (int)$member_id) {
                     throw new RuntimeException('assets.messages.permission_denied');
                 }
-                $assetCode = trim($_POST['asset_code'] ?? $existing['asset_code']);
+                $assetCode = $usePrefix
+                    ? ($suffixInput === '' ? '' : $assetCodePrefix . $suffixInput)
+                    : $suffixInput;
                 if ($assetCode === '') {
-                    $assetCode = generate_asset_code($pdo);
+                    $assetCode = generate_asset_code($pdo, $assetCodePrefix);
+                }
+                if (!$is_manager) {
+                    $assetCode = $existing['asset_code'];
                 }
                 if ($assetCode !== $existing['asset_code']) {
                     $chk = $pdo->prepare('SELECT COUNT(*) FROM assets WHERE asset_code=? AND id<>?');
@@ -257,7 +308,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $inboundId = (int)$existing['inbound_order_id'];
                     $category = $existing['category'];
                     $model = $existing['model'];
-                    $assetCode = $existing['asset_code'];
                 }
                 $update = $pdo->prepare('UPDATE assets SET inbound_order_id=?, asset_code=?, category=?, model=?, organization=?, remarks=?, current_office_id=?, current_seat_id=?, owner_member_id=?, status=?, updated_at=NOW() WHERE id=?');
                 $update->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $status, $id]);
@@ -287,9 +337,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$is_manager) {
                     throw new RuntimeException('assets.messages.permission_denied');
                 }
-                $assetCode = trim($_POST['asset_code'] ?? '');
+                $assetCode = $usePrefix
+                    ? ($suffixInput === '' ? '' : $assetCodePrefix . $suffixInput)
+                    : $suffixInput;
                 if ($assetCode === '') {
-                    $assetCode = generate_asset_code($pdo);
+                    $assetCode = generate_asset_code($pdo, $assetCodePrefix);
                 } else {
                     $stmt = $pdo->prepare('SELECT COUNT(*) FROM assets WHERE asset_code=?');
                     $stmt->execute([$assetCode]);
@@ -370,6 +422,31 @@ $inboundOptions = $pdo->query('SELECT id, order_number FROM asset_inbound_orders
 $members = $pdo->query('SELECT id, name FROM members ORDER BY name')->fetchAll();
 $offices = $pdo->query('SELECT id, name, location_description, region FROM offices ORDER BY name')->fetchAll();
 $seats = $pdo->query('SELECT id, office_id, label FROM office_seats ORDER BY label')->fetchAll();
+$memberAssets = [];
+if ($is_manager) {
+    $memberAssetStmt = $pdo->query('SELECT m.id AS member_id, m.name AS member_name, a.id AS asset_id, a.asset_code, a.category, a.model, a.organization, a.status, a.updated_at, o.name AS office_name, s.label AS seat_label FROM members m LEFT JOIN assets a ON a.owner_member_id = m.id LEFT JOIN offices o ON a.current_office_id = o.id LEFT JOIN office_seats s ON a.current_seat_id = s.id WHERE m.status = "in_work" ORDER BY m.name ASC, a.asset_code ASC, a.id ASC');
+    foreach ($memberAssetStmt->fetchAll() as $row) {
+        $memberId = (int)$row['member_id'];
+        if (!isset($memberAssets[$memberId])) {
+            $memberAssets[$memberId] = [
+                'member_name' => $row['member_name'],
+                'assets' => []
+            ];
+        }
+        if (!empty($row['asset_id'])) {
+            $memberAssets[$memberId]['assets'][] = [
+                'asset_code' => $row['asset_code'],
+                'organization' => $row['organization'],
+                'category' => $row['category'],
+                'model' => $row['model'],
+                'office_name' => $row['office_name'],
+                'seat_label' => $row['seat_label'],
+                'status' => $row['status'],
+                'updated_at' => $row['updated_at']
+            ];
+        }
+    }
+}
 
 include 'header.php';
 ?>
@@ -379,6 +456,27 @@ include 'header.php';
   <div class="alert alert-<?= htmlspecialchars($flash['type']); ?>" data-i18n="<?= htmlspecialchars($flash['key']); ?>"><?= htmlspecialchars($flash['default']); ?></div>
   <?php endif; ?>
 </div>
+<?php if ($is_manager): ?>
+<div class="card mb-4">
+  <div class="card-header">
+    <h3 class="mb-0" data-i18n="assets.settings.title">General Settings</h3>
+  </div>
+  <div class="card-body">
+    <p class="text-muted" data-i18n="assets.settings.description">Configure global options for asset management.</p>
+    <form method="post" class="row g-3 align-items-end">
+      <input type="hidden" name="action" value="save_settings">
+      <div class="col-md-6 col-lg-4">
+        <label class="form-label" data-i18n="assets.settings.code_prefix">Asset Code Prefix</label>
+        <input type="text" class="form-control" name="code_prefix" value="<?= htmlspecialchars($assetCodePrefix); ?>" maxlength="30">
+        <div class="form-text" data-i18n="assets.settings.code_prefix_hint">This prefix appears before the asset code input.</div>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary" data-i18n="assets.settings.save">Save Settings</button>
+      </div>
+    </form>
+  </div>
+</div>
+<?php endif; ?>
 <div class="asset-stats mb-4">
   <div class="row g-3">
     <div class="col-12">
@@ -473,13 +571,14 @@ include 'header.php';
   </div>
 </div>
 <div class="card mb-4">
-  <div class="card-header d-flex justify-content-between align-items-center">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <h3 class="mb-0" data-i18n="assets.list.title">Asset Inventory</h3>
-    <div>
-      <?php if ($is_manager): ?>
+    <?php if ($is_manager): ?>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="assets_export.php" class="btn btn-outline-secondary" id="exportAssets" data-i18n="assets.export">Export to Excel</a>
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assetModal" data-mode="create" data-i18n="assets.add">New Asset</button>
-      <?php endif; ?>
     </div>
+    <?php endif; ?>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -567,6 +666,65 @@ include 'header.php';
   <input type="hidden" name="id" id="deleteAssetId">
 </form>
 
+<?php if ($is_manager): ?>
+<div class="card mb-4">
+  <div class="card-header">
+    <h3 class="mb-0" data-i18n="assets.assignments.title">Member Asset Responsibilities</h3>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover mb-0 align-middle asset-table-nowrap">
+        <thead class="table-light">
+          <tr>
+            <th data-i18n="assets.assignments.member">Member</th>
+            <th data-i18n="assets.assignments.asset_code">Asset Code</th>
+            <th data-i18n="assets.assignments.organization">Owning Unit</th>
+            <th data-i18n="assets.assignments.category">Category</th>
+            <th data-i18n="assets.assignments.model">Model / Configuration</th>
+            <th data-i18n="assets.assignments.location">Location</th>
+            <th data-i18n="assets.assignments.status">Status</th>
+            <th data-i18n="assets.assignments.updated_at">Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if ($memberAssets): ?>
+            <?php foreach ($memberAssets as $record): ?>
+              <?php if (!empty($record['assets'])): ?>
+                <?php foreach ($record['assets'] as $assignedAsset): ?>
+                  <?php
+                    $assignmentLocation = trim(($assignedAsset['office_name'] ? $assignedAsset['office_name'] : '') . ($assignedAsset['seat_label'] ? (' / ' . $assignedAsset['seat_label']) : ''));
+                    $assignmentOrg = trim((string)($assignedAsset['organization'] ?? ''));
+                  ?>
+                  <tr>
+                    <td><?= htmlspecialchars($record['member_name']); ?></td>
+                    <td><?= htmlspecialchars($assignedAsset['asset_code']); ?></td>
+                    <td><?= htmlspecialchars($assignmentOrg === '' ? '-' : $assignmentOrg); ?></td>
+                    <td><?= htmlspecialchars($assignedAsset['category'] ?? '-'); ?></td>
+                    <td><?= htmlspecialchars($assignedAsset['model'] ?? '-'); ?></td>
+                    <td><?= htmlspecialchars($assignmentLocation === '' ? '-' : $assignmentLocation); ?></td>
+                    <td><span data-i18n="assets.status.<?= htmlspecialchars($assignedAsset['status']); ?>"><?= htmlspecialchars($assignedAsset['status']); ?></span></td>
+                    <td><?= htmlspecialchars($assignedAsset['updated_at'] ?: '-'); ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php else: ?>
+                <tr>
+                  <td><?= htmlspecialchars($record['member_name']); ?></td>
+                  <td colspan="7" class="text-muted" data-i18n="assets.assignments.member_empty">No assets assigned.</td>
+                </tr>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <tr>
+              <td colspan="8" class="text-center" data-i18n="assets.assignments.none">No member asset data</td>
+            </tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="modal fade" id="inboundModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <form class="modal-content" method="post">
@@ -616,7 +774,7 @@ include 'header.php';
   </div>
 </div>
 
-<div class="modal fade" id="assetModal" tabindex="-1">
+<div class="modal fade" id="assetModal" tabindex="-1" data-asset-prefix="<?= htmlspecialchars($assetCodePrefix); ?>">
   <div class="modal-dialog modal-xl">
     <form class="modal-content" method="post" enctype="multipart/form-data" id="assetForm">
       <input type="hidden" name="action" value="save_asset">
@@ -638,7 +796,11 @@ include 'header.php';
           </div>
           <div class="col-md-4">
             <label class="form-label" data-i18n="assets.form.asset_code">Asset Code</label>
-            <input type="text" class="form-control" name="asset_code" id="asset-code" placeholder="AUTO">
+            <div class="input-group">
+              <span class="input-group-text<?= $assetCodePrefix === '' ? ' d-none' : ''; ?>" id="asset-code-prefix-display"><?= htmlspecialchars($assetCodePrefix); ?></span>
+              <input type="text" class="form-control" name="asset_code_suffix" id="asset-code-suffix" data-i18n-placeholder="assets.form.asset_code_suffix_placeholder" placeholder="AUTO">
+            </div>
+            <input type="hidden" name="asset_code_use_prefix" id="asset-code-use-prefix" value="<?= $assetCodePrefix !== '' ? '1' : '0'; ?>">
           </div>
           <div class="col-md-4">
             <label class="form-label" data-i18n="assets.form.status">Status</label>
@@ -786,6 +948,9 @@ include 'header.php';
   const seatOptions = Array.from(document.querySelectorAll('#asset-seat option[value]'));
   const lastCategoryKey = 'asset-last-category';
   const lastModelKey = 'asset-last-model';
+  const assetCodePrefixDisplay = document.getElementById('asset-code-prefix-display');
+  const assetCodeSuffixInput = document.getElementById('asset-code-suffix');
+  const assetCodeUsePrefixInput = document.getElementById('asset-code-use-prefix');
   let deleteTarget = null;
 
   function filterSeats(officeId) {
@@ -826,16 +991,46 @@ include 'header.php';
       document.getElementById('asset-inbound').disabled = false;
       document.getElementById('asset-category').readOnly = false;
       document.getElementById('asset-model').readOnly = false;
-      document.getElementById('asset-code').readOnly = false;
       document.getElementById('asset-organization').value = '';
       document.getElementById('asset-remarks').value = '';
+      const currentPrefix = assetModal.getAttribute('data-asset-prefix') || '';
+      if (assetCodePrefixDisplay) {
+        assetCodePrefixDisplay.textContent = currentPrefix;
+        if (currentPrefix) {
+          assetCodePrefixDisplay.classList.remove('d-none');
+        } else {
+          assetCodePrefixDisplay.classList.add('d-none');
+        }
+      }
+      if (assetCodeSuffixInput) {
+        assetCodeSuffixInput.value = '';
+        assetCodeSuffixInput.readOnly = false;
+        assetCodeSuffixInput.dataset.usesPrefix = currentPrefix ? '1' : '0';
+        assetCodeSuffixInput.dataset.original = '';
+      }
+      if (assetCodeUsePrefixInput) {
+        assetCodeUsePrefixInput.value = currentPrefix ? '1' : '0';
+      }
       const title = document.getElementById('assetModalLabel');
       if (mode === 'edit') {
         title.setAttribute('data-i18n', 'assets.edit');
         const asset = JSON.parse(button.getAttribute('data-asset'));
         document.getElementById('asset-id').value = asset.id;
         document.getElementById('asset-inbound').value = asset.inbound_order_id;
-        document.getElementById('asset-code').value = asset.asset_code;
+        if (assetCodeSuffixInput) {
+          let suffixValue = asset.asset_code || '';
+          let usesPrefix = false;
+          if (currentPrefix && suffixValue.startsWith(currentPrefix)) {
+            suffixValue = suffixValue.substring(currentPrefix.length);
+            usesPrefix = true;
+          }
+          assetCodeSuffixInput.value = suffixValue;
+          assetCodeSuffixInput.dataset.usesPrefix = usesPrefix ? '1' : '0';
+          assetCodeSuffixInput.dataset.original = suffixValue;
+          if (assetCodeUsePrefixInput) {
+            assetCodeUsePrefixInput.value = usesPrefix && currentPrefix ? '1' : '0';
+          }
+        }
         document.getElementById('asset-status').value = asset.status;
         document.getElementById('asset-category').value = asset.category;
         document.getElementById('asset-model').value = asset.model;
@@ -852,7 +1047,9 @@ include 'header.php';
           document.getElementById('asset-inbound').disabled = true;
           document.getElementById('asset-category').readOnly = true;
           document.getElementById('asset-model').readOnly = true;
-          document.getElementById('asset-code').readOnly = true;
+          if (assetCodeSuffixInput) {
+            assetCodeSuffixInput.readOnly = true;
+          }
         }
         document.getElementById('assetLogsSection').style.display = 'block';
         fetch(`assets.php?asset_logs=${asset.id}`)
@@ -882,6 +1079,10 @@ include 'header.php';
         const lastModel = localStorage.getItem(lastModelKey);
         filterSeats('');
         document.getElementById('asset-office').value = '';
+        if (assetCodeSuffixInput) {
+          assetCodeSuffixInput.dataset.usesPrefix = currentPrefix ? '1' : '0';
+          assetCodeSuffixInput.dataset.original = '';
+        }
         if (lastCategory || lastModel) {
           const lang = document.documentElement.lang || 'zh';
           const msg = translations[lang]['assets.form.reuse_prompt'];
@@ -899,6 +1100,18 @@ include 'header.php';
     document.getElementById('assetForm').addEventListener('submit', () => {
       localStorage.setItem(lastCategoryKey, document.getElementById('asset-category').value.trim());
       localStorage.setItem(lastModelKey, document.getElementById('asset-model').value.trim());
+      if (assetCodeSuffixInput) {
+        const prefixValue = assetModal.getAttribute('data-asset-prefix') || '';
+        let suffixValue = assetCodeSuffixInput.value.trim();
+        if (prefixValue && suffixValue.startsWith(prefixValue)) {
+          suffixValue = suffixValue.substring(prefixValue.length);
+        }
+        assetCodeSuffixInput.value = suffixValue;
+        if (assetCodeUsePrefixInput) {
+          const usePrefix = prefixValue && assetCodeSuffixInput.dataset.usesPrefix === '1';
+          assetCodeUsePrefixInput.value = usePrefix ? '1' : '0';
+        }
+      }
     });
   }
 

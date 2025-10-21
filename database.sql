@@ -278,3 +278,13 @@ CREATE TABLE asset_operation_logs (
   INDEX idx_asset_logs_target (target_type, target_id)
 );
 
+CREATE TABLE asset_settings (
+  id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+  code_prefix VARCHAR(60) NOT NULL DEFAULT 'ASSET-',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO asset_settings (id, code_prefix)
+VALUES (1, 'ASSET-')
+ON DUPLICATE KEY UPDATE code_prefix = code_prefix;
+

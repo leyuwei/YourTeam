@@ -438,6 +438,7 @@ const translations = {
     'assets.inbound.delete.double': 'Please confirm again: all assets linked to this inbound order will be removed.',
     'assets.list.title': 'Asset Inventory',
     'assets.add': 'New Asset',
+    'assets.export': 'Export to Excel',
     'assets.edit': 'Edit Asset',
     'assets.table.order_number': 'Order #',
     'assets.table.asset_code': 'Asset Code',
@@ -458,6 +459,7 @@ const translations = {
     'assets.form.inbound': 'Inbound Order',
     'assets.form.inbound_placeholder': 'Select inbound order',
     'assets.form.asset_code': 'Asset Code',
+    'assets.form.asset_code_suffix_placeholder': 'Leave blank to auto-generate',
     'assets.form.status': 'Status',
     'assets.form.category': 'Category',
     'assets.form.model': 'Model / Configuration',
@@ -497,12 +499,29 @@ const translations = {
     'assets.messages.asset_created': 'Asset created successfully.',
     'assets.messages.asset_updated': 'Asset updated successfully.',
     'assets.messages.asset_deleted': 'Asset deleted successfully.',
+    'assets.messages.settings_saved': 'Settings updated successfully.',
     'assets.messages.asset_code_exists': 'Asset code already exists.',
     'assets.messages.invalid_seat': 'Selected seat does not exist.',
     'assets.messages.seat_office_mismatch': 'Selected seat does not belong to the chosen office.',
     'assets.messages.image_upload_failed': 'Asset photo upload failed.',
     'assets.messages.invalid_image': 'Uploaded file is not a valid image.',
-    'assets.messages.generic_error': 'Operation failed, please try again later.'
+    'assets.messages.generic_error': 'Operation failed, please try again later.',
+    'assets.settings.title': 'General Settings',
+    'assets.settings.description': 'Configure global options for asset management.',
+    'assets.settings.code_prefix': 'Asset Code Prefix',
+    'assets.settings.code_prefix_hint': 'Shown before the asset code input and combined with the suffix.',
+    'assets.settings.save': 'Save Settings',
+    'assets.assignments.title': 'Member Asset Responsibilities',
+    'assets.assignments.member': 'Member',
+    'assets.assignments.asset_code': 'Asset Code',
+    'assets.assignments.organization': 'Owning Unit',
+    'assets.assignments.category': 'Category',
+    'assets.assignments.model': 'Model / Configuration',
+    'assets.assignments.location': 'Location',
+    'assets.assignments.status': 'Status',
+    'assets.assignments.updated_at': 'Updated',
+    'assets.assignments.none': 'No member asset data',
+    'assets.assignments.member_empty': 'No assets assigned.'
   ,
   'reimburse.title': 'Reimbursement Batches',
   'reimburse.add_batch': 'Add Batch',
@@ -1020,6 +1039,7 @@ const translations = {
     'assets.inbound.delete.double': '请再次确认：该入库单下的所有固定资产都会被删除。',
     'assets.list.title': '固定资产清单',
     'assets.add': '新建固定资产',
+    'assets.export': '导出Excel',
     'assets.edit': '编辑固定资产',
     'assets.table.order_number': '入库单号',
     'assets.table.asset_code': '资产编号',
@@ -1040,6 +1060,7 @@ const translations = {
     'assets.form.inbound': '绑定入库单',
     'assets.form.inbound_placeholder': '选择入库单',
     'assets.form.asset_code': '固定资产编号',
+    'assets.form.asset_code_suffix_placeholder': '留空自动生成',
     'assets.form.status': '资产状态',
     'assets.form.category': '资产类别',
     'assets.form.model': '型号配置',
@@ -1079,12 +1100,29 @@ const translations = {
     'assets.messages.asset_created': '固定资产新建成功。',
     'assets.messages.asset_updated': '固定资产更新成功。',
     'assets.messages.asset_deleted': '固定资产删除成功。',
+    'assets.messages.settings_saved': '通用配置更新成功。',
     'assets.messages.asset_code_exists': '固定资产编号已存在。',
     'assets.messages.invalid_seat': '所选工位不存在。',
     'assets.messages.seat_office_mismatch': '所选工位不属于当前办公地点。',
     'assets.messages.image_upload_failed': '资产照片上传失败。',
     'assets.messages.invalid_image': '上传文件不是有效的图片。',
-    'assets.messages.generic_error': '操作失败，请稍后再试。'
+    'assets.messages.generic_error': '操作失败，请稍后再试。',
+    'assets.settings.title': '通用配置',
+    'assets.settings.description': '配置固定资产模块的通用选项。',
+    'assets.settings.code_prefix': '资产编号前缀',
+    'assets.settings.code_prefix_hint': '该前缀会显示在资产编号输入框前，与后缀共同组成完整编号。',
+    'assets.settings.save': '保存配置',
+    'assets.assignments.title': '在岗成员资产列表',
+    'assets.assignments.member': '成员',
+    'assets.assignments.asset_code': '资产编号',
+    'assets.assignments.organization': '所属单位',
+    'assets.assignments.category': '资产类别',
+    'assets.assignments.model': '型号配置',
+    'assets.assignments.location': '所在地点',
+    'assets.assignments.status': '资产状态',
+    'assets.assignments.updated_at': '更新时间',
+    'assets.assignments.none': '暂无在岗成员资产记录',
+    'assets.assignments.member_empty': '暂无负责资产。'
   ,
   'reimburse.title': '报销批次',
   'reimburse.add_batch': '新增批次',
@@ -1380,6 +1418,10 @@ function applyTranslations() {
   const exportLink = document.getElementById('exportMembers');
   if(exportLink) {
     exportLink.href = `members_export.php?lang=${lang}`;
+  }
+  const exportAssetsLink = document.getElementById('exportAssets');
+  if (exportAssetsLink) {
+    exportAssetsLink.href = `assets_export.php?lang=${lang}`;
   }
 }
 
