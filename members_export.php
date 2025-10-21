@@ -1,5 +1,6 @@
 <?php
 include 'auth.php';
+require_once 'member_extra_helpers.php';
 
 if (!class_exists('ZipArchive')) {
     http_response_code(500);
@@ -16,13 +17,53 @@ $statusLabels = [
     'en' => ['in_work' => 'Active', 'exited' => 'Exited'],
     'zh' => ['in_work' => '在岗', 'exited' => '已离退'],
 ];
+$extraAttributes = getMemberExtraAttributes($pdo);
+$extraHeadersEn = array_map(function ($attr) {
+    $id = (int)($attr['id'] ?? 0);
+    $nameEn = trim((string)($attr['name_en'] ?? ''));
+    $nameZh = trim((string)($attr['name_zh'] ?? ''));
+    if ($nameEn !== '') {
+        return $nameEn;
+    }
+    if ($nameZh !== '') {
+        return $nameZh;
+    }
+    return 'Attribute ' . $id;
+}, $extraAttributes);
+$extraHeadersZh = array_map(function ($attr) {
+    $id = (int)($attr['id'] ?? 0);
+    $nameZh = trim((string)($attr['name_zh'] ?? ''));
+    $nameEn = trim((string)($attr['name_en'] ?? ''));
+    if ($nameZh !== '') {
+        return $nameZh;
+    }
+    if ($nameEn !== '') {
+        return $nameEn;
+    }
+    return '属性' . $id;
+}, $extraAttributes);
 $selectedHeaders = $headers[$lang] ?? $headers['zh'];
 $statusDisplay = $statusLabels[$lang] ?? $statusLabels['zh'];
+$selectedHeaders = array_merge($selectedHeaders, $lang === 'en' ? $extraHeadersEn : $extraHeadersZh);
 
 $columns = ['campus_id','name','email','identity_number','year_of_join','current_degree','degree_pursuing','phone','wechat','department','workplace','homeplace','status'];
+foreach ($extraAttributes as $attr) {
+    $columns[] = 'extra_' . (int)($attr['id'] ?? 0);
+}
 
-$stmt = $pdo->query('SELECT campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status FROM members');
+$stmt = $pdo->query('SELECT id,campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status FROM members');
 $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$memberIds = array_column($members, 'id');
+$extraValuesMap = !empty($memberIds) ? getMemberExtraValues($pdo, $memberIds) : [];
+foreach ($members as &$member) {
+    $memberId = (int)($member['id'] ?? 0);
+    foreach ($extraAttributes as $attr) {
+        $attrId = (int)($attr['id'] ?? 0);
+        $key = 'extra_' . $attrId;
+        $member[$key] = $extraValuesMap[$memberId][$attrId] ?? (string)($attr['default_value'] ?? '');
+    }
+}
+unset($member);
 
 $activeMembers = array_values(array_filter($members, fn($m) => ($m['status'] ?? '') === 'in_work'));
 $exitedMembers = array_values(array_filter($members, fn($m) => ($m['status'] ?? '') !== 'in_work'));

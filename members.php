@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 include_once 'auth.php';
+require_once 'member_extra_helpers.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') === 'save') {
     if (($_SESSION['role'] ?? '') !== 'manager') {
@@ -25,6 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
     $workplace = trim($_POST['workplace'] ?? '');
     $homeplace = trim($_POST['homeplace'] ?? '');
     $status = ($_POST['status'] ?? 'in_work') === 'exited' ? 'exited' : 'in_work';
+
+    $extraAttributes = getMemberExtraAttributes($pdo);
 
     if ($memberId) {
         $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=?, status=? WHERE id=?');
@@ -64,7 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
             $status,
             $nextOrder
         ]);
+        $memberId = (int)$pdo->lastInsertId();
     }
+
+    $extraValues = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
+    ensureMemberExtraValues($pdo, (int)$memberId, $extraValues, $extraAttributes);
 
     header('Location: members.php');
     exit();
@@ -86,6 +93,8 @@ $columns = [
     'workplace' => ['key' => 'members.table.workplace', 'label' => '工作地点'],
     'homeplace' => ['key' => 'members.table.homeplace', 'label' => '家庭住址']
 ];
+
+$extraAttributes = $extraAttributes ?? getMemberExtraAttributes($pdo);
 
 if($_SESSION['role'] === 'member') {
     $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
@@ -130,6 +139,12 @@ if($_SESSION['role'] === 'member') {
         $inWorkByDegree[$degreeKey] = (int)($row['total'] ?? 0);
     }
     arsort($inWorkByDegree);
+}
+
+$memberExtraValues = [];
+if (!empty($members)) {
+    $memberIds = array_column($members, 'id');
+    $memberExtraValues = getMemberExtraValues($pdo, $memberIds);
 }
 
 $summaryCounts = [];
@@ -183,6 +198,7 @@ include 'header.php';
     <a class="btn btn-secondary" href="members_import.php" data-i18n="members.import">从表格导入</a>
     <a class="btn btn-secondary" href="members_export.php" id="exportMembers" data-i18n="members.export">导出至表格</a>
     <button type="button" class="btn btn-warning qr-btn" data-url="member_self_update.php" data-i18n="members.request_update">请求信息更新</button>
+    <button type="button" class="btn btn-outline-primary" id="editExtraAttributesBtn" data-i18n="members.extra.edit">编辑额外属性</button>
   </div>
   <?php endif; ?>
 </div>
@@ -270,6 +286,14 @@ include 'header.php';
     <?php else: ?>
       <th data-i18n="<?= $key; ?>"><?= htmlspecialchars($label); ?></th>
     <?php endif; endforeach; ?>
+    <?php foreach ($extraAttributes as $attr):
+        $nameZh = trim((string)($attr['name_zh'] ?? ''));
+        $nameEn = trim((string)($attr['name_en'] ?? ''));
+        $attrId = (int)($attr['id'] ?? 0);
+        $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('Attr ' . $attrId));
+    ?>
+      <th data-extra-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-extra-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($display); ?></th>
+    <?php endforeach; ?>
     <th data-i18n="members.table.actions">操作</th>
   </tr>
   </thead>
@@ -294,6 +318,21 @@ include 'header.php';
     <td><?= htmlspecialchars($m['department']); ?></td>
     <td><?= htmlspecialchars($m['workplace']); ?></td>
     <td><?= htmlspecialchars($m['homeplace']); ?></td>
+    <?php
+      $memberId = (int)($m['id'] ?? 0);
+      $rowExtraValues = [];
+      foreach ($extraAttributes as $attr) {
+        $attrId = (int)($attr['id'] ?? 0);
+        $rowExtraValues[$attrId] = (string)($memberExtraValues[$memberId][$attrId] ?? ($attr['default_value'] ?? ''));
+      }
+      $rowExtraJson = htmlspecialchars(json_encode($rowExtraValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+    ?>
+    <?php foreach ($extraAttributes as $attr):
+      $attrId = (int)($attr['id'] ?? 0);
+      $value = $rowExtraValues[$attrId] ?? '';
+    ?>
+    <td><?= htmlspecialchars($value); ?></td>
+    <?php endforeach; ?>
     <td>
       <button type="button"
               class="btn btn-sm btn-primary member-edit-btn"
@@ -310,6 +349,7 @@ include 'header.php';
               data-department="<?= htmlspecialchars((string)($m['department'] ?? ''), ENT_QUOTES); ?>"
               data-workplace="<?= htmlspecialchars((string)($m['workplace'] ?? ''), ENT_QUOTES); ?>"
               data-homeplace="<?= htmlspecialchars((string)($m['homeplace'] ?? ''), ENT_QUOTES); ?>"
+              data-extra='<?= $rowExtraJson; ?>'
               data-status="<?= htmlspecialchars((string)($m['status'] ?? 'in_work'), ENT_QUOTES); ?>"
               data-i18n="members.action.edit">编辑</button>
       <?php if($_SESSION['role'] === 'manager'): ?>
@@ -382,6 +422,24 @@ include 'header.php';
                 <label class="form-label" data-i18n="members.table.homeplace">Homeplace</label>
                 <input type="text" name="homeplace" class="form-control">
               </div>
+              <?php if (!empty($extraAttributes)): ?>
+              <div class="col-12">
+                <hr class="my-2">
+                <h6 class="text-muted" data-i18n="members.extra.section_title">额外属性</h6>
+              </div>
+              <?php foreach ($extraAttributes as $attr):
+                $attrId = (int)($attr['id'] ?? 0);
+                $nameZh = (string)($attr['name_zh'] ?? '');
+                $nameEn = (string)($attr['name_en'] ?? '');
+                $defaultValue = (string)($attr['default_value'] ?? '');
+                $displayName = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('Attr ' . $attrId));
+              ?>
+              <div class="col-md-6">
+                <label class="form-label" data-extra-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-extra-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($displayName); ?></label>
+                <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>">
+              </div>
+              <?php endforeach; ?>
+              <?php endif; ?>
               <div class="col-md-6">
                 <label class="form-label" data-i18n="members.table.status">Status</label>
                 <select name="status" class="form-select">
@@ -399,6 +457,30 @@ include 'header.php';
       </div>
     </div>
   </div>
+  <div class="modal fade" id="extraAttributesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <form id="extraAttributesForm">
+          <div class="modal-header">
+            <h5 class="modal-title" data-i18n="members.extra.modal_title">编辑额外属性</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted" data-i18n="members.extra.description">额外属性会显示在成员列表中，并同步到新增、编辑以及信息更新页面。</p>
+            <div id="extraAttributesList" class="mt-3"></div>
+            <button type="button" class="btn btn-outline-secondary mt-3" id="addExtraAttribute" data-i18n="members.extra.add">新增属性</button>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="members.extra.cancel">取消</button>
+            <button type="submit" class="btn btn-primary" data-i18n="members.extra.save">保存</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script>
+    const memberExtraAttributes = <?= json_encode($extraAttributes, JSON_UNESCAPED_UNICODE); ?>;
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
   <script>
   document.addEventListener('DOMContentLoaded', function(){
@@ -455,6 +537,7 @@ include 'header.php';
       }
       const memberModal = new bootstrap.Modal(memberModalElement);
       const fieldNames = ['campus_id','name','email','identity_number','year_of_join','current_degree','degree_pursuing','phone','wechat','department','workplace','homeplace'];
+      const extraInputs = Array.from(memberForm.querySelectorAll('[data-extra-field]'));
       function translate(key){
         const lang = document.documentElement.lang || 'zh';
         return (translations?.[lang] && translations[lang][key]) || key;
@@ -466,10 +549,17 @@ include 'header.php';
         modalTitle.setAttribute('data-i18n', key);
         modalTitle.textContent = translate(key);
       }
+      function resetExtraFields(){
+        extraInputs.forEach(function(input){
+          const defaultValue = input.dataset.defaultValue ?? '';
+          input.value = defaultValue;
+        });
+      }
       function resetForm(){
         memberForm.reset();
         memberForm.elements['member_id'].value = '';
         memberForm.elements['status'].value = 'in_work';
+        resetExtraFields();
       }
       addMemberBtn?.addEventListener('click', function(){
         resetForm();
@@ -486,9 +576,173 @@ include 'header.php';
             const datasetKey = name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
             memberForm.elements[name].value = data[datasetKey] || '';
           });
+          let extraData = {};
+          if (data.extra) {
+            try {
+              extraData = JSON.parse(data.extra);
+            } catch (error) {
+              extraData = {};
+            }
+          }
+          extraInputs.forEach(function(input){
+            const attrId = input.dataset.attributeId;
+            if (attrId && Object.prototype.hasOwnProperty.call(extraData, attrId)) {
+              input.value = extraData[attrId] ?? '';
+            } else {
+              input.value = input.dataset.defaultValue ?? '';
+            }
+          });
           memberForm.elements['status'].value = data.status || 'in_work';
           setModalTitle('member_edit.title_edit');
           memberModal.show();
+        });
+      });
+    }
+
+    const editExtraBtn = document.getElementById('editExtraAttributesBtn');
+    const extraAttributesModalEl = document.getElementById('extraAttributesModal');
+    const extraAttributesForm = document.getElementById('extraAttributesForm');
+    const extraAttributesList = document.getElementById('extraAttributesList');
+    const addExtraAttributeBtn = document.getElementById('addExtraAttribute');
+    if(editExtraBtn && extraAttributesModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal){
+      const extraModal = new bootstrap.Modal(extraAttributesModalEl);
+      const cloneAttributes = (list) => Array.isArray(list) ? list.map(attr => ({
+        id: attr.id ?? null,
+        name_zh: attr.name_zh ?? '',
+        name_en: attr.name_en ?? '',
+        default_value: attr.default_value ?? ''
+      })) : [];
+      let workingAttributes = cloneAttributes(window.memberExtraAttributes || []);
+      const getLang = () => document.documentElement.lang || 'zh';
+      const translationsFor = (key, fallback) => {
+        const lang = getLang();
+        return translations?.[lang]?.[key] ?? fallback;
+      };
+      const validationMessage = () => translationsFor('members.extra.validation', '请为每个属性提供中文或英文名称。');
+      const saveErrorMessage = () => translationsFor('members.extra.save_error', '保存失败，请稍后重试。');
+      const emptyMessage = () => translationsFor('members.extra.empty', '暂无额外属性。');
+      function escapeHtml(text){
+        return String(text ?? '').replace(/[&<>"']/g, function(ch){
+          switch(ch){
+            case '&': return '&amp;';
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '"': return '&quot;';
+            case "'": return '&#39;';
+            default: return ch;
+          }
+        });
+      }
+      function renderExtraAttributes(){
+        if(!extraAttributesList){
+          return;
+        }
+        extraAttributesList.innerHTML='';
+        if(!workingAttributes.length){
+          const emptyDiv=document.createElement('div');
+          emptyDiv.className='text-muted';
+          emptyDiv.setAttribute('data-i18n','members.extra.empty');
+          emptyDiv.textContent = emptyMessage();
+          extraAttributesList.appendChild(emptyDiv);
+          if(typeof applyTranslations==='function'){
+            applyTranslations();
+          }
+          return;
+        }
+        workingAttributes.forEach(function(attr,index){
+          const wrapper=document.createElement('div');
+          wrapper.className='border rounded p-3 mb-3';
+          wrapper.dataset.index=String(index);
+          wrapper.innerHTML=`<div class="row g-3 align-items-end">
+  <div class="col-md-4">
+    <label class="form-label" data-i18n="members.extra.field.name_zh">中文名称</label>
+    <input type="text" class="form-control" data-field="name_zh" value="${escapeHtml(attr.name_zh)}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" data-i18n="members.extra.field.name_en">英文名称</label>
+    <input type="text" class="form-control" data-field="name_en" value="${escapeHtml(attr.name_en)}">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label" data-i18n="members.extra.field.default_value">默认值</label>
+    <input type="text" class="form-control" data-field="default_value" value="${escapeHtml(attr.default_value)}">
+  </div>
+  <div class="col-12 d-flex justify-content-end mt-2">
+    <button type="button" class="btn btn-sm btn-outline-danger extra-attr-delete" data-index="${index}" data-i18n="members.extra.delete">删除</button>
+  </div>
+</div>`;
+          extraAttributesList.appendChild(wrapper);
+        });
+        if(typeof applyTranslations==='function'){
+          applyTranslations();
+        }
+      }
+      editExtraBtn.addEventListener('click', function(){
+        workingAttributes = cloneAttributes(window.memberExtraAttributes || []);
+        renderExtraAttributes();
+        extraModal.show();
+      });
+      addExtraAttributeBtn?.addEventListener('click', function(){
+        workingAttributes.push({id:null,name_zh:'',name_en:'',default_value:''});
+        renderExtraAttributes();
+      });
+      extraAttributesList?.addEventListener('input', function(event){
+        const target = event.target;
+        if(!(target instanceof HTMLInputElement)){
+          return;
+        }
+        const row = target.closest('[data-index]');
+        if(!row){
+          return;
+        }
+        const index = Number(row.dataset.index);
+        if(Number.isNaN(index) || !workingAttributes[index]){
+          return;
+        }
+        const field = target.getAttribute('data-field');
+        if(!field){
+          return;
+        }
+        workingAttributes[index][field] = target.value;
+      });
+      extraAttributesList?.addEventListener('click', function(event){
+        const deleteBtn = event.target.closest('.extra-attr-delete');
+        if(!deleteBtn){
+          return;
+        }
+        const index = Number(deleteBtn.dataset.index);
+        if(Number.isNaN(index)){
+          return;
+        }
+        workingAttributes.splice(index, 1);
+        renderExtraAttributes();
+      });
+      extraAttributesForm?.addEventListener('submit', function(event){
+        event.preventDefault();
+        const payload = workingAttributes.map(function(attr){
+          return {
+            id: attr.id ?? null,
+            name_zh: String(attr.name_zh ?? '').trim(),
+            name_en: String(attr.name_en ?? '').trim(),
+            default_value: String(attr.default_value ?? '')
+          };
+        });
+        const validCount = payload.filter(item => item.name_zh !== '' || item.name_en !== '').length;
+        if(payload.length !== validCount){
+          alert(validationMessage());
+          return;
+        }
+        fetch('member_extra_attributes.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({attributes: payload})
+        }).then(response => response.json()).then(data => {
+          if(data?.success){
+            window.location.reload();
+          } else {
+            alert(data?.error || saveErrorMessage());
+          }
+        }).catch(() => {
+          alert(saveErrorMessage());
         });
       });
     }
