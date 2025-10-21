@@ -925,13 +925,14 @@ include 'header.php';
       const label = document.getElementById('deleteModalLabel');
       const body = document.getElementById('deleteModalBody');
       const lang = document.documentElement.lang || 'zh';
+      body.removeAttribute('data-i18n-params');
       if (target === 'asset') {
         const id = button.getAttribute('data-id');
         const code = button.getAttribute('data-code');
         document.getElementById('deleteAssetId').value = id;
         label.setAttribute('data-i18n', 'assets.delete.title');
         body.setAttribute('data-i18n', 'assets.delete.message');
-        body.textContent = translations[lang]['assets.delete.message'].replace('{code}', code);
+        body.setAttribute('data-i18n-params', JSON.stringify({ code: code || '' }));
       } else {
         const id = button.getAttribute('data-id');
         const count = button.getAttribute('data-assets');
@@ -939,7 +940,7 @@ include 'header.php';
         document.getElementById('deleteInboundId').value = id;
         label.setAttribute('data-i18n', 'assets.inbound.delete.title');
         body.setAttribute('data-i18n', 'assets.inbound.delete.message');
-        body.textContent = translations[lang]['assets.inbound.delete.message'].replace('{order}', order).replace('{count}', count);
+        body.setAttribute('data-i18n-params', JSON.stringify({ order: order || '', count: count || '0' }));
         const row = document.querySelector(`tr[data-order-id="${id}"]`);
         row?.classList.add('highlight-delete');
         setTimeout(() => row?.classList.remove('highlight-delete'), 2000);

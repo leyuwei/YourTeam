@@ -1291,8 +1291,21 @@ function applyTranslations() {
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    const text = translations[lang][key];
-    if(text) {
+    let text = translations[lang][key];
+    if (text) {
+      const paramsAttr = el.getAttribute('data-i18n-params');
+      if (paramsAttr) {
+        try {
+          const params = JSON.parse(paramsAttr);
+          Object.keys(params).forEach(paramKey => {
+            const value = params[paramKey];
+            const pattern = new RegExp(`\\{${paramKey}\\}`, 'g');
+            text = text.replace(pattern, value);
+          });
+        } catch (err) {
+          console.error('Invalid translation params', err);
+        }
+      }
       el.textContent = text;
     }
   });
