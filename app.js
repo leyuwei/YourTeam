@@ -219,10 +219,24 @@ const translations = {
     'bold_font': 'Bold font',
     'members.title': 'Team Members',
     'members.add': 'Add Member',
-    'members.import': 'Import from Spreadsheet',
+  'members.import': 'Import from Spreadsheet',
   'members.export': 'Export to Spreadsheet',
   'members.request_update': 'Request Info Update',
   'members.toggle_color': 'Toggle Colors',
+  'members.extra.edit': 'Edit Attributes',
+  'members.extra.modal_title': 'Edit Extra Attributes',
+  'members.extra.description': 'Extra attributes will appear in the member list and in all member forms.',
+  'members.extra.add': 'Add Attribute',
+  'members.extra.cancel': 'Cancel',
+  'members.extra.save': 'Save Changes',
+  'members.extra.empty': 'No extra attributes defined yet.',
+  'members.extra.validation': 'Please provide either a Chinese or an English name for each attribute.',
+  'members.extra.save_error': 'Failed to save attributes. Please try again later.',
+  'members.extra.section_title': 'Extra Attributes',
+  'members.extra.field.name_zh': 'Chinese Name',
+  'members.extra.field.name_en': 'English Name',
+  'members.extra.field.default_value': 'Default Value',
+  'members.extra.delete': 'Remove',
   'members.summary.title': 'Summary',
   'members.summary.in_work_total': 'Current Active Members',
   'members.summary.by_degree': 'Active Members by Current Degree',
@@ -695,10 +709,24 @@ const translations = {
     'bold_font': '加粗字体',
     'members.title': '团队成员',
     'members.add': '新增成员',
-    'members.import': '从表格导入',
+  'members.import': '从表格导入',
   'members.export': '导出至表格',
   'members.request_update': '请求信息更新',
   'members.toggle_color': '切换颜色',
+  'members.extra.edit': '编辑额外属性',
+  'members.extra.modal_title': '编辑额外属性',
+  'members.extra.description': '这些额外属性会展示在成员列表以及新增、编辑和信息更新页面。',
+  'members.extra.add': '新增属性',
+  'members.extra.cancel': '取消',
+  'members.extra.save': '保存',
+  'members.extra.empty': '暂无额外属性。',
+  'members.extra.validation': '请为每个属性提供中文或英文名称。',
+  'members.extra.save_error': '保存失败，请稍后重试。',
+  'members.extra.section_title': '额外属性',
+  'members.extra.field.name_zh': '中文名称',
+  'members.extra.field.name_en': '英文名称',
+  'members.extra.field.default_value': '默认值',
+  'members.extra.delete': '删除',
   'members.summary.title': '成员汇总',
   'members.summary.in_work_total': '当前在岗总人数',
   'members.summary.by_degree': '按当前学历统计在岗人数',
@@ -1104,6 +1132,17 @@ function applyTranslations() {
     const text = translations[lang][key];
     if(text) {
       el.setAttribute('placeholder', text);
+    }
+  });
+  document.querySelectorAll('[data-extra-name-zh]').forEach(el => {
+    const zhName = el.getAttribute('data-extra-name-zh') || '';
+    const enName = el.getAttribute('data-extra-name-en') || '';
+    const fallback = typeof el.textContent === 'string' ? el.textContent : '';
+    const text = lang === 'en'
+      ? (enName || zhName || fallback)
+      : (zhName || enName || fallback);
+    if (typeof el.textContent === 'string') {
+      el.textContent = text;
     }
   });
   const langToggle = document.getElementById('langToggle');

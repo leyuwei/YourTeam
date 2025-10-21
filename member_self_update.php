@@ -1,11 +1,14 @@
 <?php
 require 'config.php';
+require_once 'member_extra_helpers.php';
 $member_id = $_SESSION['self_update_member_id'] ?? null;
 $member = null;
 $error = '';
 $msg = '';
 $current_projects = [];
 $current_directions = [];
+$extraAttributes = getMemberExtraAttributes($pdo);
+$memberExtraValues = [];
 
 if(isset($_POST['action']) && $_POST['action'] === 'verify'){
     $name = $_POST['name'];
@@ -16,6 +19,8 @@ if(isset($_POST['action']) && $_POST['action'] === 'verify'){
     if($member){
         $_SESSION['self_update_member_id'] = $member['id'];
         $member_id = $member['id'];
+        $valuesMap = getMemberExtraValues($pdo, [$member_id]);
+        $memberExtraValues = $valuesMap[$member_id] ?? [];
     } else {
         $error = '输入信息校验失败，请检查并重新提交验证.';
     }
@@ -26,6 +31,8 @@ if($member_id){
         $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
         $stmt->execute([$member_id]);
         $member = $stmt->fetch();
+        $valuesMap = getMemberExtraValues($pdo, [$member_id]);
+        $memberExtraValues = $valuesMap[$member_id] ?? [];
     }
     if(isset($_POST['action']) && $_POST['action'] === 'update'){
         $campus_id = $_POST['campus_id'];
@@ -42,10 +49,14 @@ if($member_id){
         $homeplace = $_POST['homeplace'];
         $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=? WHERE id=?');
         $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$member_id]);
+        $extraSubmitted = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
+        ensureMemberExtraValues($pdo, $member_id, $extraSubmitted, $extraAttributes);
         $msg = 'Information updated successfully.';
         $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
         $stmt->execute([$member_id]);
         $member = $stmt->fetch();
+        $valuesMap = getMemberExtraValues($pdo, [$member_id]);
+        $memberExtraValues = $valuesMap[$member_id] ?? [];
     }
     $projStmt = $pdo->prepare('SELECT p.title FROM project_member_log l JOIN projects p ON l.project_id=p.id WHERE l.member_id=? AND l.exit_time IS NULL ORDER BY l.sort_order');
     $projStmt->execute([$member_id]);
@@ -135,6 +146,22 @@ if($member_id){
     <label class="form-label">家庭地址</label>
     <input type="text" name="homeplace" class="form-control" value="<?= htmlspecialchars($member['homeplace']); ?>">
   </div>
+  <?php if(!empty($extraAttributes)): ?>
+    <hr class="my-4">
+    <h4 class="mt-4">额外属性</h4>
+    <?php foreach($extraAttributes as $attr):
+      $attrId = (int)($attr['id'] ?? 0);
+      $nameZh = (string)($attr['name_zh'] ?? '');
+      $nameEn = (string)($attr['name_en'] ?? '');
+      $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('属性' . $attrId));
+      $value = $memberExtraValues[$attrId] ?? ($attr['default_value'] ?? '');
+    ?>
+    <div class="mb-3">
+      <label class="form-label"><?= htmlspecialchars($display); ?></label>
+      <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars((string)$value, ENT_QUOTES); ?>">
+    </div>
+    <?php endforeach; ?>
+  <?php endif; ?>
   <button type="submit" class="btn btn-primary">更新信息</button>
 </form>
 <h4 class="mt-5">当前参与/承担的项目</h4>

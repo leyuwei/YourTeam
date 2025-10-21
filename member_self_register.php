@@ -1,7 +1,9 @@
 <?php
 require 'config.php';
+require_once 'member_extra_helpers.php';
 $error = '';
 $msg = '';
+$extraAttributes = getMemberExtraAttributes($pdo);
 if(isset($_POST['action']) && $_POST['action'] === 'register'){
     $campus_id = trim($_POST['campus_id']);
     $name = trim($_POST['name']);
@@ -21,6 +23,8 @@ if(isset($_POST['action']) && $_POST['action'] === 'register'){
         $nextOrder = $orderStmt->fetchColumn();
         $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,'in_work',$nextOrder]);
+        $newMemberId = (int)$pdo->lastInsertId();
+        ensureMemberExtraValues($pdo, $newMemberId, [], $extraAttributes);
         $msg = '注册成功。';
     } catch (Exception $e) {
         $error = '注册失败，请检查输入后再试。';
