@@ -407,8 +407,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $flash = $_SESSION['asset_flash'] ?? null;
 unset($_SESSION['asset_flash']);
 
-$inboundTableStmt = $pdo->query('SELECT io.*, COUNT(a.id) AS asset_count FROM asset_inbound_orders io LEFT JOIN assets a ON a.inbound_order_id = io.id GROUP BY io.id ORDER BY io.arrival_date DESC, io.id DESC');
-$inboundOrders = $inboundTableStmt->fetchAll();
+$inboundOrders = [];
+if ($is_manager) {
+    $inboundTableStmt = $pdo->query('SELECT io.*, COUNT(a.id) AS asset_count FROM asset_inbound_orders io LEFT JOIN assets a ON a.inbound_order_id = io.id GROUP BY io.id ORDER BY io.arrival_date DESC, io.id DESC');
+    $inboundOrders = $inboundTableStmt->fetchAll();
+}
 
 $assetQuery = 'SELECT a.*, io.order_number, io.arrival_date, m.name AS owner_name, o.name AS office_name, s.label AS seat_label FROM assets a JOIN asset_inbound_orders io ON a.inbound_order_id=io.id LEFT JOIN members m ON a.owner_member_id=m.id LEFT JOIN offices o ON a.current_office_id=o.id LEFT JOIN office_seats s ON a.current_seat_id=s.id';
 $params = [];
@@ -421,15 +424,21 @@ $stmt = $pdo->prepare($assetQuery);
 $stmt->execute($params);
 $assets = $stmt->fetchAll();
 
-$categoryStmt = $pdo->prepare('SELECT category, COUNT(*) AS total FROM assets' . ($params ? ' WHERE owner_member_id = ?' : '') . ' GROUP BY category ORDER BY total DESC');
-$categoryStmt->execute($params);
-$categoryStats = $categoryStmt->fetchAll();
+$categoryStats = [];
+$statusStats = [];
+if ($is_manager) {
+    $categoryStmt = $pdo->prepare('SELECT category, COUNT(*) AS total FROM assets GROUP BY category ORDER BY total DESC');
+    $categoryStmt->execute();
+    $categoryStats = $categoryStmt->fetchAll();
 
-$statusStmt = $pdo->prepare('SELECT status, COUNT(*) AS total FROM assets' . ($params ? ' WHERE owner_member_id = ?' : '') . ' GROUP BY status');
-$statusStmt->execute($params);
-$statusStats = $statusStmt->fetchAll();
+    $statusStmt = $pdo->prepare('SELECT status, COUNT(*) AS total FROM assets GROUP BY status');
+    $statusStmt->execute();
+    $statusStats = $statusStmt->fetchAll();
+}
 
-$inboundOptions = $pdo->query('SELECT id, order_number FROM asset_inbound_orders ORDER BY arrival_date DESC, id DESC')->fetchAll();
+$inboundOptions = $is_manager
+    ? $pdo->query('SELECT id, order_number FROM asset_inbound_orders ORDER BY arrival_date DESC, id DESC')->fetchAll()
+    : [];
 $members = $pdo->query('SELECT id, name FROM members ORDER BY name')->fetchAll();
 $offices = $pdo->query('SELECT id, name, location_description, region FROM offices ORDER BY name')->fetchAll();
 $seats = $pdo->query('SELECT id, office_id, label FROM office_seats ORDER BY label')->fetchAll();
@@ -488,6 +497,7 @@ include 'header.php';
   </div>
 </div>
 <?php endif; ?>
+<?php if ($is_manager): ?>
 <div class="asset-stats mb-4">
   <div class="row g-3">
     <div class="col-12">
@@ -581,6 +591,7 @@ include 'header.php';
     </div>
   </div>
 </div>
+<?php endif; ?>
 <div class="card mb-4">
   <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <h3 class="mb-0" data-i18n="assets.list.title">Asset Inventory</h3>
@@ -596,7 +607,9 @@ include 'header.php';
       <table class="table table-hover table-bordered align-middle mb-0 asset-table-nowrap">
         <thead class="table-light">
           <tr>
+            <?php if ($is_manager): ?>
             <th data-i18n="assets.table.order_number">Order #</th>
+            <?php endif; ?>
             <th data-i18n="assets.table.asset_code">Asset Code</th>
             <th data-i18n="assets.table.category">Category</th>
             <th data-i18n="assets.table.model">Model</th>
@@ -615,7 +628,9 @@ include 'header.php';
             <?php foreach ($assets as $asset): ?>
             <?php $canEdit = $is_manager || (int)$asset['owner_member_id'] === (int)$member_id; ?>
             <tr data-asset-id="<?= (int)$asset['id']; ?>">
+              <?php if ($is_manager): ?>
               <td><?= htmlspecialchars($asset['order_number']); ?></td>
+              <?php endif; ?>
               <td><?= htmlspecialchars($asset['asset_code']); ?></td>
               <td><?= htmlspecialchars($asset['category']); ?></td>
               <td><?= htmlspecialchars($asset['model']); ?></td>
@@ -660,14 +675,13 @@ include 'header.php';
             </tr>
             <?php endforeach; ?>
           <?php else: ?>
-            <tr><td colspan="12" class="text-center" data-i18n="assets.none">No assets</td></tr>
+            <tr><td colspan="<?= $is_manager ? '12' : '11'; ?>" class="text-center" data-i18n="assets.none">No assets</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
   </div>
 </div>
-
 <form id="deleteInboundForm" method="post" class="d-none">
   <input type="hidden" name="action" value="delete_inbound">
   <input type="hidden" name="id" id="deleteInboundId">
@@ -790,12 +804,16 @@ include 'header.php';
     <form class="modal-content" method="post" enctype="multipart/form-data" id="assetForm">
       <input type="hidden" name="action" value="save_asset">
       <input type="hidden" name="id" id="asset-id">
+      <?php if (!$is_manager): ?>
+      <input type="hidden" name="inbound_order_id" id="asset-inbound">
+      <?php endif; ?>
       <div class="modal-header">
         <h5 class="modal-title" id="assetModalLabel" data-i18n="assets.add">New Asset</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="row g-3">
+          <?php if ($is_manager): ?>
           <div class="col-md-4">
             <label class="form-label" data-i18n="assets.form.inbound">Inbound Order</label>
             <select class="form-select" name="inbound_order_id" id="asset-inbound" required>
@@ -805,6 +823,7 @@ include 'header.php';
               <?php endforeach; ?>
             </select>
           </div>
+          <?php endif; ?>
           <div class="col-md-4">
             <label class="form-label" data-i18n="assets.form.asset_code">Asset Code</label>
             <div class="input-group">
@@ -962,6 +981,7 @@ include 'header.php';
   const assetCodePrefixDisplay = document.getElementById('asset-code-prefix-display');
   const assetCodeSuffixInput = document.getElementById('asset-code-suffix');
   const assetCodeUsePrefixInput = document.getElementById('asset-code-use-prefix');
+  const assetInboundField = document.getElementById('asset-inbound');
   let deleteTarget = null;
 
   function filterSeats(officeId) {
@@ -999,7 +1019,10 @@ include 'header.php';
       document.getElementById('asset-image-preview').innerHTML = '';
       document.getElementById('assetLogs').innerHTML = '';
       document.getElementById('assetLogsSection').style.display = 'none';
-      document.getElementById('asset-inbound').disabled = false;
+      if (assetInboundField) {
+        assetInboundField.disabled = false;
+        assetInboundField.value = '';
+      }
       document.getElementById('asset-category').readOnly = false;
       document.getElementById('asset-model').readOnly = false;
       document.getElementById('asset-organization').value = '';
@@ -1027,7 +1050,9 @@ include 'header.php';
         title.setAttribute('data-i18n', 'assets.edit');
         const asset = JSON.parse(button.getAttribute('data-asset'));
         document.getElementById('asset-id').value = asset.id;
-        document.getElementById('asset-inbound').value = asset.inbound_order_id;
+        if (assetInboundField) {
+          assetInboundField.value = asset.inbound_order_id;
+        }
         if (assetCodeSuffixInput) {
           let suffixValue = asset.asset_code || '';
           let usesPrefix = false;
@@ -1054,8 +1079,8 @@ include 'header.php';
         if (asset.image_path) {
           document.getElementById('asset-image-preview').innerHTML = `<a href="${asset.image_path}" target="_blank"><img src="${asset.image_path}" class="img-thumbnail" style="max-height:60px;"></a>`;
         }
-        if (role === 'member') {
-          document.getElementById('asset-inbound').disabled = true;
+        if (role === 'member' && assetInboundField && assetInboundField.tagName === 'SELECT') {
+          assetInboundField.disabled = true;
           document.getElementById('asset-category').readOnly = true;
           document.getElementById('asset-model').readOnly = true;
           if (assetCodeSuffixInput) {
