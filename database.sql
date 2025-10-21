@@ -251,6 +251,8 @@ CREATE TABLE assets (
   asset_code VARCHAR(120) NOT NULL UNIQUE,
   category VARCHAR(150) DEFAULT '',
   model VARCHAR(255) DEFAULT '',
+  organization VARCHAR(255) DEFAULT '',
+  remarks TEXT,
   current_office_id INT DEFAULT NULL,
   current_seat_id INT DEFAULT NULL,
   owner_member_id INT DEFAULT NULL,

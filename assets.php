@@ -195,6 +195,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $inboundId = isset($_POST['inbound_order_id']) ? (int)$_POST['inbound_order_id'] : 0;
             $category = trim($_POST['category'] ?? '');
             $model = trim($_POST['model'] ?? '');
+            $organization = trim($_POST['organization'] ?? '');
+            $remarksInput = trim($_POST['remarks'] ?? '');
+            $remarksValue = $remarksInput === '' ? null : $remarksInput;
             $officeId = isset($_POST['office_id']) && $_POST['office_id'] !== '' ? (int)$_POST['office_id'] : null;
             $seatId = isset($_POST['seat_id']) && $_POST['seat_id'] !== '' ? (int)$_POST['seat_id'] : null;
             $ownerId = isset($_POST['owner_id']) && $_POST['owner_id'] !== '' ? (int)$_POST['owner_id'] : null;
@@ -256,8 +259,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $model = $existing['model'];
                     $assetCode = $existing['asset_code'];
                 }
-                $update = $pdo->prepare('UPDATE assets SET inbound_order_id=?, asset_code=?, category=?, model=?, current_office_id=?, current_seat_id=?, owner_member_id=?, status=?, updated_at=NOW() WHERE id=?');
-                $update->execute([$inboundId, $assetCode, $category, $model, $officeId, $seatId, $ownerId, $status, $id]);
+                $update = $pdo->prepare('UPDATE assets SET inbound_order_id=?, asset_code=?, category=?, model=?, organization=?, remarks=?, current_office_id=?, current_seat_id=?, owner_member_id=?, status=?, updated_at=NOW() WHERE id=?');
+                $update->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $status, $id]);
                 $newPath = handle_asset_image_upload($id, $existing['image_path'], $_FILES['image'] ?? [], $errors);
                 if ($errors) {
                     throw new RuntimeException($errors[0]);
@@ -270,6 +273,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($existing['asset_code'] !== $assetCode) $changes[] = 'Code ' . $existing['asset_code'] . ' → ' . $assetCode;
                 if ($existing['category'] !== $category) $changes[] = 'Category updated';
                 if ($existing['model'] !== $model) $changes[] = 'Model updated';
+                if ($existing['organization'] !== $organization) $changes[] = 'Organization updated';
+                $existingRemarks = $existing['remarks'] ?? null;
+                if ($existingRemarks !== $remarksValue) $changes[] = 'Remarks updated';
                 if ((int)$existing['current_office_id'] !== (int)$officeId) $changes[] = 'Office updated';
                 if ((int)$existing['current_seat_id'] !== (int)$seatId) $changes[] = 'Seat updated';
                 if ((int)$existing['owner_member_id'] !== (int)$ownerId) $changes[] = 'Owner updated';
@@ -291,8 +297,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         throw new RuntimeException('assets.messages.asset_code_exists');
                     }
                 }
-                $insert = $pdo->prepare('INSERT INTO assets (inbound_order_id, asset_code, category, model, current_office_id, current_seat_id, owner_member_id, status) VALUES (?,?,?,?,?,?,?,?)');
-                $insert->execute([$inboundId, $assetCode, $category, $model, $officeId, $seatId, $ownerId, $status]);
+                $insert = $pdo->prepare('INSERT INTO assets (inbound_order_id, asset_code, category, model, organization, remarks, current_office_id, current_seat_id, owner_member_id, status) VALUES (?,?,?,?,?,?,?,?,?,?)');
+                $insert->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $status]);
                 $newId = (int)$pdo->lastInsertId();
                 $newPath = handle_asset_image_upload($newId, null, $_FILES['image'] ?? [], $errors);
                 if ($errors) {
@@ -484,6 +490,8 @@ include 'header.php';
             <th data-i18n="assets.table.asset_code">Asset Code</th>
             <th data-i18n="assets.table.category">Category</th>
             <th data-i18n="assets.table.model">Model</th>
+            <th data-i18n="assets.table.organization">Owning Unit</th>
+            <th data-i18n="assets.table.remarks">Remarks</th>
             <th data-i18n="assets.table.location">Location</th>
             <th data-i18n="assets.table.owner">Responsible</th>
             <th data-i18n="assets.table.status">Status</th>
@@ -501,6 +509,19 @@ include 'header.php';
               <td><?= htmlspecialchars($asset['asset_code']); ?></td>
               <td><?= htmlspecialchars($asset['category']); ?></td>
               <td><?= htmlspecialchars($asset['model']); ?></td>
+              <?php $organizationLabel = trim($asset['organization'] ?? ''); ?>
+              <td><?= htmlspecialchars($organizationLabel === '' ? '-' : $organizationLabel); ?></td>
+              <?php
+                $remarksRaw = trim((string)($asset['remarks'] ?? ''));
+                $remarksSingle = $remarksRaw === '' ? '' : preg_replace("/\s+/u", ' ', $remarksRaw);
+              ?>
+              <td>
+                <?php if ($remarksSingle === ''): ?>
+                  <span class="text-muted">-</span>
+                <?php else: ?>
+                  <?= htmlspecialchars($remarksSingle); ?>
+                <?php endif; ?>
+              </td>
               <?php
                 $locationLabel = trim(($asset['office_name'] ? $asset['office_name'] : '') . ($asset['seat_label'] ? (' / ' . $asset['seat_label']) : ''));
               ?>
@@ -529,7 +550,7 @@ include 'header.php';
             </tr>
             <?php endforeach; ?>
           <?php else: ?>
-            <tr><td colspan="10" class="text-center" data-i18n="assets.none">No assets</td></tr>
+            <tr><td colspan="12" class="text-center" data-i18n="assets.none">No assets</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
@@ -636,6 +657,14 @@ include 'header.php';
           <div class="col-md-6">
             <label class="form-label" data-i18n="assets.form.model">Model / Configuration</label>
             <input type="text" class="form-control" name="model" id="asset-model">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" data-i18n="assets.form.organization">Owning Unit</label>
+            <input type="text" class="form-control" name="organization" id="asset-organization">
+          </div>
+          <div class="col-12">
+            <label class="form-label" data-i18n="assets.form.remarks">Remarks</label>
+            <textarea class="form-control" name="remarks" id="asset-remarks" rows="3"></textarea>
           </div>
           <div class="col-md-6">
             <label class="form-label" data-i18n="assets.form.office">Current Office</label>
@@ -782,6 +811,8 @@ include 'header.php';
       document.getElementById('asset-category').readOnly = false;
       document.getElementById('asset-model').readOnly = false;
       document.getElementById('asset-code').readOnly = false;
+      document.getElementById('asset-organization').value = '';
+      document.getElementById('asset-remarks').value = '';
       const title = document.getElementById('assetModalLabel');
       if (mode === 'edit') {
         title.setAttribute('data-i18n', 'assets.edit');
@@ -792,6 +823,8 @@ include 'header.php';
         document.getElementById('asset-status').value = asset.status;
         document.getElementById('asset-category').value = asset.category;
         document.getElementById('asset-model').value = asset.model;
+        document.getElementById('asset-organization').value = asset.organization || '';
+        document.getElementById('asset-remarks').value = asset.remarks || '';
         document.getElementById('asset-office').value = asset.current_office_id || '';
         filterSeats(asset.current_office_id ? String(asset.current_office_id) : '');
         document.getElementById('asset-seat').value = asset.current_seat_id || '';

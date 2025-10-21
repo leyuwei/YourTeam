@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS assets (
   asset_code VARCHAR(120) NOT NULL UNIQUE,
   category VARCHAR(150) DEFAULT '',
   model VARCHAR(255) DEFAULT '',
+  organization VARCHAR(255) DEFAULT '',
+  remarks TEXT,
   current_office_id INT DEFAULT NULL,
   current_seat_id INT DEFAULT NULL,
   owner_member_id INT DEFAULT NULL,
@@ -41,3 +43,9 @@ CREATE TABLE IF NOT EXISTS asset_operation_logs (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_asset_logs_target (target_type, target_id)
 );
+
+ALTER TABLE assets
+  ADD COLUMN IF NOT EXISTS organization VARCHAR(255) DEFAULT '' AFTER model;
+
+ALTER TABLE assets
+  ADD COLUMN IF NOT EXISTS remarks TEXT AFTER organization;
