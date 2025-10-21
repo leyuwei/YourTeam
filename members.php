@@ -479,7 +479,7 @@ include 'header.php';
     </div>
   </div>
   <script>
-    const memberExtraAttributes = <?= json_encode($extraAttributes, JSON_UNESCAPED_UNICODE); ?>;
+    window.memberExtraAttributes = <?= json_encode($extraAttributes, JSON_UNESCAPED_UNICODE); ?>;
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
   <script>
