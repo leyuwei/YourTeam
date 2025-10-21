@@ -60,6 +60,16 @@ $today_key = strtolower(date('D'));
 .today-heading .btn{color:inherit;border-color:var(--app-highlight-border);}
 .today-heading .btn:hover,.today-heading .btn:focus{background-color:var(--app-highlight-button-hover);color:var(--app-text-color);}
 .todolist.today{border-left:4px solid var(--app-highlight-border);padding-left:4px;background:var(--app-highlight-surface);}
+.save-status{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:0.5rem;padding:0.75rem 1.25rem;border-radius:999px;background:var(--app-surface-bg);border:1px solid var(--app-surface-border);box-shadow:0 0.75rem 1.5rem rgba(0,0,0,0.08);backdrop-filter:blur(12px);font-size:0.95rem;z-index:1080;color:#198754;font-weight:500;}
+.save-status .status-indicator{width:0.65rem;height:0.65rem;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;flex:0 0 auto;}
+.save-status[data-state='pending']{color:#0d6efd;border-color:rgba(13,110,253,0.3);}
+.save-status[data-state='pending'] .status-indicator{animation:status-pulse 1.4s ease-in-out infinite;}
+.save-status[data-state='success']{color:#198754;border-color:rgba(25,135,84,0.28);}
+.save-status[data-state='error']{color:#b02a37;border-color:rgba(220,53,69,0.28);}
+.save-status[data-state='error'] .status-indicator{animation:none;}
+.save-status .status-text{white-space:nowrap;}
+@keyframes status-pulse{0%{box-shadow:0 0 0 0 rgba(13,110,253,0.45);}70%{box-shadow:0 0 0 10px rgba(13,110,253,0);}100%{box-shadow:0 0 0 0 rgba(13,110,253,0);}}
+@media (max-width:575.98px){.save-status{left:1rem;right:1rem;transform:none;justify-content:center;padding:0.65rem 1rem;border-radius:0.85rem;}.save-status .status-text{white-space:normal;text-align:center;}}
 @media print {
   @page { size: A4; margin: 10mm; }
   body { font-size: 12pt; }
@@ -207,28 +217,63 @@ $today_key = strtolower(date('D'));
     </ul>
   </div>
 </div>
-<div id="saveHint" class="position-fixed bottom-0 end-0 p-3 bg-success text-white rounded" style="display:none;z-index:1080;">已自动保存</div>
-<div id="unsavedWarning" class="position-fixed bottom-0 start-0 p-3 bg-warning text-dark rounded" style="display:none;z-index:1080;">有未保存内容</div>
+<div id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true" data-state="pending" style="display:none;">
+  <span class="status-indicator" aria-hidden="true"></span>
+  <span class="status-text">保存中…</span>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
 window.addEventListener('DOMContentLoaded',()=>{
   const enableEditing = window.innerWidth >= 768;
   let pendingSaves=0;
-  function showHint(){
-    const hint=document.getElementById('saveHint');
-    hint.style.display='block';
-    clearTimeout(hint.dataset.t);
-    hint.dataset.t=setTimeout(()=>{hint.style.display='none';},2000);
+  const statusEl=document.getElementById('saveStatus');
+  const statusDefaults={pending:'保存中…',success:'已自动保存',error:'保存失败，请稍后重试'};
+  let statusTimer=null;
+  function getStatusMessage(state){
+    const key='todolist.status.'+state;
+    const lang=document.documentElement.lang||'zh';
+    if(typeof translations!=='undefined'){
+      if(translations[lang] && translations[lang][key]) return translations[lang][key];
+      if(translations.zh && translations.zh[key]) return translations.zh[key];
+    }
+    return statusDefaults[state]||'';
   }
-  function updateWarning(){
-    const warn=document.getElementById('unsavedWarning');
-    warn.style.display=pendingSaves>0?'block':'none';
+  function hideStatus(){
+    if(!statusEl) return;
+    statusEl.style.display='none';
+    statusEl.setAttribute('aria-hidden','true');
+  }
+  function showStatus(state){
+    if(!statusEl) return;
+    const message=getStatusMessage(state);
+    statusEl.dataset.state=state;
+    statusEl.querySelector('.status-text').textContent=message;
+    statusEl.style.display='flex';
+    statusEl.setAttribute('aria-hidden','false');
+    clearTimeout(statusTimer);
+    if(state==='success'){
+      statusTimer=setTimeout(hideStatus,2000);
+    }else if(state==='error'){
+      statusTimer=setTimeout(hideStatus,4000);
+    }
   }
   function postData(data){
     pendingSaves++;
-    updateWarning();
+    showStatus('pending');
+    let hadError=false;
     return fetch('todolist_save.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
-      .finally(()=>{pendingSaves--;showHint();updateWarning();});
+      .then(response=>{if(!response.ok) throw new Error('Network response was not ok');return response;})
+      .catch(err=>{console.error(err);hadError=true;showStatus('error');throw err;})
+      .finally(()=>{
+        pendingSaves=Math.max(0,pendingSaves-1);
+        if(pendingSaves>0 && !hadError){
+          showStatus('pending');
+        }else if(pendingSaves===0 && !hadError){
+          showStatus('success');
+        }else if(pendingSaves===0 && hadError){
+          // allow error message to linger before hiding automatically
+        }
+      });
   }
   function updateStats(){
     ['work','personal','longterm'].forEach(cat=>{
