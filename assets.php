@@ -368,7 +368,7 @@ $statusStats = $statusStmt->fetchAll();
 
 $inboundOptions = $pdo->query('SELECT id, order_number FROM asset_inbound_orders ORDER BY arrival_date DESC, id DESC')->fetchAll();
 $members = $pdo->query('SELECT id, name FROM members ORDER BY name')->fetchAll();
-$offices = $pdo->query('SELECT id, name FROM offices ORDER BY name')->fetchAll();
+$offices = $pdo->query('SELECT id, name, location_description, region FROM offices ORDER BY name')->fetchAll();
 $seats = $pdo->query('SELECT id, office_id, label FROM office_seats ORDER BY label')->fetchAll();
 
 include 'header.php';
@@ -668,10 +668,26 @@ include 'header.php';
           </div>
           <div class="col-md-6">
             <label class="form-label" data-i18n="assets.form.office">Current Office</label>
-            <select class="form-select" name="office_id" id="asset-office">
+            <select class="form-select" name="office_id" id="asset-office" data-office-select="1">
               <option value="" data-i18n="assets.form.none">None</option>
               <?php foreach ($offices as $office): ?>
-              <option value="<?= (int)$office['id']; ?>"><?= htmlspecialchars($office['name']); ?></option>
+              <?php
+                $officeName = trim((string)$office['name']);
+                $officeRegion = trim((string)($office['region'] ?? ''));
+                $officeLocation = trim((string)($office['location_description'] ?? ''));
+                $infoParts = [];
+                if ($officeRegion !== '') {
+                    $infoParts[] = $officeRegion;
+                }
+                if ($officeLocation !== '') {
+                    $infoParts[] = $officeLocation;
+                }
+                $fallbackLabel = $officeName;
+                if ($infoParts) {
+                    $fallbackLabel .= ' · ' . implode(' · ', $infoParts);
+                }
+              ?>
+              <option value="<?= (int)$office['id']; ?>" data-office-option="1" data-office-name="<?= htmlspecialchars($officeName); ?>" data-office-region="<?= htmlspecialchars($officeRegion); ?>" data-office-location="<?= htmlspecialchars($officeLocation); ?>"><?= htmlspecialchars($fallbackLabel); ?></option>
               <?php endforeach; ?>
             </select>
           </div>

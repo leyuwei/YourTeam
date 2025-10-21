@@ -470,6 +470,10 @@ const translations = {
     'assets.form.image_hint': 'Upload an asset photo for verification.',
     'assets.form.none': 'None',
     'assets.form.reuse_prompt': 'Reuse the last filled category and configuration?',
+    'assets.form.office_option.region_label': 'Region: {region}',
+    'assets.form.office_option.location_label': 'Location: {location}',
+    'assets.form.office_option.main_separator': ' — ',
+    'assets.form.office_option.sub_separator': ' / ',
     'assets.logs.title': 'Operation History',
     'assets.logs.empty': 'No history yet',
     'assets.status.in_use': 'In Use',
@@ -1048,6 +1052,10 @@ const translations = {
     'assets.form.image_hint': '请上传资产照片以便核实。',
     'assets.form.none': '无',
     'assets.form.reuse_prompt': '是否复用上一次填写的类别和型号配置？',
+    'assets.form.office_option.region_label': '所属区域：{region}',
+    'assets.form.office_option.location_label': '位置描述：{location}',
+    'assets.form.office_option.main_separator': ' —— ',
+    'assets.form.office_option.sub_separator': ' / ',
     'assets.logs.title': '操作历史',
     'assets.logs.empty': '暂无记录',
     'assets.status.in_use': '使用中',
@@ -1333,6 +1341,31 @@ function applyTranslations() {
     if (typeof el.textContent === 'string') {
       el.textContent = text;
     }
+  });
+  const officeRegionTemplate = translations[lang]['assets.form.office_option.region_label'] || '{region}';
+  const officeLocationTemplate = translations[lang]['assets.form.office_option.location_label'] || '{location}';
+  const officeMainSeparator = Object.prototype.hasOwnProperty.call(translations[lang], 'assets.form.office_option.main_separator')
+    ? translations[lang]['assets.form.office_option.main_separator']
+    : ' — ';
+  const officeSubSeparator = Object.prototype.hasOwnProperty.call(translations[lang], 'assets.form.office_option.sub_separator')
+    ? translations[lang]['assets.form.office_option.sub_separator']
+    : ' / ';
+  document.querySelectorAll('[data-office-option]').forEach(option => {
+    const name = option.getAttribute('data-office-name') || '';
+    if (!name) {
+      return;
+    }
+    const region = option.getAttribute('data-office-region') || '';
+    const location = option.getAttribute('data-office-location') || '';
+    const segments = [];
+    if (region) {
+      segments.push(officeRegionTemplate.replace('{region}', region));
+    }
+    if (location) {
+      segments.push(officeLocationTemplate.replace('{location}', location));
+    }
+    const detail = segments.join(officeSubSeparator);
+    option.textContent = detail ? `${name}${officeMainSeparator}${detail}` : name;
   });
   const langToggle = document.getElementById('langToggle');
   if(langToggle) {
