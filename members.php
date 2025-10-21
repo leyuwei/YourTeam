@@ -3,12 +3,12 @@ require_once 'config.php';
 include_once 'auth.php';
 require_once 'member_extra_helpers.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') === 'save') {
-    if (($_SESSION['role'] ?? '') !== 'manager') {
-        header('Location: members.php');
-        exit();
-    }
+$role = $_SESSION['role'] ?? '';
+$isManager = $role === 'manager';
+$sessionMemberId = (int)($_SESSION['member_id'] ?? 0);
+$extraAttributes = null;
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') === 'save') {
     $memberId = isset($_POST['member_id']) && $_POST['member_id'] !== ''
         ? (int)$_POST['member_id']
         : null;
@@ -28,9 +28,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
     $status = ($_POST['status'] ?? 'in_work') === 'exited' ? 'exited' : 'in_work';
 
     $extraAttributes = getMemberExtraAttributes($pdo);
+    $extraValues = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
 
-    if ($memberId) {
-        $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=?, status=? WHERE id=?');
+    if ($isManager) {
+        if ($memberId) {
+            $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=?, status=? WHERE id=?');
+            $stmt->execute([
+                $campus_id,
+                $name,
+                $email,
+                $identity_number,
+                $year_of_join,
+                $current_degree,
+                $degree_pursuing,
+                $phone,
+                $wechat,
+                $department,
+                $workplace,
+                $homeplace,
+                $status,
+                $memberId
+            ]);
+        } else {
+            $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order), -1) + 1 FROM members');
+            $nextOrder = (int)($orderStmt->fetchColumn() ?? 0);
+            $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+            $stmt->execute([
+                $campus_id,
+                $name,
+                $email,
+                $identity_number,
+                $year_of_join,
+                $current_degree,
+                $degree_pursuing,
+                $phone,
+                $wechat,
+                $department,
+                $workplace,
+                $homeplace,
+                $status,
+                $nextOrder
+            ]);
+            $memberId = (int)$pdo->lastInsertId();
+        }
+    } elseif ($role === 'member' && $memberId && $memberId === $sessionMemberId) {
+        $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=? WHERE id=?');
         $stmt->execute([
             $campus_id,
             $name,
@@ -44,33 +86,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
             $department,
             $workplace,
             $homeplace,
-            $status,
             $memberId
         ]);
     } else {
-        $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order), -1) + 1 FROM members');
-        $nextOrder = (int)($orderStmt->fetchColumn() ?? 0);
-        $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-        $stmt->execute([
-            $campus_id,
-            $name,
-            $email,
-            $identity_number,
-            $year_of_join,
-            $current_degree,
-            $degree_pursuing,
-            $phone,
-            $wechat,
-            $department,
-            $workplace,
-            $homeplace,
-            $status,
-            $nextOrder
-        ]);
-        $memberId = (int)$pdo->lastInsertId();
+        header('Location: members.php');
+        exit();
     }
 
-    $extraValues = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
     ensureMemberExtraValues($pdo, (int)$memberId, $extraValues, $extraAttributes);
 
     header('Location: members.php');
@@ -96,9 +118,9 @@ $columns = [
 
 $extraAttributes = $extraAttributes ?? getMemberExtraAttributes($pdo);
 
-if($_SESSION['role'] === 'member') {
+if($role === 'member') {
     $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
-    $stmt->execute([$_SESSION['member_id']]);
+    $stmt->execute([$sessionMemberId]);
     $members = $stmt->fetchAll();
     $sort = 'sort_order';
     $dir = 'ASC';
@@ -192,7 +214,7 @@ include 'header.php';
 </style>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="members.title">团队成员</h2>
-  <?php if($_SESSION['role'] === 'manager'): ?>
+  <?php if($isManager): ?>
   <div>
     <button type="button" class="btn btn-success" id="addMemberBtn" data-i18n="members.add">新增成员</button>
     <a class="btn btn-secondary" href="members_import.php" data-i18n="members.import">从表格导入</a>
@@ -202,7 +224,7 @@ include 'header.php';
   </div>
   <?php endif; ?>
 </div>
-<?php if($_SESSION['role'] === 'manager'): ?>
+<?php if($isManager): ?>
 <div class="mb-3">
   <a class="btn btn-sm <?= $statusFilter==='all'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=all&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.all">全部</a>
   <a class="btn btn-sm <?= $statusFilter==='in_work'? 'btn-primary':'btn-outline-primary'; ?>" href="?status=in_work&amp;sort=<?= $sort; ?>&amp;dir=<?= strtolower($dir); ?>" data-i18n="members.filter.in_work">在岗</a>
@@ -280,7 +302,7 @@ include 'header.php';
         $label = $info['label'];
         $key = $info['key'];
         $newDir = ($sort === $col && $dir === 'ASC') ? 'desc' : 'asc';
-        if($_SESSION['role'] === 'manager'):
+        if($isManager):
     ?>
       <th><a href="?sort=<?= $col; ?>&amp;dir=<?= $newDir; ?>&amp;status=<?= $statusFilter; ?>" data-i18n="<?= $key; ?>"><?= htmlspecialchars($label); ?></a></th>
     <?php else: ?>
@@ -300,7 +322,7 @@ include 'header.php';
   <tbody id="memberList">
   <?php foreach($members as $m): ?>
   <tr data-id="<?= $m['id']; ?>" data-year="<?= htmlspecialchars($m['year_of_join']); ?>" data-degree="<?= htmlspecialchars($m['degree_pursuing']); ?>">
-    <?php if($_SESSION['role'] === 'manager'): ?>
+    <?php if($isManager): ?>
     <td class="drag-handle">&#9776;</td>
     <?php else: ?>
     <td></td>
@@ -352,7 +374,7 @@ include 'header.php';
               data-extra='<?= $rowExtraJson; ?>'
               data-status="<?= htmlspecialchars((string)($m['status'] ?? 'in_work'), ENT_QUOTES); ?>"
               data-i18n="members.action.edit">编辑</button>
-      <?php if($_SESSION['role'] === 'manager'): ?>
+      <?php if($isManager): ?>
       <a class="btn btn-sm btn-danger" href="member_delete.php?id=<?= $m['id']; ?>" onclick="return doubleConfirm(translations[document.documentElement.lang]['members.confirm.remove']);" data-i18n="members.action.remove">移除</a>
       <?php endif; ?>
     </td>
@@ -361,7 +383,6 @@ include 'header.php';
   </tbody>
 </table>
   </div>
-  <?php if($_SESSION['role'] === 'manager'): ?>
   <div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
@@ -440,6 +461,7 @@ include 'header.php';
               </div>
               <?php endforeach; ?>
               <?php endif; ?>
+              <?php if($isManager): ?>
               <div class="col-md-6">
                 <label class="form-label" data-i18n="members.table.status">Status</label>
                 <select name="status" class="form-select">
@@ -447,6 +469,7 @@ include 'header.php';
                   <option value="exited" data-i18n="members.status.exited">Exited</option>
                 </select>
               </div>
+              <?php endif; ?>
             </div>
           </div>
           <div class="modal-footer">
@@ -457,6 +480,7 @@ include 'header.php';
       </div>
     </div>
   </div>
+  <?php if($isManager): ?>
   <div class="modal fade" id="extraAttributesModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
@@ -482,25 +506,29 @@ include 'header.php';
     window.memberExtraAttributes = <?= json_encode($extraAttributes, JSON_UNESCAPED_UNICODE); ?>;
   </script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+  <?php endif; ?>
   <script>
   document.addEventListener('DOMContentLoaded', function(){
-    Sortable.create(document.getElementById('memberList'), {
-      handle: '.drag-handle',
-      animation: 150,
-      onEnd: function(){
-        const order = Array.from(document.querySelectorAll('#memberList tr')).map((row, index) => ({id: row.dataset.id, position: index}));
-        fetch('member_order.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({order: order})
-        });
-      }
-    });
-    const exportLink=document.getElementById('exportMembers');
+    const exportLink = document.getElementById('exportMembers');
     if(exportLink){
-      exportLink.href=`members_export.php?lang=${document.documentElement.lang||'zh'}`;
+      exportLink.href = `members_export.php?lang=${document.documentElement.lang||'zh'}`;
     }
-    const toggleBtn=document.getElementById('toggleColor');
+    <?php if($isManager): ?>
+    if(typeof Sortable !== 'undefined' && document.getElementById('memberList')){
+      Sortable.create(document.getElementById('memberList'), {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: function(){
+          const order = Array.from(document.querySelectorAll('#memberList tr')).map((row, index) => ({id: row.dataset.id, position: index}));
+          fetch('member_order.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({order: order})
+          });
+        }
+      });
+    }
+    const toggleBtn = document.getElementById('toggleColor');
     if(toggleBtn){
       let colored=false;
       const colorMap={};
@@ -526,10 +554,12 @@ include 'header.php';
         else{clearColors();toggleBtn.classList.remove('btn-primary');}
       });
     }
+    <?php endif; ?>
     const memberModalElement = document.getElementById('memberModal');
     const memberForm = document.getElementById('memberForm');
     const addMemberBtn = document.getElementById('addMemberBtn');
     const modalTitle = document.getElementById('memberModalTitle');
+    const isManager = <?= $isManager ? 'true' : 'false'; ?>;
     if(memberModalElement && memberForm){
       if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
         console.warn('Bootstrap modal is not available.');
@@ -558,14 +588,18 @@ include 'header.php';
       function resetForm(){
         memberForm.reset();
         memberForm.elements['member_id'].value = '';
-        memberForm.elements['status'].value = 'in_work';
+        if(memberForm.elements['status']){
+          memberForm.elements['status'].value = 'in_work';
+        }
         resetExtraFields();
       }
-      addMemberBtn?.addEventListener('click', function(){
-        resetForm();
-        setModalTitle('member_edit.title_add');
-        memberModal.show();
-      });
+      if(isManager && addMemberBtn){
+        addMemberBtn.addEventListener('click', function(){
+          resetForm();
+          setModalTitle('member_edit.title_add');
+          memberModal.show();
+        });
+      }
       document.querySelectorAll('.member-edit-btn').forEach(function(btn){
         btn.addEventListener('click', function(event){
           event.preventDefault();
@@ -574,7 +608,9 @@ include 'header.php';
           memberForm.elements['member_id'].value = data.id || '';
           fieldNames.forEach(function(name){
             const datasetKey = name.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-            memberForm.elements[name].value = data[datasetKey] || '';
+            if(memberForm.elements[name]){
+              memberForm.elements[name].value = data[datasetKey] || '';
+            }
           });
           let extraData = {};
           if (data.extra) {
@@ -592,13 +628,15 @@ include 'header.php';
               input.value = input.dataset.defaultValue ?? '';
             }
           });
-          memberForm.elements['status'].value = data.status || 'in_work';
-          setModalTitle('member_edit.title_edit');
+          if(memberForm.elements['status']){
+            memberForm.elements['status'].value = data.status || 'in_work';
+          }
+          setModalTitle(data.id ? 'member_edit.title_edit' : 'member_edit.title_add');
           memberModal.show();
         });
       });
     }
-
+    <?php if($isManager): ?>
     const editExtraBtn = document.getElementById('editExtraAttributesBtn');
     const extraAttributesModalEl = document.getElementById('extraAttributesModal');
     const extraAttributesForm = document.getElementById('extraAttributesForm');
@@ -746,7 +784,7 @@ include 'header.php';
         });
       });
     }
+    <?php endif; ?>
   });
   </script>
-  <?php endif; ?>
   <?php include 'footer.php'; ?>
