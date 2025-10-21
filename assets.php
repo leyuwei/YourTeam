@@ -252,6 +252,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $suffixInput = trim((string)($_POST['asset_code_suffix'] ?? ''));
             $usePrefix = $assetCodePrefix !== '' && ($_POST['asset_code_use_prefix'] ?? '1') === '1';
+            $existing = null;
+            if ($id) {
+                $stmt = $pdo->prepare('SELECT * FROM assets WHERE id=?');
+                $stmt->execute([$id]);
+                $existing = $stmt->fetch();
+                if (!$existing) {
+                    throw new RuntimeException('assets.messages.asset_missing');
+                }
+                if (!$is_manager && (int)$existing['owner_member_id'] !== (int)$member_id) {
+                    throw new RuntimeException('assets.messages.permission_denied');
+                }
+            }
+            if ($existing && !$is_manager) {
+                $inboundId = (int)$existing['inbound_order_id'];
+                $category = $existing['category'];
+                $model = $existing['model'];
+            }
+            if ($inboundId <= 0) {
+                throw new RuntimeException('assets.messages.inbound_missing');
+            }
             $stmt = $pdo->prepare('SELECT id FROM asset_inbound_orders WHERE id=?');
             $stmt->execute([$inboundId]);
             if (!$stmt->fetch()) {
@@ -279,15 +299,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             if ($id) {
-                $stmt = $pdo->prepare('SELECT * FROM assets WHERE id=?');
-                $stmt->execute([$id]);
-                $existing = $stmt->fetch();
-                if (!$existing) {
-                    throw new RuntimeException('assets.messages.asset_missing');
-                }
-                if (!$is_manager && (int)$existing['owner_member_id'] !== (int)$member_id) {
-                    throw new RuntimeException('assets.messages.permission_denied');
-                }
                 $assetCode = $usePrefix
                     ? ($suffixInput === '' ? '' : $assetCodePrefix . $suffixInput)
                     : $suffixInput;
