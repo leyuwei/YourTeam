@@ -13,20 +13,32 @@ if($_SESSION['role']==='member'){
     $stmt = $pdo->prepare('SELECT n.id,n.content,n.valid_begin_date,n.valid_end_date,nt.status FROM notifications n JOIN notification_targets nt ON n.id=nt.notification_id WHERE nt.member_id=? AND n.is_revoked=0 AND CURDATE() BETWEEN n.valid_begin_date AND n.valid_end_date ORDER BY CASE nt.status WHEN \'checked\' THEN 1 ELSE 0 END, n.id DESC');
     $stmt->execute([$member_id]);
     $notifications = $stmt->fetchAll();
+    $pendingNotifications = array_filter($notifications, fn($n) => $n['status'] !== 'checked');
 }
 ?>
 
 <?php if($_SESSION['role']==='member'): ?>
+<style>
+  .notification-item.pending {
+    border-left: 4px solid var(--app-highlight-border);
+    background: var(--app-highlight-surface);
+  }
+  .notification-item.pending .notification-content {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--app-highlight-text);
+  }
+</style>
 <h2 class="mt-4 mb-3" data-i18n="index.notifications" style="font-weight:bold; color:red; font-color:red">Notifications</h2>
 <div class="list-group mb-4">
   <?php foreach($notifications as $n): ?>
-  <div class="list-group-item">
+  <div class="list-group-item notification-item <?= $n['status']!=='checked' ? 'pending' : ''; ?>">
     <div class="d-flex w-100 justify-content-between">
-      <p class="mb-1"><?= nl2br(htmlspecialchars($n['content'])); ?></p>
+      <p class="mb-1 notification-content<?= $n['status']!=='checked' ? '' : ' text-body'; ?>"><?= nl2br(htmlspecialchars($n['content'])); ?></p>
       <small><?= htmlspecialchars($n['valid_begin_date']); ?> ~ <?= htmlspecialchars($n['valid_end_date']); ?></small>
     </div>
     <div class="mt-2">
-      <span class="badge bg-secondary me-2" data-i18n="notifications.status.<?= $n['status']; ?>"><?= $n['status']; ?></span>
+      <span class="badge <?= $n['status']!=='checked' ? 'bg-warning text-dark' : 'bg-secondary'; ?> me-2" data-i18n="notifications.status.<?= $n['status']; ?>"><?= $n['status']; ?></span>
       <?php if($n['status']!=='checked'): ?>
       <a class="btn btn-sm btn-outline-success check-notification" href="notification_check.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_check">Check</a>
       <?php endif; ?>
@@ -37,6 +49,37 @@ if($_SESSION['role']==='member'){
   <div class="list-group-item" data-i18n="notifications.none">No notifications</div>
   <?php endif; ?>
 </div>
+<?php if(!empty($pendingNotifications)): ?>
+<div class="modal fade" id="pendingNotificationsModal" tabindex="-1" aria-hidden="true" aria-labelledby="pendingNotificationsTitle" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pendingNotificationsTitle" data-i18n="index.pending_notifications.title">Pending Notifications</h5>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" data-i18n="index.pending_notifications.description">You still have notifications that need your attention.</p>
+        <div class="list-group">
+          <?php foreach($pendingNotifications as $pn): ?>
+          <div class="list-group-item notification-item pending">
+            <div class="d-flex w-100 justify-content-between">
+              <p class="mb-1 notification-content"><?= nl2br(htmlspecialchars($pn['content'])); ?></p>
+              <small><?= htmlspecialchars($pn['valid_begin_date']); ?> ~ <?= htmlspecialchars($pn['valid_end_date']); ?></small>
+            </div>
+            <div class="mt-2">
+              <span class="badge bg-warning text-dark me-2" data-i18n="notifications.status.<?= $pn['status']; ?>"><?= $pn['status']; ?></span>
+              <a class="btn btn-sm btn-outline-success check-notification" href="notification_check.php?id=<?= $pn['id']; ?>" data-i18n="notifications.action_check">Check</a>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-i18n="index.pending_notifications.maybe_later">Maybe Later</button>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 <script>
 document.querySelectorAll('.check-notification').forEach(link=>{
   link.addEventListener('click',e=>{
@@ -46,6 +89,17 @@ document.querySelectorAll('.check-notification').forEach(link=>{
   });
 });
 </script>
+<?php if(!empty($pendingNotifications)): ?>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const modalEl=document.getElementById('pendingNotificationsModal');
+  if(modalEl){
+    const reminderModal=new bootstrap.Modal(modalEl,{backdrop:'static',keyboard:false});
+    reminderModal.show();
+  }
+});
+</script>
+<?php endif; ?>
 <?php endif; ?>
 
 
