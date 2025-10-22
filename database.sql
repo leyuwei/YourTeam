@@ -256,6 +256,7 @@ CREATE TABLE assets (
   current_office_id INT DEFAULT NULL,
   current_seat_id INT DEFAULT NULL,
   owner_member_id INT DEFAULT NULL,
+  owner_external_name VARCHAR(150) DEFAULT NULL,
   image_path VARCHAR(255) DEFAULT NULL,
   status ENUM('in_use','maintenance','pending','lost','retired') DEFAULT 'pending',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

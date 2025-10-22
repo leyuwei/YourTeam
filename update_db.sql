@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS assets (
   current_office_id INT DEFAULT NULL,
   current_seat_id INT DEFAULT NULL,
   owner_member_id INT DEFAULT NULL,
+  owner_external_name VARCHAR(150) DEFAULT NULL,
   image_path VARCHAR(255) DEFAULT NULL,
   status ENUM('in_use','maintenance','pending','lost','retired') DEFAULT 'pending',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -49,6 +50,9 @@ ALTER TABLE assets
 
 ALTER TABLE assets
   ADD COLUMN IF NOT EXISTS remarks TEXT AFTER organization;
+
+ALTER TABLE assets
+  ADD COLUMN IF NOT EXISTS owner_external_name VARCHAR(150) DEFAULT NULL AFTER owner_member_id;
 
 CREATE TABLE IF NOT EXISTS asset_settings (
   id TINYINT UNSIGNED NOT NULL PRIMARY KEY,

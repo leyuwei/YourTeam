@@ -263,15 +263,17 @@ if (isset($_GET['asset_logs'])) {
     $stmt = $pdo->prepare('SELECT owner_member_id FROM assets WHERE id=?');
     $stmt->execute([$assetId]);
     $assetOwner = $stmt->fetchColumn();
-    if (!$assetOwner) {
+    if ($assetOwner === false) {
         http_response_code(404);
         echo json_encode([]);
         exit;
     }
-    if (!$is_manager && $assetOwner != $member_id) {
-        http_response_code(403);
-        echo json_encode([]);
-        exit;
+    if (!$is_manager) {
+        if ($assetOwner === null || (int)$assetOwner !== (int)$member_id) {
+            http_response_code(403);
+            echo json_encode([]);
+            exit;
+        }
     }
     $stmt = $pdo->prepare('SELECT action, details, operator_name, operator_role, created_at FROM asset_operation_logs WHERE target_type="asset" AND target_id=? ORDER BY created_at DESC');
     $stmt->execute([$assetId]);
@@ -526,7 +528,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $remarksValue = $remarksInput === '' ? null : $remarksInput;
             $officeId = isset($_POST['office_id']) && $_POST['office_id'] !== '' ? (int)$_POST['office_id'] : null;
             $seatId = isset($_POST['seat_id']) && $_POST['seat_id'] !== '' ? (int)$_POST['seat_id'] : null;
-            $ownerId = isset($_POST['owner_id']) && $_POST['owner_id'] !== '' ? (int)$_POST['owner_id'] : null;
+            $ownerSelection = isset($_POST['owner_id']) ? trim((string)$_POST['owner_id']) : '';
+            $ownerExternalInput = isset($_POST['owner_external_name']) ? trim((string)$_POST['owner_external_name']) : '';
+            $ownerId = null;
+            $ownerExternalName = null;
+            if ($ownerSelection === '__external__') {
+                if (function_exists('mb_substr')) {
+                    $ownerExternalName = mb_substr($ownerExternalInput, 0, 150);
+                } else {
+                    $ownerExternalName = substr($ownerExternalInput, 0, 150);
+                }
+                $ownerExternalName = str_replace(["\r", "\n"], '', (string)$ownerExternalName);
+                $ownerExternalName = trim($ownerExternalName);
+                if ($ownerExternalName === '') {
+                    throw new RuntimeException('assets.messages.owner_external_required');
+                }
+            } else {
+                if ($ownerSelection !== '') {
+                    $ownerId = (int)$ownerSelection;
+                    if ($ownerId <= 0) {
+                        $ownerId = null;
+                    }
+                }
+                $ownerExternalName = null;
+            }
             $status = $_POST['status'] ?? 'pending';
             $allowedStatus = ['in_use', 'maintenance', 'pending', 'lost', 'retired'];
             if (!in_array($status, $allowedStatus, true)) {
@@ -602,8 +627,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $category = $existing['category'];
                     $model = $existing['model'];
                 }
-                $update = $pdo->prepare('UPDATE assets SET inbound_order_id=?, asset_code=?, category=?, model=?, organization=?, remarks=?, current_office_id=?, current_seat_id=?, owner_member_id=?, status=?, updated_at=NOW() WHERE id=?');
-                $update->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $status, $id]);
+                $update = $pdo->prepare('UPDATE assets SET inbound_order_id=?, asset_code=?, category=?, model=?, organization=?, remarks=?, current_office_id=?, current_seat_id=?, owner_member_id=?, owner_external_name=?, status=?, updated_at=NOW() WHERE id=?');
+                $update->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $ownerExternalName, $status, $id]);
                 $newPath = handle_asset_image_upload($id, $existing['image_path'], $_FILES['image'] ?? [], $errors);
                 if ($errors) {
                     throw new RuntimeException($errors[0]);
@@ -621,7 +646,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($existingRemarks !== $remarksValue) $changes[] = 'Remarks updated';
                 if ((int)$existing['current_office_id'] !== (int)$officeId) $changes[] = 'Office updated';
                 if ((int)$existing['current_seat_id'] !== (int)$seatId) $changes[] = 'Seat updated';
-                if ((int)$existing['owner_member_id'] !== (int)$ownerId) $changes[] = 'Owner updated';
+                $existingExternal = is_string($existing['owner_external_name'] ?? null) ? trim($existing['owner_external_name']) : '';
+                $newExternal = is_string($ownerExternalName) ? trim($ownerExternalName) : '';
+                if ((int)$existing['owner_member_id'] !== (int)$ownerId || $existingExternal !== $newExternal) $changes[] = 'Owner updated';
                 if ($existing['status'] !== $status) $changes[] = 'Status: ' . $existing['status'] . ' → ' . $status;
                 if ($newPath !== $existing['image_path']) $changes[] = 'Image replaced';
                 add_asset_log($pdo, 'asset', $id, $username, $_SESSION['role'], 'Asset updated', implode('; ', $changes));
@@ -642,8 +669,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         throw new RuntimeException('assets.messages.asset_code_exists');
                     }
                 }
-                $insert = $pdo->prepare('INSERT INTO assets (inbound_order_id, asset_code, category, model, organization, remarks, current_office_id, current_seat_id, owner_member_id, status) VALUES (?,?,?,?,?,?,?,?,?,?)');
-                $insert->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $status]);
+                $insert = $pdo->prepare('INSERT INTO assets (inbound_order_id, asset_code, category, model, organization, remarks, current_office_id, current_seat_id, owner_member_id, owner_external_name, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+                $insert->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $ownerExternalName, $status]);
                 $newId = (int)$pdo->lastInsertId();
                 $newPath = handle_asset_image_upload($newId, null, $_FILES['image'] ?? [], $errors);
                 if ($errors) {
@@ -917,7 +944,12 @@ include 'header.php';
                 $locationLabel = trim(($asset['office_name'] ? $asset['office_name'] : '') . ($asset['seat_label'] ? (' / ' . $asset['seat_label']) : ''));
               ?>
               <td><?= htmlspecialchars($locationLabel === '' ? '-' : $locationLabel); ?></td>
-              <td><?= htmlspecialchars($asset['owner_name'] ?: '-'); ?></td>
+              <?php
+                $customOwner = trim((string)($asset['owner_external_name'] ?? ''));
+                $memberOwner = trim((string)($asset['owner_name'] ?? ''));
+                $ownerDisplay = $customOwner !== '' ? $customOwner : ($memberOwner !== '' ? $memberOwner : '-');
+              ?>
+              <td><?= htmlspecialchars($ownerDisplay); ?></td>
               <td><span data-i18n="assets.status.<?= htmlspecialchars($asset['status']); ?>"><?= htmlspecialchars($asset['status']); ?></span></td>
               <td>
                 <?php if (!empty($asset['image_path'])): ?>
@@ -1277,7 +1309,12 @@ include 'header.php';
               <?php foreach ($members as $member): ?>
               <option value="<?= (int)$member['id']; ?>"><?= htmlspecialchars($member['name']); ?></option>
               <?php endforeach; ?>
+              <option value="__external__" data-i18n="assets.form.owner_other">Others</option>
             </select>
+            <div class="mt-2 d-none" id="asset-owner-custom-wrapper">
+              <input type="text" class="form-control" name="owner_external_name" id="asset-owner-custom" maxlength="150" data-i18n-placeholder="assets.form.owner_other_placeholder" placeholder="Enter responsible person">
+              <div class="form-text" data-i18n="assets.form.owner_other_hint">Enter the responsible person's name if they are not listed.</div>
+            </div>
           </div>
           <div class="col-md-6">
             <label class="form-label" data-i18n="assets.form.image">Asset Photo</label>
@@ -1361,6 +1398,9 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
   const assetCodeSuffixInput = document.getElementById('asset-code-suffix');
   const assetCodeUsePrefixInput = document.getElementById('asset-code-use-prefix');
   const assetInboundField = document.getElementById('asset-inbound');
+  const assetOwnerField = document.getElementById('asset-owner');
+  const assetOwnerCustomWrapper = document.getElementById('asset-owner-custom-wrapper');
+  const assetOwnerCustomInput = document.getElementById('asset-owner-custom');
   const syncFetchBtn = document.getElementById('syncFetchBtn');
   const syncSampleInput = document.getElementById('syncSampleInput');
   const syncSampleResult = document.getElementById('syncSampleResult');
@@ -1491,6 +1531,17 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       }
     }
     applyTranslationsSafe();
+  }
+
+  function updateOwnerCustomVisibility() {
+    if (!assetOwnerField || !assetOwnerCustomWrapper) {
+      return;
+    }
+    const showCustom = assetOwnerField.value === '__external__';
+    assetOwnerCustomWrapper.classList.toggle('d-none', !showCustom);
+    if (!showCustom && assetOwnerCustomInput) {
+      assetOwnerCustomInput.value = '';
+    }
   }
 
   if (syncMappingSection) {
@@ -1627,6 +1678,12 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
     });
   }
 
+  if (assetOwnerField) {
+    assetOwnerField.addEventListener('change', () => {
+      updateOwnerCustomVisibility();
+    });
+  }
+
   if (assetModal) {
     assetModal.addEventListener('show.bs.modal', event => {
       const button = event.relatedTarget;
@@ -1638,6 +1695,13 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       document.getElementById('asset-image-preview').innerHTML = '';
       document.getElementById('assetLogs').innerHTML = '';
       document.getElementById('assetLogsSection').style.display = 'none';
+      if (assetOwnerField) {
+        assetOwnerField.value = '';
+      }
+      if (assetOwnerCustomInput) {
+        assetOwnerCustomInput.value = '';
+      }
+      updateOwnerCustomVisibility();
       if (assetInboundField) {
         assetInboundField.disabled = false;
         assetInboundField.value = '';
@@ -1694,7 +1758,25 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
         document.getElementById('asset-office').value = asset.current_office_id || '';
         filterSeats(asset.current_office_id ? String(asset.current_office_id) : '');
         document.getElementById('asset-seat').value = asset.current_seat_id || '';
-        document.getElementById('asset-owner').value = asset.owner_member_id || '';
+        if (assetOwnerField) {
+          const ownerId = asset.owner_member_id ? String(asset.owner_member_id) : '';
+          if (ownerId) {
+            assetOwnerField.value = ownerId;
+            if (assetOwnerCustomInput) {
+              assetOwnerCustomInput.value = '';
+            }
+          } else if (asset.owner_external_name) {
+            assetOwnerField.value = '__external__';
+            if (assetOwnerCustomInput) {
+              assetOwnerCustomInput.value = asset.owner_external_name;
+            }
+          } else {
+            assetOwnerField.value = '';
+            if (assetOwnerCustomInput) {
+              assetOwnerCustomInput.value = '';
+            }
+          }
+        }
         if (asset.image_path) {
           document.getElementById('asset-image-preview').innerHTML = `<a href="${asset.image_path}" target="_blank"><img src="${asset.image_path}" class="img-thumbnail" style="max-height:60px;"></a>`;
         }
@@ -1747,6 +1829,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
           }
         }
       }
+      updateOwnerCustomVisibility();
       applyTranslationsSafe();
     });
     document.getElementById('asset-office').addEventListener('change', e => {
@@ -1765,6 +1848,13 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
         if (assetCodeUsePrefixInput) {
           const usePrefix = prefixValue && assetCodeSuffixInput.dataset.usesPrefix === '1';
           assetCodeUsePrefixInput.value = usePrefix ? '1' : '0';
+        }
+      }
+      if (assetOwnerField && assetOwnerCustomInput) {
+        if (assetOwnerField.value === '__external__') {
+          assetOwnerCustomInput.value = assetOwnerCustomInput.value.trim();
+        } else {
+          assetOwnerCustomInput.value = '';
         }
       }
     });

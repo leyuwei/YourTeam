@@ -56,7 +56,7 @@ $statusLabels = [
 ];
 
 $query = 'SELECT a.asset_code, io.order_number, a.category, a.model, a.organization, a.remarks, '
-    . 'o.name AS office_name, s.label AS seat_label, m.name AS owner_name, a.status, a.updated_at '
+    . 'o.name AS office_name, s.label AS seat_label, a.owner_external_name, m.name AS owner_name, a.status, a.updated_at '
     . 'FROM assets a '
     . 'JOIN asset_inbound_orders io ON a.inbound_order_id = io.id '
     . 'LEFT JOIN offices o ON a.current_office_id = o.id '
@@ -79,6 +79,9 @@ foreach ($rows as $row) {
     $location = trim(((string)($row['office_name'] ?? '')) . (($row['seat_label'] ?? '') ? ' / ' . $row['seat_label'] : ''));
     $status = $row['status'] ?? '';
     $statusLabel = $statusLabels[$lang][$status] ?? $status;
+    $ownerExternal = trim((string)($row['owner_external_name'] ?? ''));
+    $ownerMember = trim((string)($row['owner_name'] ?? ''));
+    $ownerLabel = $ownerExternal !== '' ? $ownerExternal : $ownerMember;
     $data = [
         $row['order_number'] ?? '',
         $row['asset_code'] ?? '',
@@ -87,7 +90,7 @@ foreach ($rows as $row) {
         $row['organization'] ?? '',
         $row['remarks'] ?? '',
         $location,
-        $row['owner_name'] ?? '',
+        $ownerLabel,
         $statusLabel,
         $row['updated_at'] ?? ''
     ];
