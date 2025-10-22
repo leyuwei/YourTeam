@@ -454,6 +454,7 @@ const translations = {
     'assets.table.actions': 'Actions',
     'assets.none': 'No assets',
     'assets.action.edit': 'Edit',
+    'assets.action.goto': 'GoTo',
     'assets.action.delete': 'Delete',
     'assets.action.confirm_delete': 'Confirm Delete',
     'assets.form.inbound': 'Inbound Order',
@@ -510,6 +511,8 @@ const translations = {
     'assets.settings.description': 'Configure global options for asset management.',
     'assets.settings.code_prefix': 'Asset Code Prefix',
     'assets.settings.code_prefix_hint': 'Shown before the asset code input and combined with the suffix.',
+    'assets.settings.link_prefix': 'Asset Link Prefix',
+    'assets.settings.link_prefix_hint': 'Prepended to the code suffix to open the external asset platform.',
     'assets.settings.save': 'Save Settings',
     'assets.assignments.title': 'Member Asset Responsibilities',
     'assets.assignments.member': 'Member',
@@ -1055,6 +1058,7 @@ const translations = {
     'assets.table.actions': '操作',
     'assets.none': '暂无固定资产',
     'assets.action.edit': '编辑',
+    'assets.action.goto': '跳转',
     'assets.action.delete': '删除',
     'assets.action.confirm_delete': '确认删除',
     'assets.form.inbound': '绑定入库单',
@@ -1111,6 +1115,8 @@ const translations = {
     'assets.settings.description': '配置固定资产模块的通用选项。',
     'assets.settings.code_prefix': '资产编号前缀',
     'assets.settings.code_prefix_hint': '该前缀会显示在资产编号输入框前，与后缀共同组成完整编号。',
+    'assets.settings.link_prefix': '资产链接前缀',
+    'assets.settings.link_prefix_hint': '与资产编号后缀拼接，用于跳转专业管理平台。',
     'assets.settings.save': '保存配置',
     'assets.assignments.title': '在岗成员资产列表',
     'assets.assignments.member': '成员',
@@ -1621,6 +1627,7 @@ function initApp() {
 
   const qrLinkInput = document.getElementById('qrLinkInput');
   const qrCopyBtn = document.getElementById('qrCopyBtn');
+  const qrLinkAnchor = document.getElementById('qrLinkAnchor');
   const qrButtons = document.querySelectorAll('.qr-btn');
   if (qrCopyBtn && qrLinkInput) {
     qrCopyBtn.addEventListener('click', () => {
@@ -1640,6 +1647,10 @@ function initApp() {
       }
       if (qrLinkInput) {
         qrLinkInput.value = fullUrl;
+      }
+      if (qrLinkAnchor) {
+        qrLinkAnchor.href = fullUrl;
+        qrLinkAnchor.textContent = fullUrl;
       }
       const modal = new bootstrap.Modal(document.getElementById('qrModal'));
       modal.show();

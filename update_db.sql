@@ -53,9 +53,13 @@ ALTER TABLE assets
 CREATE TABLE IF NOT EXISTS asset_settings (
   id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
   code_prefix VARCHAR(60) NOT NULL DEFAULT 'ASSET-',
+  link_prefix VARCHAR(255) NOT NULL DEFAULT '',
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-INSERT INTO asset_settings (id, code_prefix)
-VALUES (1, 'ASSET-')
-ON DUPLICATE KEY UPDATE code_prefix = code_prefix;
+ALTER TABLE asset_settings
+  ADD COLUMN IF NOT EXISTS link_prefix VARCHAR(255) DEFAULT '' AFTER code_prefix;
+
+INSERT INTO asset_settings (id, code_prefix, link_prefix)
+VALUES (1, 'ASSET-', '')
+ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix;

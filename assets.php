@@ -91,21 +91,53 @@ function remove_asset_files(array $paths): void {
 }
 
 $assetCodePrefix = 'ASSET-';
+$assetLinkPrefix = '';
+$settingsRow = false;
+$tableMissing = false;
+$columnMissing = false;
 try {
-    $settingsStmt = $pdo->query('SELECT code_prefix FROM asset_settings WHERE id=1');
+    $settingsStmt = $pdo->query('SELECT code_prefix, link_prefix FROM asset_settings WHERE id=1');
     $settingsRow = $settingsStmt->fetch();
-    if ($settingsRow && array_key_exists('code_prefix', $settingsRow)) {
-        $retrievedPrefix = trim((string)$settingsRow['code_prefix']);
-        if ($retrievedPrefix !== '') {
-            $assetCodePrefix = $retrievedPrefix;
-        }
-    } else {
-        $ensureStmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix) VALUES (1, ?) ON DUPLICATE KEY UPDATE code_prefix = code_prefix');
-        $ensureStmt->execute([$assetCodePrefix]);
-    }
 } catch (PDOException $e) {
-    if ($e->getCode() !== '42S02') {
+    if ($e->getCode() === '42S22') {
+        $columnMissing = true;
+        try {
+            $fallbackStmt = $pdo->query('SELECT code_prefix FROM asset_settings WHERE id=1');
+            $settingsRow = $fallbackStmt->fetch();
+        } catch (PDOException $inner) {
+            if ($inner->getCode() === '42S02') {
+                $tableMissing = true;
+            } else {
+                throw $inner;
+            }
+        }
+    } elseif ($e->getCode() === '42S02') {
+        $tableMissing = true;
+    } else {
         throw $e;
+    }
+}
+if ($settingsRow && array_key_exists('code_prefix', $settingsRow)) {
+    $retrievedPrefix = trim((string)$settingsRow['code_prefix']);
+    if ($retrievedPrefix !== '') {
+        $assetCodePrefix = $retrievedPrefix;
+    }
+}
+if ($settingsRow && array_key_exists('link_prefix', $settingsRow)) {
+    $retrievedLink = str_replace(["\r", "\n"], '', (string)$settingsRow['link_prefix']);
+    $retrievedLink = trim($retrievedLink);
+    if ($retrievedLink !== '') {
+        $assetLinkPrefix = $retrievedLink;
+    }
+}
+if (!$settingsRow && !$tableMissing && !$columnMissing) {
+    try {
+        $ensureStmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix, link_prefix) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix');
+        $ensureStmt->execute([$assetCodePrefix, $assetLinkPrefix]);
+    } catch (PDOException $e) {
+        if ($e->getCode() !== '42S02' && $e->getCode() !== '42S22') {
+            throw $e;
+        }
     }
 }
 
@@ -154,9 +186,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $prefixInput = substr($prefixInput, 0, $maxLen);
                 }
             }
-            $stmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix) VALUES (1, ?) ON DUPLICATE KEY UPDATE code_prefix = VALUES(code_prefix), updated_at = CURRENT_TIMESTAMP');
-            $stmt->execute([$prefixInput]);
+            $linkPrefixInput = isset($_POST['link_prefix']) ? trim((string)$_POST['link_prefix']) : '';
+            $linkPrefixInput = str_replace(["\r", "\n"], '', $linkPrefixInput);
+            $maxLinkLen = 255;
+            if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+                if (mb_strlen($linkPrefixInput) > $maxLinkLen) {
+                    $linkPrefixInput = mb_substr($linkPrefixInput, 0, $maxLinkLen);
+                }
+            } else {
+                if (strlen($linkPrefixInput) > $maxLinkLen) {
+                    $linkPrefixInput = substr($linkPrefixInput, 0, $maxLinkLen);
+                }
+            }
+            $stmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix, link_prefix) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE code_prefix = VALUES(code_prefix), link_prefix = VALUES(link_prefix), updated_at = CURRENT_TIMESTAMP');
+            $stmt->execute([$prefixInput, $linkPrefixInput]);
             $assetCodePrefix = $prefixInput;
+            $assetLinkPrefix = $linkPrefixInput;
             $_SESSION['asset_flash'] = ['type' => 'success', 'key' => 'assets.messages.settings_saved', 'default' => 'Settings updated successfully'];
         } elseif ($action === 'save_inbound') {
             if (!$is_manager) {
@@ -490,6 +535,11 @@ include 'header.php';
         <input type="text" class="form-control" name="code_prefix" value="<?= htmlspecialchars($assetCodePrefix); ?>" maxlength="30">
         <div class="form-text" data-i18n="assets.settings.code_prefix_hint">This prefix appears before the asset code input.</div>
       </div>
+      <div class="col-md-6 col-lg-4">
+        <label class="form-label" data-i18n="assets.settings.link_prefix">Asset Link Prefix</label>
+        <input type="text" class="form-control" name="link_prefix" value="<?= htmlspecialchars($assetLinkPrefix); ?>" maxlength="255">
+        <div class="form-text" data-i18n="assets.settings.link_prefix_hint">Combine with the asset code suffix to reach the external platform.</div>
+      </div>
       <div class="col-12">
         <button type="submit" class="btn btn-primary" data-i18n="assets.settings.save">Save Settings</button>
       </div>
@@ -665,6 +715,25 @@ include 'header.php';
               ?>
               <td><?= htmlspecialchars($timestampLabel === '' ? '-' : $timestampLabel); ?></td>
               <td>
+                <?php
+                  $gotoUrl = '';
+                  if ($assetLinkPrefix !== '') {
+                      $rawCode = (string)($asset['asset_code'] ?? '');
+                      if ($rawCode !== '') {
+                          $codeSuffix = $rawCode;
+                          if ($assetCodePrefix !== '' && strncmp($rawCode, $assetCodePrefix, strlen($assetCodePrefix)) === 0) {
+                              $codeSuffix = substr($rawCode, strlen($assetCodePrefix));
+                          }
+                          $codeSuffix = trim($codeSuffix);
+                          if ($codeSuffix !== '') {
+                              $gotoUrl = $assetLinkPrefix . $codeSuffix;
+                          }
+                      }
+                  }
+                ?>
+                <?php if ($gotoUrl !== ''): ?>
+                <button type="button" class="btn btn-sm btn-outline-secondary me-1 qr-btn asset-goto" data-url="<?= htmlspecialchars($gotoUrl); ?>" data-i18n="assets.action.goto">GoTo</button>
+                <?php endif; ?>
                 <?php if ($canEdit): ?>
                 <button class="btn btn-sm btn-outline-primary asset-edit" data-bs-toggle="modal" data-bs-target="#assetModal" data-mode="edit" data-member-role="<?= $is_manager ? 'manager' : 'member'; ?>" data-asset='<?= json_encode($asset, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>' data-i18n="assets.action.edit">Edit</button>
                 <?php endif; ?>
