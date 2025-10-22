@@ -720,91 +720,214 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $assetCode = $codeSuffix !== ''
                 ? ($assetCodePrefix !== '' ? $assetCodePrefix . $codeSuffix : $codeSuffix)
                 : '';
-            if ($assetCode === '') {
-                $assetCode = generate_asset_code($pdo, $assetCodePrefix);
-                $generatedCode = true;
-            } else {
-                $dupeStmt = $pdo->prepare('SELECT COUNT(*) FROM assets WHERE asset_code=?');
-                $dupeStmt->execute([$assetCode]);
-                if ($dupeStmt->fetchColumn()) {
-                    asset_sync_json([
-                        'success' => true,
-                        'skipped' => true,
-                        'message' => 'assets.sync_all.result.skipped_exists',
-                        'code' => $assetCode
-                    ]);
+
+            $existingAsset = null;
+            $lookupCandidates = [];
+            if ($assetCode !== '') {
+                $lookupCandidates[] = $assetCode;
+            }
+            if ($suffix !== '') {
+                $normalizedCandidate = $assetCodePrefix !== '' ? $assetCodePrefix . $suffix : $suffix;
+                if ($normalizedCandidate !== '' && $normalizedCandidate !== $assetCode) {
+                    $lookupCandidates[] = $normalizedCandidate;
+                }
+            }
+            if ($lookupCandidates) {
+                $lookupStmt = $pdo->prepare('SELECT id, asset_code, inbound_order_id, category, model, organization, remarks, current_office_id, current_seat_id, owner_member_id, owner_external_name, status FROM assets WHERE asset_code=? LIMIT 1');
+                foreach ($lookupCandidates as $candidateCode) {
+                    $lookupStmt->execute([$candidateCode]);
+                    $row = $lookupStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($row) {
+                        $existingAsset = $row;
+                        break;
+                    }
                 }
             }
 
-            $category = isset($fields['category']) ? trim((string)$fields['category']) : '';
-            if ($category !== '') {
-                $category = limit_text_length($category, 150);
+            if ($existingAsset) {
+                $assetCode = (string)$existingAsset['asset_code'];
+            } elseif ($assetCode === '') {
+                $assetCode = generate_asset_code($pdo, $assetCodePrefix);
+                $generatedCode = true;
             }
-            $model = isset($fields['model']) ? trim((string)$fields['model']) : '';
-            if ($model !== '') {
-                $model = limit_text_length($model, 255);
-            }
-            $organization = isset($fields['organization']) ? trim((string)$fields['organization']) : '';
-            if ($organization !== '') {
-                $organization = limit_text_length($organization, 255);
-            }
-            $remarksValue = isset($fields['remarks']) ? trim((string)$fields['remarks']) : '';
 
-            $status = isset($fields['status']) ? match_asset_status($fields['status']) : 'pending';
-            if (!in_array($status, ['in_use', 'maintenance', 'pending', 'lost', 'retired'], true)) {
-                $status = 'pending';
+            $categoryInput = array_key_exists('category', $fields) ? trim((string)$fields['category']) : null;
+            if ($categoryInput !== null && $categoryInput !== '') {
+                $categoryInput = limit_text_length($categoryInput, 150);
+            }
+            $modelInput = array_key_exists('model', $fields) ? trim((string)$fields['model']) : null;
+            if ($modelInput !== null && $modelInput !== '') {
+                $modelInput = limit_text_length($modelInput, 255);
+            }
+            $organizationInput = array_key_exists('organization', $fields) ? trim((string)$fields['organization']) : null;
+            if ($organizationInput !== null && $organizationInput !== '') {
+                $organizationInput = limit_text_length($organizationInput, 255);
+            }
+            $remarksInput = array_key_exists('remarks', $fields) ? trim((string)$fields['remarks']) : null;
+            if ($remarksInput !== null && $remarksInput !== '') {
+                $remarksInput = limit_text_length($remarksInput, 2000);
+            }
+
+            $statusInput = array_key_exists('status', $fields) ? match_asset_status($fields['status']) : null;
+            if ($statusInput !== null && !in_array($statusInput, ['in_use', 'maintenance', 'pending', 'lost', 'retired'], true)) {
+                $statusInput = 'pending';
             }
 
             $membersData = $pdo->query('SELECT id, name FROM members ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
             $officesData = $pdo->query('SELECT id, name, location_description, region FROM offices ORDER BY name')->fetchAll(PDO::FETCH_ASSOC);
             $seatsData = $pdo->query('SELECT id, office_id, label FROM office_seats ORDER BY label')->fetchAll(PDO::FETCH_ASSOC);
 
-            $ownerMemberId = null;
-            $ownerExternalName = null;
-            if (isset($fields['owner_name'])) {
+            $category = $categoryInput !== null
+                ? $categoryInput
+                : ($existingAsset && isset($existingAsset['category']) ? (string)$existingAsset['category'] : '');
+            if ($category !== '') {
+                $category = limit_text_length($category, 150);
+            }
+
+            $model = $modelInput !== null
+                ? $modelInput
+                : ($existingAsset && isset($existingAsset['model']) ? (string)$existingAsset['model'] : '');
+            if ($model !== '') {
+                $model = limit_text_length($model, 255);
+            }
+
+            $organization = $organizationInput !== null
+                ? $organizationInput
+                : ($existingAsset && isset($existingAsset['organization']) ? (string)$existingAsset['organization'] : '');
+            if ($organization !== '') {
+                $organization = limit_text_length($organization, 255);
+            }
+
+            $remarksValue = $remarksInput !== null
+                ? $remarksInput
+                : ($existingAsset && isset($existingAsset['remarks']) && is_string($existingAsset['remarks']) ? trim($existingAsset['remarks']) : '');
+
+            $status = $statusInput !== null
+                ? $statusInput
+                : ($existingAsset && isset($existingAsset['status']) ? (string)$existingAsset['status'] : 'pending');
+            if (!in_array($status, ['in_use', 'maintenance', 'pending', 'lost', 'retired'], true)) {
+                $status = 'pending';
+            }
+
+            $ownerMemberId = $existingAsset && $existingAsset['owner_member_id'] !== null ? (int)$existingAsset['owner_member_id'] : null;
+            $ownerExternalName = $existingAsset && isset($existingAsset['owner_external_name']) ? $existingAsset['owner_external_name'] : null;
+            if ($ownerExternalName !== null) {
+                $ownerExternalName = limit_text_length((string)$ownerExternalName, 150);
+            }
+
+            if (array_key_exists('owner_name', $fields)) {
                 $ownerCandidate = trim((string)$fields['owner_name']);
-                if ($ownerCandidate !== '') {
+                if ($ownerCandidate === '') {
+                    $ownerMemberId = null;
+                    $ownerExternalName = null;
+                } else {
                     $matchedMember = match_member_by_name($membersData, $ownerCandidate);
                     if ($matchedMember !== null) {
                         $ownerMemberId = (int)$matchedMember;
+                        $ownerExternalName = null;
                     } else {
+                        $ownerMemberId = null;
                         $ownerExternalName = limit_text_length($ownerCandidate, 150);
                     }
                 }
             }
 
-            $officeId = null;
-            if (isset($fields['office_label'])) {
+            $officeId = $existingAsset && $existingAsset['current_office_id'] !== null ? (int)$existingAsset['current_office_id'] : null;
+            if ($officeId !== null && $officeId <= 0) {
+                $officeId = null;
+            }
+            $seatId = $existingAsset && $existingAsset['current_seat_id'] !== null ? (int)$existingAsset['current_seat_id'] : null;
+            if ($seatId !== null && $seatId <= 0) {
+                $seatId = null;
+            }
+
+            if (array_key_exists('office_label', $fields)) {
                 $officeCandidate = trim((string)$fields['office_label']);
                 if ($officeCandidate !== '') {
                     $matchedOffice = match_office_by_label($officesData, $officeCandidate);
                     if ($matchedOffice !== null) {
                         $officeId = (int)$matchedOffice;
+                        if ($seatId !== null) {
+                            $seatValid = null;
+                            foreach ($seatsData as $seatRow) {
+                                if ((int)$seatRow['id'] === $seatId) {
+                                    $seatValid = isset($seatRow['office_id']) ? (int)$seatRow['office_id'] : null;
+                                    break;
+                                }
+                            }
+                            if ($seatValid !== null && $seatValid !== $officeId) {
+                                $seatId = null;
+                            }
+                        }
                     }
                 }
             }
 
-            $seatId = null;
-            if (isset($fields['seat_label'])) {
+            if (array_key_exists('seat_label', $fields)) {
                 $seatCandidate = trim((string)$fields['seat_label']);
                 if ($seatCandidate !== '') {
                     $seatMatch = match_seat_by_label($seatsData, $seatCandidate, $officeId);
                     if ($seatMatch) {
                         $seatId = (int)$seatMatch['id'];
                         $seatOffice = isset($seatMatch['office_id']) ? (int)$seatMatch['office_id'] : 0;
-                        if ($seatOffice > 0 && $seatOffice !== $officeId) {
+                        if ($seatOffice > 0) {
                             $officeId = $seatOffice;
                         }
                     }
                 }
             }
 
+            $ownerMemberParam = ($ownerMemberId !== null && $ownerMemberId > 0) ? $ownerMemberId : null;
+            $ownerExternalParam = ($ownerExternalName !== null && trim((string)$ownerExternalName) !== '')
+                ? limit_text_length(trim((string)$ownerExternalName), 150)
+                : null;
+            $remarksParam = $remarksValue === '' ? null : $remarksValue;
+            $officeParam = ($officeId !== null && $officeId > 0) ? $officeId : null;
+            $seatParam = ($seatId !== null && $seatId > 0) ? $seatId : null;
+
+            if ($existingAsset) {
+                $pdo->beginTransaction();
+                try {
+                    $update = $pdo->prepare('UPDATE assets SET inbound_order_id=?, category=?, model=?, organization=?, remarks=?, current_office_id=?, current_seat_id=?, owner_member_id=?, owner_external_name=?, status=?, updated_at=NOW() WHERE id=?');
+                    $update->execute([
+                        $inboundId,
+                        $category,
+                        $model,
+                        $organization,
+                        $remarksParam,
+                        $officeParam,
+                        $seatParam,
+                        $ownerMemberParam,
+                        $ownerExternalParam,
+                        $status,
+                        (int)$existingAsset['id']
+                    ]);
+                    $pdo->commit();
+                } catch (Throwable $inner) {
+                    $pdo->rollBack();
+                    throw $inner;
+                }
+
+                add_asset_log($pdo, 'asset', (int)$existingAsset['id'], $username, $_SESSION['role'], 'Asset updated via sync', 'Code ' . $assetCode);
+                asset_sync_json([
+                    'success' => true,
+                    'message' => 'assets.sync_all.result.updated',
+                    'code' => $assetCode,
+                    'id' => (int)$existingAsset['id'],
+                    'skipped' => false,
+                    'generated' => $generatedCode,
+                    'updated' => true
+                ]);
+            }
+
+            if ($assetCode === '') {
+                $assetCode = generate_asset_code($pdo, $assetCodePrefix);
+                $generatedCode = true;
+            }
+
             $pdo->beginTransaction();
             try {
                 $insert = $pdo->prepare('INSERT INTO assets (inbound_order_id, asset_code, category, model, organization, remarks, current_office_id, current_seat_id, owner_member_id, owner_external_name, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
-                $ownerMemberParam = $ownerMemberId !== null ? $ownerMemberId : null;
-                $ownerExternalParam = ($ownerExternalName !== null && $ownerExternalName !== '') ? $ownerExternalName : null;
-                $remarksParam = $remarksValue === '' ? null : $remarksValue;
                 $insert->execute([
                     $inboundId,
                     $assetCode,
@@ -812,8 +935,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $model,
                     $organization,
                     $remarksParam,
-                    $officeId ?: null,
-                    $seatId ?: null,
+                    $officeParam,
+                    $seatParam,
                     $ownerMemberParam,
                     $ownerExternalParam,
                     $status
