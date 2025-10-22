@@ -726,6 +726,10 @@ include 'header.php';
                           }
                           $codeSuffix = trim($codeSuffix);
                           if ($codeSuffix !== '') {
+                              if (preg_match('/^\d+$/', $codeSuffix)) {
+                                  $normalizedNumeric = ltrim($codeSuffix, '0');
+                                  $codeSuffix = $normalizedNumeric === '' ? '0' : $normalizedNumeric;
+                              }
                               $gotoUrl = $assetLinkPrefix . $codeSuffix;
                           }
                       }
