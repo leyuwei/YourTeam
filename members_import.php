@@ -142,6 +142,7 @@ function normalizeStatus($value)
         'active' => 'in_work',
         '在籍' => 'in_work',
         'exited' => 'exited',
+        '已离退' => 'exited',
         '离岗' => 'exited',
         '离职' => 'exited',
         '退出' => 'exited',
@@ -385,16 +386,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $header = array_map(fn($v) => to_utf8($v), $rawHeader);
                     $headerMap = [];
                     foreach ($header as $idx => $cell) {
-                        $key = norm($cell);
-                        if ($key === '') continue;
-                        if (isset($aliasToColumn[$key])) {
-                            $columnKey = $aliasToColumn[$key];
-                            if (!isset($headerMap[$columnKey])) {
-                                $headerMap[$columnKey] = $idx;
+                        $candidates = [$cell];
+                        if (strpos($cell, ' / ') !== false) {
+                            foreach (explode(' / ', $cell) as $part) {
+                                $part = trim($part);
+                                if ($part !== '') {
+                                    $candidates[] = $part;
+                                }
                             }
-                        } elseif (isset($extraAliasToId[$key])) {
-                            $attrId = $extraAliasToId[$key];
-                            $headerMap['extra:' . $attrId] = $idx;
+                        }
+                        foreach ($candidates as $candidate) {
+                            $key = norm($candidate);
+                            if ($key === '') {
+                                continue;
+                            }
+                            if (isset($aliasToColumn[$key])) {
+                                $columnKey = $aliasToColumn[$key];
+                                if (!isset($headerMap[$columnKey])) {
+                                    $headerMap[$columnKey] = $idx;
+                                }
+                            } elseif (isset($extraAliasToId[$key])) {
+                                $attrId = $extraAliasToId[$key];
+                                $headerMap['extra:' . $attrId] = $idx;
+                            }
                         }
                     }
 
