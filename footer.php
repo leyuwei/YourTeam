@@ -12,6 +12,7 @@
           <input id="qrLinkInput" type="text" class="form-control" readonly>
           <button type="button" id="qrCopyBtn" class="btn btn-outline-secondary" data-i18n="qr.copy">复制链接</button>
         </div>
+        <a id="qrLinkAnchor" class="d-block mt-2 text-break" href="#" target="_blank" rel="noopener noreferrer"></a>
       </div>
     </div>
   </div>
