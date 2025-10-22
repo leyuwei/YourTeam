@@ -90,19 +90,102 @@ function remove_asset_files(array $paths): void {
     }
 }
 
+function normalize_asset_suffix(string $assetCode, string $prefix): string {
+    $suffix = $assetCode;
+    if ($prefix !== '' && strncmp($assetCode, $prefix, strlen($prefix)) === 0) {
+        $suffix = substr($assetCode, strlen($prefix));
+    }
+    $suffix = trim((string)$suffix);
+    if ($suffix !== '' && preg_match('/^\d+$/', $suffix)) {
+        $normalizedNumeric = ltrim($suffix, '0');
+        $suffix = $normalizedNumeric === '' ? '0' : $normalizedNumeric;
+    }
+    return $suffix;
+}
+
+function flatten_json_keys($data, string $prefix = ''): array {
+    $results = [];
+    if (is_array($data)) {
+        $isAssoc = array_keys($data) !== range(0, count($data) - 1);
+        foreach ($data as $key => $value) {
+            $segment = (string)$key;
+            $nextPrefix = $isAssoc
+                ? ($prefix === '' ? $segment : $prefix . '.' . $segment)
+                : ($prefix === '' ? '[' . $segment . ']' : $prefix . '[' . $segment . ']');
+            if (is_array($value)) {
+                $results = array_merge($results, flatten_json_keys($value, $nextPrefix));
+            } else {
+                $results[] = $nextPrefix;
+            }
+        }
+    } elseif ($prefix !== '') {
+        $results[] = $prefix;
+    }
+    return array_values(array_unique($results));
+}
+
+function fetch_remote_payload(string $url, int $timeout = 5): array {
+    $error = null;
+    $body = null;
+    $status = null;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        $body = curl_exec($ch);
+        if ($body === false) {
+            $error = curl_error($ch) ?: 'curl_error';
+        }
+        $status = curl_getinfo($ch, CURLINFO_RESPONSE_CODE) ?: null;
+        curl_close($ch);
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => $timeout,
+                'ignore_errors' => true
+            ]
+        ]);
+        $body = @file_get_contents($url, false, $context);
+        if ($body === false) {
+            $lastError = error_get_last();
+            $error = $lastError['message'] ?? 'stream_error';
+        }
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $line) {
+                if (preg_match('#^HTTP/\S+\s+(\d{3})#', $line, $matches)) {
+                    $status = (int)$matches[1];
+                    break;
+                }
+            }
+        }
+    }
+    return [$body, $error, $status];
+}
+
+function asset_sync_json(array $payload): void {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $assetCodePrefix = 'ASSET-';
 $assetLinkPrefix = '';
+$assetSyncApiPrefix = '';
+$assetSyncMapping = [];
+$assetSyncMappingJson = null;
 $settingsRow = false;
 $tableMissing = false;
 $columnMissing = false;
 try {
-    $settingsStmt = $pdo->query('SELECT code_prefix, link_prefix FROM asset_settings WHERE id=1');
+    $settingsStmt = $pdo->query('SELECT code_prefix, link_prefix, sync_api_prefix, sync_mapping FROM asset_settings WHERE id=1');
     $settingsRow = $settingsStmt->fetch();
 } catch (PDOException $e) {
     if ($e->getCode() === '42S22') {
         $columnMissing = true;
         try {
-            $fallbackStmt = $pdo->query('SELECT code_prefix FROM asset_settings WHERE id=1');
+            $fallbackStmt = $pdo->query('SELECT code_prefix, link_prefix FROM asset_settings WHERE id=1');
             $settingsRow = $fallbackStmt->fetch();
         } catch (PDOException $inner) {
             if ($inner->getCode() === '42S02') {
@@ -130,16 +213,50 @@ if ($settingsRow && array_key_exists('link_prefix', $settingsRow)) {
         $assetLinkPrefix = $retrievedLink;
     }
 }
+if ($settingsRow && array_key_exists('sync_api_prefix', $settingsRow)) {
+    $retrievedSync = str_replace(["\r", "\n"], '', (string)$settingsRow['sync_api_prefix']);
+    $retrievedSync = trim($retrievedSync);
+    if ($retrievedSync !== '') {
+        $assetSyncApiPrefix = $retrievedSync;
+    }
+}
+if ($settingsRow && array_key_exists('sync_mapping', $settingsRow)) {
+    $rawMapping = $settingsRow['sync_mapping'];
+    if (is_string($rawMapping) && $rawMapping !== '') {
+        $decodedMapping = json_decode($rawMapping, true);
+        if (is_array($decodedMapping)) {
+            $assetSyncMapping = $decodedMapping;
+            $assetSyncMappingJson = json_encode($decodedMapping, JSON_UNESCAPED_UNICODE);
+        } else {
+            $assetSyncMappingJson = $rawMapping;
+        }
+    } elseif ($rawMapping === null) {
+        $assetSyncMappingJson = null;
+    }
+}
 if (!$settingsRow && !$tableMissing && !$columnMissing) {
     try {
-        $ensureStmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix, link_prefix) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix');
-        $ensureStmt->execute([$assetCodePrefix, $assetLinkPrefix]);
+        $ensureStmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix, link_prefix, sync_api_prefix, sync_mapping) VALUES (1, ?, ?, ?, NULL) ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix, sync_api_prefix = sync_api_prefix, sync_mapping = sync_mapping');
+        $ensureStmt->execute([$assetCodePrefix, $assetLinkPrefix, $assetSyncApiPrefix]);
     } catch (PDOException $e) {
         if ($e->getCode() !== '42S02' && $e->getCode() !== '42S22') {
             throw $e;
         }
     }
 }
+
+$syncAttributeOptions = [
+    'asset_code_suffix' => ['key' => 'assets.sync.attributes.asset_code', 'default' => 'Asset Code Suffix'],
+    'category' => ['key' => 'assets.sync.attributes.category', 'default' => 'Category'],
+    'model' => ['key' => 'assets.sync.attributes.model', 'default' => 'Model / Configuration'],
+    'organization' => ['key' => 'assets.sync.attributes.organization', 'default' => 'Owning Unit'],
+    'remarks' => ['key' => 'assets.sync.attributes.remarks', 'default' => 'Remarks'],
+    'status' => ['key' => 'assets.sync.attributes.status', 'default' => 'Status'],
+    'owner_name' => ['key' => 'assets.sync.attributes.owner', 'default' => 'Responsible Person'],
+    'office_label' => ['key' => 'assets.sync.attributes.office', 'default' => 'Office Label'],
+    'seat_label' => ['key' => 'assets.sync.attributes.seat', 'default' => 'Workstation Label'],
+    'image_url' => ['key' => 'assets.sync.attributes.image', 'default' => 'Image URL']
+];
 
 if (isset($_GET['asset_logs'])) {
     $assetId = (int)$_GET['asset_logs'];
@@ -165,6 +282,113 @@ if (isset($_GET['asset_logs'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+    if ($action === 'fetch_sync_preview') {
+        if (!$is_manager) {
+            asset_sync_json(['success' => false, 'message' => 'assets.messages.permission_denied']);
+        }
+        try {
+            if ($assetSyncApiPrefix === '') {
+                throw new RuntimeException('assets.sync.errors.prefix_missing');
+            }
+            $assetInput = isset($_POST['asset_id']) ? trim((string)$_POST['asset_id']) : '';
+            if ($assetInput === '') {
+                throw new RuntimeException('assets.sync.errors.asset_required');
+            }
+            $suffix = normalize_asset_suffix($assetInput, $assetCodePrefix);
+            if ($suffix === '') {
+                throw new RuntimeException('assets.sync.errors.asset_suffix_empty');
+            }
+            $url = $assetSyncApiPrefix . $suffix;
+            [$body, $fetchError, $statusCode] = fetch_remote_payload($url);
+            if ($fetchError !== null) {
+                throw new RuntimeException('assets.sync.errors.fetch_failed');
+            }
+            if ($statusCode !== null && $statusCode >= 400) {
+                throw new RuntimeException('assets.sync.errors.http');
+            }
+            if (!is_string($body) || trim($body) === '') {
+                throw new RuntimeException('assets.sync.errors.fetch_failed');
+            }
+            $decoded = json_decode($body, true);
+            if (!is_array($decoded)) {
+                throw new RuntimeException('assets.sync.errors.invalid_json');
+            }
+            $flatKeys = flatten_json_keys($decoded);
+            sort($flatKeys, SORT_NATURAL | SORT_FLAG_CASE);
+            $pretty = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            if ($pretty === false) {
+                $pretty = json_encode($decoded, JSON_UNESCAPED_UNICODE);
+            }
+            if ($pretty === false) {
+                $pretty = $body;
+            }
+            asset_sync_json([
+                'success' => true,
+                'message' => 'assets.sync.status.loaded',
+                'url' => $url,
+                'raw' => $pretty,
+                'keys' => $flatKeys,
+                'mapping' => $assetSyncMapping,
+                'status' => $statusCode
+            ]);
+        } catch (Throwable $e) {
+            $msg = $e->getMessage();
+            if (strpos($msg, 'assets.') !== 0) {
+                $msg = 'assets.sync.errors.unknown';
+            }
+            asset_sync_json(['success' => false, 'message' => $msg]);
+        }
+    }
+    if ($action === 'save_sync_mapping') {
+        if (!$is_manager) {
+            asset_sync_json(['success' => false, 'message' => 'assets.messages.permission_denied']);
+        }
+        try {
+            $mappingInput = $_POST['mapping'] ?? '';
+            $decoded = [];
+            if (is_string($mappingInput) && $mappingInput !== '') {
+                $decoded = json_decode($mappingInput, true);
+                if (!is_array($decoded)) {
+                    throw new RuntimeException('assets.sync.errors.invalid_json');
+                }
+            }
+            $cleanMapping = [];
+            foreach ($syncAttributeOptions as $attribute => $meta) {
+                if (!isset($decoded[$attribute])) {
+                    continue;
+                }
+                $value = $decoded[$attribute];
+                if (!is_string($value)) {
+                    continue;
+                }
+                $value = trim($value);
+                if ($value === '') {
+                    continue;
+                }
+                if (function_exists('mb_substr')) {
+                    $value = mb_substr($value, 0, 255);
+                } else {
+                    $value = substr($value, 0, 255);
+                }
+                $cleanMapping[$attribute] = $value;
+            }
+            $encoded = json_encode($cleanMapping, JSON_UNESCAPED_UNICODE);
+            if ($encoded === false) {
+                throw new RuntimeException('assets.sync.errors.unknown');
+            }
+            $stmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix, link_prefix, sync_api_prefix, sync_mapping) VALUES (1, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE sync_mapping = VALUES(sync_mapping), updated_at = CURRENT_TIMESTAMP');
+            $stmt->execute([$assetCodePrefix, $assetLinkPrefix, $assetSyncApiPrefix, $encoded]);
+            $assetSyncMapping = $cleanMapping;
+            $assetSyncMappingJson = $encoded;
+            asset_sync_json(['success' => true, 'message' => 'assets.sync.status.saved', 'mapping' => $cleanMapping]);
+        } catch (Throwable $e) {
+            $msg = $e->getMessage();
+            if (strpos($msg, 'assets.') !== 0) {
+                $msg = 'assets.sync.errors.unknown';
+            }
+            asset_sync_json(['success' => false, 'message' => $msg]);
+        }
+    }
     $errors = [];
     try {
         if ($action === 'save_settings') {
@@ -198,10 +422,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $linkPrefixInput = substr($linkPrefixInput, 0, $maxLinkLen);
                 }
             }
-            $stmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix, link_prefix) VALUES (1, ?, ?) ON DUPLICATE KEY UPDATE code_prefix = VALUES(code_prefix), link_prefix = VALUES(link_prefix), updated_at = CURRENT_TIMESTAMP');
-            $stmt->execute([$prefixInput, $linkPrefixInput]);
+            $syncPrefixInput = isset($_POST['sync_api_prefix']) ? trim((string)$_POST['sync_api_prefix']) : '';
+            $syncPrefixInput = str_replace(["\r", "\n"], '', $syncPrefixInput);
+            $maxSyncLen = 255;
+            if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+                if (mb_strlen($syncPrefixInput) > $maxSyncLen) {
+                    $syncPrefixInput = mb_substr($syncPrefixInput, 0, $maxSyncLen);
+                }
+            } else {
+                if (strlen($syncPrefixInput) > $maxSyncLen) {
+                    $syncPrefixInput = substr($syncPrefixInput, 0, $maxSyncLen);
+                }
+            }
+            $stmt = $pdo->prepare('INSERT INTO asset_settings (id, code_prefix, link_prefix, sync_api_prefix, sync_mapping) VALUES (1, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE code_prefix = VALUES(code_prefix), link_prefix = VALUES(link_prefix), sync_api_prefix = VALUES(sync_api_prefix), updated_at = CURRENT_TIMESTAMP');
+            $stmt->execute([$prefixInput, $linkPrefixInput, $syncPrefixInput, $assetSyncMappingJson]);
             $assetCodePrefix = $prefixInput;
             $assetLinkPrefix = $linkPrefixInput;
+            $assetSyncApiPrefix = $syncPrefixInput;
             $_SESSION['asset_flash'] = ['type' => 'success', 'key' => 'assets.messages.settings_saved', 'default' => 'Settings updated successfully'];
         } elseif ($action === 'save_inbound') {
             if (!$is_manager) {
@@ -540,10 +777,74 @@ include 'header.php';
         <input type="text" class="form-control" name="link_prefix" value="<?= htmlspecialchars($assetLinkPrefix); ?>" maxlength="255">
         <div class="form-text" data-i18n="assets.settings.link_prefix_hint">Combine with the asset code suffix to reach the external platform.</div>
       </div>
+      <div class="col-md-6 col-lg-4">
+        <label class="form-label" data-i18n="assets.settings.sync_api_prefix">Sync API Prefix</label>
+        <input type="text" class="form-control" name="sync_api_prefix" value="<?= htmlspecialchars($assetSyncApiPrefix); ?>" maxlength="255">
+        <div class="form-text" data-i18n="assets.settings.sync_api_prefix_hint">Append the asset code suffix to query the integration endpoint.</div>
+      </div>
       <div class="col-12">
         <button type="submit" class="btn btn-primary" data-i18n="assets.settings.save">Save Settings</button>
       </div>
     </form>
+    <hr class="my-4">
+    <h4 class="mb-2" data-i18n="assets.sync.title">Sync Interface</h4>
+    <p class="text-muted" data-i18n="assets.sync.description">After saving the prefix, load a sample asset to map JSON keys to local fields.</p>
+    <?php if ($assetSyncApiPrefix === ''): ?>
+      <div class="alert alert-info" data-i18n="assets.sync.prefix_notice">Provide and save the sync API prefix to start configuring mappings.</div>
+    <?php else: ?>
+      <div id="syncStatus" class="alert d-none" role="alert"></div>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-6 col-lg-4">
+          <label class="form-label" for="syncSampleInput" data-i18n="assets.sync.sample_input_label">Sample Asset ID</label>
+          <input type="text" class="form-control" id="syncSampleInput" data-i18n-placeholder="assets.sync.sample_input_placeholder" placeholder="Enter asset ID or code">
+          <div class="form-text" data-i18n="assets.sync.sample_help">The asset code suffix (without the prefix and leading zeros) will be appended to the sync API prefix.</div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <button type="button" class="btn btn-outline-secondary w-100" id="syncFetchBtn" data-i18n="assets.sync.load_button">Load Sample</button>
+        </div>
+      </div>
+      <div class="mt-3 d-none" id="syncSampleResult">
+        <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between mb-2 gap-2">
+          <h5 class="mb-0" data-i18n="assets.sync.sample_result_title">Sample Response</h5>
+          <div class="text-muted small">
+            <span data-i18n="assets.sync.sample_url">Requested URL:</span>
+            <code id="syncSampleUrl"></code>
+          </div>
+        </div>
+        <pre class="bg-body-tertiary border rounded p-3 text-start" id="syncSampleJson" style="max-height:320px; overflow:auto;"></pre>
+      </div>
+      <div class="mt-3 d-none" id="syncMappingSection">
+        <h5 data-i18n="assets.sync.mapping_title">Attribute Mapping</h5>
+        <p class="text-muted" data-i18n="assets.sync.mapping_description">Select the JSON key that matches each asset field.</p>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered align-middle mb-3">
+            <thead class="table-light">
+              <tr>
+                <th data-i18n="assets.sync.mapping.attribute">Attribute</th>
+                <th data-i18n="assets.sync.mapping.json_key">JSON Key</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($syncAttributeOptions as $attribute => $meta): ?>
+              <?php $currentMappingValue = $assetSyncMapping[$attribute] ?? ''; ?>
+              <tr>
+                <td><span data-i18n="<?= htmlspecialchars($meta['key']); ?>"><?= htmlspecialchars($meta['default']); ?></span></td>
+                <td>
+                  <select class="form-select form-select-sm sync-map-select" data-attribute="<?= htmlspecialchars($attribute); ?>" data-current="<?= htmlspecialchars($currentMappingValue); ?>">
+                    <option value="" data-i18n="assets.sync.mapping.none">Not linked</option>
+                  </select>
+                </td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <p class="text-muted d-none" id="syncNoKeys" data-i18n="assets.sync.no_keys">No scalar values detected in the sample response.</p>
+        <div class="d-flex justify-content-end">
+          <button type="button" class="btn btn-primary" id="syncSaveMapping" data-i18n="assets.sync.save_button">Save Mapping</button>
+        </div>
+      </div>
+    <?php endif; ?>
   </div>
 </div>
 <?php endif; ?>
@@ -720,16 +1021,8 @@ include 'header.php';
                   if ($assetLinkPrefix !== '') {
                       $rawCode = (string)($asset['asset_code'] ?? '');
                       if ($rawCode !== '') {
-                          $codeSuffix = $rawCode;
-                          if ($assetCodePrefix !== '' && strncmp($rawCode, $assetCodePrefix, strlen($assetCodePrefix)) === 0) {
-                              $codeSuffix = substr($rawCode, strlen($assetCodePrefix));
-                          }
-                          $codeSuffix = trim($codeSuffix);
+                          $codeSuffix = normalize_asset_suffix($rawCode, $assetCodePrefix);
                           if ($codeSuffix !== '') {
-                              if (preg_match('/^\d+$/', $codeSuffix)) {
-                                  $normalizedNumeric = ltrim($codeSuffix, '0');
-                                  $codeSuffix = $normalizedNumeric === '' ? '0' : $normalizedNumeric;
-                              }
                               $gotoUrl = $assetLinkPrefix . $codeSuffix;
                           }
                       }
@@ -1044,6 +1337,7 @@ include 'header.php';
 </style>
 
 <script>
+const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>;
 (function(){
   const assetModal = document.getElementById('assetModal');
   const inboundModal = document.getElementById('inboundModal');
@@ -1055,7 +1349,89 @@ include 'header.php';
   const assetCodeSuffixInput = document.getElementById('asset-code-suffix');
   const assetCodeUsePrefixInput = document.getElementById('asset-code-use-prefix');
   const assetInboundField = document.getElementById('asset-inbound');
+  const syncFetchBtn = document.getElementById('syncFetchBtn');
+  const syncSampleInput = document.getElementById('syncSampleInput');
+  const syncSampleResult = document.getElementById('syncSampleResult');
+  const syncSampleJson = document.getElementById('syncSampleJson');
+  const syncSampleUrl = document.getElementById('syncSampleUrl');
+  const syncMappingSection = document.getElementById('syncMappingSection');
+  const syncNoKeys = document.getElementById('syncNoKeys');
+  const syncStatusEl = document.getElementById('syncStatus');
+  const syncSaveBtn = document.getElementById('syncSaveMapping');
+  let assetSyncMappingState = {};
+  try {
+    assetSyncMappingState = Object.assign({}, assetSyncInitialMapping || {});
+  } catch (err) {
+    assetSyncMappingState = {};
+  }
+  let syncAvailableKeys = [];
   let deleteTarget = null;
+
+  const getLang = () => document.documentElement.lang || 'zh';
+
+  function updateSyncStatus(level, key) {
+    if (!syncStatusEl) return;
+    syncStatusEl.classList.add('alert');
+    syncStatusEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-info');
+    if (!key) {
+      syncStatusEl.classList.add('d-none');
+      syncStatusEl.textContent = '';
+      syncStatusEl.removeAttribute('data-i18n');
+      return;
+    }
+    const lang = getLang();
+    if (level === 'success') {
+      syncStatusEl.classList.add('alert-success');
+    } else if (level === 'info') {
+      syncStatusEl.classList.add('alert-info');
+    } else {
+      syncStatusEl.classList.add('alert-danger');
+    }
+    syncStatusEl.setAttribute('data-i18n', key);
+    const translated = translations[lang]?.[key];
+    syncStatusEl.textContent = translated || key;
+    applyTranslations();
+  }
+
+  function populateSyncSelects(keys) {
+    if (!syncMappingSection) return;
+    const lang = getLang();
+    const selects = Array.from(syncMappingSection.querySelectorAll('.sync-map-select'));
+    const normalizedKeys = Array.isArray(keys)
+      ? keys.map(value => (typeof value === 'string' ? value.trim() : '')).filter(value => value !== '')
+      : [];
+    const uniqueKeys = Array.from(new Set(normalizedKeys));
+    selects.forEach(select => {
+      const attribute = select.getAttribute('data-attribute');
+      const mappedValue = attribute && assetSyncMappingState[attribute] ? String(assetSyncMappingState[attribute]) : '';
+      const datasetValue = select.getAttribute('data-current') || '';
+      const merged = Array.from(new Set([...uniqueKeys, mappedValue, datasetValue].filter(value => value !== '')));
+      merged.sort((a, b) => a.localeCompare(b));
+      const fragment = document.createDocumentFragment();
+      const noneOption = document.createElement('option');
+      noneOption.value = '';
+      noneOption.setAttribute('data-i18n', 'assets.sync.mapping.none');
+      noneOption.textContent = translations[lang]?.['assets.sync.mapping.none'] || 'Not linked';
+      fragment.appendChild(noneOption);
+      merged.forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        fragment.appendChild(option);
+      });
+      select.innerHTML = '';
+      select.appendChild(fragment);
+      let selection = '';
+      if (mappedValue && merged.includes(mappedValue)) {
+        selection = mappedValue;
+      } else if (datasetValue && merged.includes(datasetValue)) {
+        selection = datasetValue;
+      }
+      select.value = selection;
+      select.setAttribute('data-current', selection);
+    });
+    applyTranslations();
+  }
 
   function filterSeats(officeId) {
     const seatSelect = document.getElementById('asset-seat');
@@ -1079,6 +1455,140 @@ include 'header.php';
       }
     }
     applyTranslations();
+  }
+
+  if (syncMappingSection) {
+    const initialValues = Object.values(assetSyncMappingState || {}).filter(value => typeof value === 'string' && value.trim() !== '');
+    if (initialValues.length) {
+      syncMappingSection.classList.remove('d-none');
+    }
+    populateSyncSelects(initialValues);
+    if (syncNoKeys) {
+      syncNoKeys.classList.add('d-none');
+    }
+  }
+
+  function handleSyncFetch() {
+    if (!syncSampleInput || !syncFetchBtn) {
+      return;
+    }
+    const sampleValue = syncSampleInput.value.trim();
+    if (sampleValue === '') {
+      updateSyncStatus('error', 'assets.sync.errors.asset_required');
+      return;
+    }
+    syncFetchBtn.disabled = true;
+    updateSyncStatus('info', 'assets.sync.status.loading');
+    const params = new URLSearchParams();
+    params.set('action', 'fetch_sync_preview');
+    params.set('asset_id', sampleValue);
+    fetch('assets.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (!data || typeof data !== 'object') {
+          updateSyncStatus('error', 'assets.sync.status.error');
+          return;
+        }
+        if (!data.success) {
+          updateSyncStatus('error', data.message || 'assets.sync.status.error');
+          return;
+        }
+        if (data.mapping && typeof data.mapping === 'object') {
+          assetSyncMappingState = Object.assign({}, data.mapping);
+        }
+        syncAvailableKeys = Array.isArray(data.keys)
+          ? data.keys.map(value => (typeof value === 'string' ? value.trim() : '')).filter(value => value !== '')
+          : [];
+        if (syncSampleResult) {
+          syncSampleResult.classList.remove('d-none');
+        }
+        if (syncSampleJson) {
+          syncSampleJson.textContent = data.raw || '';
+        }
+        if (syncSampleUrl) {
+          syncSampleUrl.textContent = data.url || '';
+        }
+        if (syncMappingSection) {
+          syncMappingSection.classList.remove('d-none');
+        }
+        if (syncNoKeys) {
+          syncNoKeys.classList.toggle('d-none', syncAvailableKeys.length > 0);
+        }
+        populateSyncSelects(syncAvailableKeys.length ? syncAvailableKeys : Object.values(assetSyncMappingState || {}));
+        updateSyncStatus('success', data.message || 'assets.sync.status.loaded');
+      })
+      .catch(() => {
+        updateSyncStatus('error', 'assets.sync.status.error');
+      })
+      .finally(() => {
+        syncFetchBtn.disabled = false;
+        applyTranslations();
+      });
+  }
+
+  if (syncFetchBtn && syncSampleInput) {
+    syncFetchBtn.addEventListener('click', handleSyncFetch);
+    syncSampleInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleSyncFetch();
+      }
+    });
+  }
+
+  if (syncSaveBtn && syncMappingSection) {
+    syncSaveBtn.addEventListener('click', () => {
+      const selects = Array.from(syncMappingSection.querySelectorAll('.sync-map-select'));
+      const payload = {};
+      selects.forEach(select => {
+        const attribute = select.getAttribute('data-attribute');
+        if (!attribute) {
+          return;
+        }
+        const value = (select.value || '').trim();
+        if (value !== '') {
+          payload[attribute] = value;
+        }
+      });
+      syncSaveBtn.disabled = true;
+      updateSyncStatus('info', 'assets.sync.status.saving');
+      const params = new URLSearchParams();
+      params.set('action', 'save_sync_mapping');
+      params.set('mapping', JSON.stringify(payload));
+      fetch('assets.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (!data || typeof data !== 'object') {
+            updateSyncStatus('error', 'assets.sync.status.error');
+            return;
+          }
+          if (!data.success) {
+            updateSyncStatus('error', data.message || 'assets.sync.status.error');
+            return;
+          }
+          if (data.mapping && typeof data.mapping === 'object') {
+            assetSyncMappingState = Object.assign({}, data.mapping);
+          } else {
+            assetSyncMappingState = Object.assign({}, payload);
+          }
+          populateSyncSelects(syncAvailableKeys.length ? syncAvailableKeys : Object.values(assetSyncMappingState || {}));
+          updateSyncStatus('success', data.message || 'assets.sync.status.saved');
+        })
+        .catch(() => {
+          updateSyncStatus('error', 'assets.sync.status.error');
+        })
+        .finally(() => {
+          syncSaveBtn.disabled = false;
+        });
+    });
   }
 
   if (assetModal) {

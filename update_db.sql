@@ -54,12 +54,20 @@ CREATE TABLE IF NOT EXISTS asset_settings (
   id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
   code_prefix VARCHAR(60) NOT NULL DEFAULT 'ASSET-',
   link_prefix VARCHAR(255) NOT NULL DEFAULT '',
+  sync_api_prefix VARCHAR(255) NOT NULL DEFAULT '',
+  sync_mapping MEDIUMTEXT DEFAULT NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 ALTER TABLE asset_settings
   ADD COLUMN IF NOT EXISTS link_prefix VARCHAR(255) DEFAULT '' AFTER code_prefix;
 
-INSERT INTO asset_settings (id, code_prefix, link_prefix)
-VALUES (1, 'ASSET-', '')
-ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix;
+ALTER TABLE asset_settings
+  ADD COLUMN IF NOT EXISTS sync_api_prefix VARCHAR(255) DEFAULT '' AFTER link_prefix;
+
+ALTER TABLE asset_settings
+  ADD COLUMN IF NOT EXISTS sync_mapping MEDIUMTEXT AFTER sync_api_prefix;
+
+INSERT INTO asset_settings (id, code_prefix, link_prefix, sync_api_prefix, sync_mapping)
+VALUES (1, 'ASSET-', '', '', NULL)
+ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix, sync_api_prefix = sync_api_prefix, sync_mapping = sync_mapping;
