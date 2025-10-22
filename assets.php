@@ -1369,6 +1369,30 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
 
   const getLang = () => document.documentElement.lang || 'zh';
 
+  const getTranslationsMap = () => {
+    if (typeof translations !== 'undefined') {
+      return translations;
+    }
+    if (typeof window !== 'undefined' && window.translations) {
+      return window.translations;
+    }
+    return {};
+  };
+
+  const translate = (lang, key, fallback) => {
+    const dict = getTranslationsMap();
+    if (dict && dict[lang] && typeof dict[lang][key] === 'string') {
+      return dict[lang][key];
+    }
+    return typeof fallback !== 'undefined' ? fallback : key;
+  };
+
+  const applyTranslationsSafe = () => {
+    if (typeof applyTranslations === 'function') {
+      applyTranslations();
+    }
+  };
+
   function updateSyncStatus(level, key) {
     if (!syncStatusEl) return;
     syncStatusEl.classList.add('alert');
@@ -1388,9 +1412,9 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       syncStatusEl.classList.add('alert-danger');
     }
     syncStatusEl.setAttribute('data-i18n', key);
-    const translated = translations[lang]?.[key];
-    syncStatusEl.textContent = translated || key;
-    applyTranslations();
+    const translated = translate(lang, key, key);
+    syncStatusEl.textContent = translated;
+    applyTranslationsSafe();
   }
 
   function populateSyncSelects(keys) {
@@ -1411,7 +1435,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       const noneOption = document.createElement('option');
       noneOption.value = '';
       noneOption.setAttribute('data-i18n', 'assets.sync.mapping.none');
-      noneOption.textContent = translations[lang]?.['assets.sync.mapping.none'] || 'Not linked';
+      noneOption.textContent = translate(lang, 'assets.sync.mapping.none', 'Not linked');
       fragment.appendChild(noneOption);
       merged.forEach(value => {
         const option = document.createElement('option');
@@ -1430,7 +1454,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       select.value = selection;
       select.setAttribute('data-current', selection);
     });
-    applyTranslations();
+    applyTranslationsSafe();
   }
 
   function filterSeats(officeId) {
@@ -1440,7 +1464,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
     const noneOption = document.createElement('option');
     noneOption.value = '';
     noneOption.setAttribute('data-i18n', 'assets.form.none');
-    noneOption.textContent = translations[document.documentElement.lang || 'zh']['assets.form.none'];
+    noneOption.textContent = translate(getLang(), 'assets.form.none', 'None');
     seatSelect.appendChild(noneOption);
     seatOptions.forEach(option => {
       const optionOffice = option.getAttribute('data-office');
@@ -1454,7 +1478,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
         seatSelect.value = '';
       }
     }
-    applyTranslations();
+    applyTranslationsSafe();
   }
 
   if (syncMappingSection) {
@@ -1526,7 +1550,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       })
       .finally(() => {
         syncFetchBtn.disabled = false;
-        applyTranslations();
+        applyTranslationsSafe();
       });
   }
 
@@ -1680,7 +1704,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
               const li = document.createElement('li');
               li.className = 'text-muted';
               li.setAttribute('data-i18n', 'assets.logs.empty');
-              li.textContent = translations[document.documentElement.lang || 'zh']['assets.logs.empty'];
+              li.textContent = translate(getLang(), 'assets.logs.empty', 'No history yet');
               list.appendChild(li);
             } else {
               logs.forEach(log => {
@@ -1690,7 +1714,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
                 list.appendChild(li);
               });
             }
-            applyTranslations();
+            applyTranslationsSafe();
           });
       } else {
         title.setAttribute('data-i18n', 'assets.add');
@@ -1704,15 +1728,14 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
         }
         if (lastCategory || lastModel) {
           const lang = document.documentElement.lang || 'zh';
-          const msg = translations[lang]['assets.form.reuse_prompt'];
+          const msg = translate(lang, 'assets.form.reuse_prompt');
           if (confirm(msg)) {
             if (lastCategory) document.getElementById('asset-category').value = lastCategory;
             if (lastModel) document.getElementById('asset-model').value = lastModel;
           }
         }
-      }
-      applyTranslations();
-    });
+        applyTranslationsSafe();
+      });
     document.getElementById('asset-office').addEventListener('change', e => {
       filterSeats(e.target.value);
     });
@@ -1761,7 +1784,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       } else {
         title.setAttribute('data-i18n', 'assets.inbound.add');
       }
-      applyTranslations();
+      applyTranslationsSafe();
     });
   }
 
@@ -1793,7 +1816,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
         row?.classList.add('highlight-delete');
         setTimeout(() => row?.classList.remove('highlight-delete'), 2000);
       }
-      applyTranslations();
+      applyTranslationsSafe();
     });
     deleteModal.addEventListener('hidden.bs.modal', () => {
       deleteTarget = null;
@@ -1801,19 +1824,19 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
     document.getElementById('deleteConfirmBtn').addEventListener('click', () => {
       const lang = document.documentElement.lang || 'zh';
       let proceed = false;
-      if (deleteTarget === 'asset') {
-        const msg = translations[lang]['assets.delete.confirm'];
-        proceed = doubleConfirm(msg);
-        if (proceed) {
-          document.getElementById('deleteAssetForm').submit();
+        if (deleteTarget === 'asset') {
+          const msg = translate(lang, 'assets.delete.confirm');
+          proceed = doubleConfirm(msg);
+          if (proceed) {
+            document.getElementById('deleteAssetForm').submit();
+          }
+        } else if (deleteTarget === 'inbound') {
+          const msg = translate(lang, 'assets.inbound.delete.confirm');
+          proceed = confirm(msg) && doubleConfirm(translate(lang, 'assets.inbound.delete.double'));
+          if (proceed) {
+            document.getElementById('deleteInboundForm').submit();
+          }
         }
-      } else if (deleteTarget === 'inbound') {
-        const msg = translations[lang]['assets.inbound.delete.confirm'];
-        proceed = confirm(msg) && doubleConfirm(translations[lang]['assets.inbound.delete.double']);
-        if (proceed) {
-          document.getElementById('deleteInboundForm').submit();
-        }
-      }
       if (!proceed) {
         const modal = bootstrap.Modal.getInstance(deleteModal);
         modal.hide();
