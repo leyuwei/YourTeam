@@ -1734,8 +1734,9 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
             if (lastModel) document.getElementById('asset-model').value = lastModel;
           }
         }
-        applyTranslationsSafe();
-      });
+      }
+      applyTranslationsSafe();
+    });
     document.getElementById('asset-office').addEventListener('change', e => {
       filterSeats(e.target.value);
     });
