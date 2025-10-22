@@ -759,93 +759,8 @@ include 'header.php';
   <?php endif; ?>
 </div>
 <?php if ($is_manager): ?>
-<div class="card mb-4">
-  <div class="card-header">
-    <h3 class="mb-0" data-i18n="assets.settings.title">General Settings</h3>
-  </div>
-  <div class="card-body">
-    <p class="text-muted" data-i18n="assets.settings.description">Configure global options for asset management.</p>
-    <form method="post" class="row g-3 align-items-end">
-      <input type="hidden" name="action" value="save_settings">
-      <div class="col-md-6 col-lg-4">
-        <label class="form-label" data-i18n="assets.settings.code_prefix">Asset Code Prefix</label>
-        <input type="text" class="form-control" name="code_prefix" value="<?= htmlspecialchars($assetCodePrefix); ?>" maxlength="30">
-        <div class="form-text" data-i18n="assets.settings.code_prefix_hint">This prefix appears before the asset code input.</div>
-      </div>
-      <div class="col-md-6 col-lg-4">
-        <label class="form-label" data-i18n="assets.settings.link_prefix">Asset Link Prefix</label>
-        <input type="text" class="form-control" name="link_prefix" value="<?= htmlspecialchars($assetLinkPrefix); ?>" maxlength="255">
-        <div class="form-text" data-i18n="assets.settings.link_prefix_hint">Combine with the asset code suffix to reach the external platform.</div>
-      </div>
-      <div class="col-md-6 col-lg-4">
-        <label class="form-label" data-i18n="assets.settings.sync_api_prefix">Sync API Prefix</label>
-        <input type="text" class="form-control" name="sync_api_prefix" value="<?= htmlspecialchars($assetSyncApiPrefix); ?>" maxlength="255">
-        <div class="form-text" data-i18n="assets.settings.sync_api_prefix_hint">Append the asset code suffix to query the integration endpoint.</div>
-      </div>
-      <div class="col-12">
-        <button type="submit" class="btn btn-primary" data-i18n="assets.settings.save">Save Settings</button>
-      </div>
-    </form>
-    <hr class="my-4">
-    <h4 class="mb-2" data-i18n="assets.sync.title">Sync Interface</h4>
-    <p class="text-muted" data-i18n="assets.sync.description">After saving the prefix, load a sample asset to map JSON keys to local fields.</p>
-    <?php if ($assetSyncApiPrefix === ''): ?>
-      <div class="alert alert-info" data-i18n="assets.sync.prefix_notice">Provide and save the sync API prefix to start configuring mappings.</div>
-    <?php else: ?>
-      <div id="syncStatus" class="alert d-none" role="alert"></div>
-      <div class="row g-3 align-items-end">
-        <div class="col-md-6 col-lg-4">
-          <label class="form-label" for="syncSampleInput" data-i18n="assets.sync.sample_input_label">Sample Asset ID</label>
-          <input type="text" class="form-control" id="syncSampleInput" data-i18n-placeholder="assets.sync.sample_input_placeholder" placeholder="Enter asset ID or code">
-          <div class="form-text" data-i18n="assets.sync.sample_help">The asset code suffix (without the prefix and leading zeros) will be appended to the sync API prefix.</div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-          <button type="button" class="btn btn-outline-secondary w-100" id="syncFetchBtn" data-i18n="assets.sync.load_button">Load Sample</button>
-        </div>
-      </div>
-      <div class="mt-3 d-none" id="syncSampleResult">
-        <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between mb-2 gap-2">
-          <h5 class="mb-0" data-i18n="assets.sync.sample_result_title">Sample Response</h5>
-          <div class="text-muted small">
-            <span data-i18n="assets.sync.sample_url">Requested URL:</span>
-            <code id="syncSampleUrl"></code>
-          </div>
-        </div>
-        <pre class="bg-body-tertiary border rounded p-3 text-start" id="syncSampleJson" style="max-height:320px; overflow:auto;"></pre>
-      </div>
-      <div class="mt-3 d-none" id="syncMappingSection">
-        <h5 data-i18n="assets.sync.mapping_title">Attribute Mapping</h5>
-        <p class="text-muted" data-i18n="assets.sync.mapping_description">Select the JSON key that matches each asset field.</p>
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered align-middle mb-3">
-            <thead class="table-light">
-              <tr>
-                <th data-i18n="assets.sync.mapping.attribute">Attribute</th>
-                <th data-i18n="assets.sync.mapping.json_key">JSON Key</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($syncAttributeOptions as $attribute => $meta): ?>
-              <?php $currentMappingValue = $assetSyncMapping[$attribute] ?? ''; ?>
-              <tr>
-                <td><span data-i18n="<?= htmlspecialchars($meta['key']); ?>"><?= htmlspecialchars($meta['default']); ?></span></td>
-                <td>
-                  <select class="form-select form-select-sm sync-map-select" data-attribute="<?= htmlspecialchars($attribute); ?>" data-current="<?= htmlspecialchars($currentMappingValue); ?>">
-                    <option value="" data-i18n="assets.sync.mapping.none">Not linked</option>
-                  </select>
-                </td>
-              </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
-        <p class="text-muted d-none" id="syncNoKeys" data-i18n="assets.sync.no_keys">No scalar values detected in the sample response.</p>
-        <div class="d-flex justify-content-end">
-          <button type="button" class="btn btn-primary" id="syncSaveMapping" data-i18n="assets.sync.save_button">Save Mapping</button>
-        </div>
-      </div>
-    <?php endif; ?>
-  </div>
+<div class="d-flex justify-content-end mb-4">
+  <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assetSettingsModal" data-i18n="assets.settings.open_modal">Manage General Settings</button>
 </div>
 <?php endif; ?>
 <?php if ($is_manager): ?>
@@ -1112,6 +1027,103 @@ include 'header.php';
         </tbody>
       </table>
     </div>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($is_manager): ?>
+<div class="modal fade" id="assetSettingsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <form class="modal-content" method="post">
+      <input type="hidden" name="action" value="save_settings">
+      <div class="modal-header">
+        <h5 class="modal-title" data-i18n="assets.settings.title">General Settings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted" data-i18n="assets.settings.description">Configure global options for asset management.</p>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label" data-i18n="assets.settings.code_prefix">Asset Code Prefix</label>
+            <input type="text" class="form-control" name="code_prefix" value="<?= htmlspecialchars($assetCodePrefix); ?>" maxlength="30">
+            <div class="form-text" data-i18n="assets.settings.code_prefix_hint">This prefix appears before the asset code input.</div>
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label" data-i18n="assets.settings.link_prefix">Asset Link Prefix</label>
+            <input type="text" class="form-control" name="link_prefix" value="<?= htmlspecialchars($assetLinkPrefix); ?>" maxlength="255">
+            <div class="form-text" data-i18n="assets.settings.link_prefix_hint">Combine with the asset code suffix to reach the external platform.</div>
+          </div>
+          <div class="col-md-6 col-lg-4">
+            <label class="form-label" data-i18n="assets.settings.sync_api_prefix">Sync API Prefix</label>
+            <input type="text" class="form-control" name="sync_api_prefix" value="<?= htmlspecialchars($assetSyncApiPrefix); ?>" maxlength="255">
+            <div class="form-text" data-i18n="assets.settings.sync_api_prefix_hint">Append the asset code suffix to query the integration endpoint.</div>
+          </div>
+        </div>
+        <hr class="my-4">
+        <h4 class="mb-2" data-i18n="assets.sync.title">Sync Interface</h4>
+        <p class="text-muted" data-i18n="assets.sync.description">After saving the prefix, load a sample asset to map JSON keys to local fields.</p>
+        <?php if ($assetSyncApiPrefix === ''): ?>
+          <div class="alert alert-info" data-i18n="assets.sync.prefix_notice">Provide and save the sync API prefix to start configuring mappings.</div>
+        <?php else: ?>
+          <div id="syncStatus" class="alert d-none" role="alert"></div>
+          <div class="row g-3 align-items-end">
+            <div class="col-md-6 col-lg-4">
+              <label class="form-label" for="syncSampleInput" data-i18n="assets.sync.sample_input_label">Sample Asset ID</label>
+              <input type="text" class="form-control" id="syncSampleInput" data-i18n-placeholder="assets.sync.sample_input_placeholder" placeholder="Enter asset ID or code">
+              <div class="form-text" data-i18n="assets.sync.sample_help">The asset code suffix (without the prefix and leading zeros) will be appended to the sync API prefix.</div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <button type="button" class="btn btn-outline-secondary w-100" id="syncFetchBtn" data-i18n="assets.sync.load_button">Load Sample</button>
+            </div>
+          </div>
+          <div class="mt-3 d-none" id="syncSampleResult">
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between mb-2 gap-2">
+              <h5 class="mb-0" data-i18n="assets.sync.sample_result_title">Sample Response</h5>
+              <div class="text-muted small">
+                <span data-i18n="assets.sync.sample_url">Requested URL:</span>
+                <code id="syncSampleUrl"></code>
+              </div>
+            </div>
+            <pre class="bg-body-tertiary border rounded p-3 text-start" id="syncSampleJson" style="max-height:320px; overflow:auto;"></pre>
+          </div>
+          <div class="mt-3 d-none" id="syncMappingSection">
+            <h5 data-i18n="assets.sync.mapping_title">Attribute Mapping</h5>
+            <p class="text-muted" data-i18n="assets.sync.mapping_description">Select the JSON key that matches each asset field.</p>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered align-middle mb-3">
+                <thead class="table-light">
+                  <tr>
+                    <th data-i18n="assets.sync.mapping.attribute">Attribute</th>
+                    <th data-i18n="assets.sync.mapping.json_key">JSON Key</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($syncAttributeOptions as $attribute => $meta): ?>
+                  <?php $currentMappingValue = $assetSyncMapping[$attribute] ?? ''; ?>
+                  <tr>
+                    <td><span data-i18n="<?= htmlspecialchars($meta['key']); ?>"><?= htmlspecialchars($meta['default']); ?></span></td>
+                    <td>
+                      <select class="form-select form-select-sm sync-map-select" data-attribute="<?= htmlspecialchars($attribute); ?>" data-current="<?= htmlspecialchars($currentMappingValue); ?>">
+                        <option value="" data-i18n="assets.sync.mapping.none">Not linked</option>
+                      </select>
+                    </td>
+                  </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+            <p class="text-muted d-none" id="syncNoKeys" data-i18n="assets.sync.no_keys">No scalar values detected in the sample response.</p>
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-primary" id="syncSaveMapping" data-i18n="assets.sync.save_button">Save Mapping</button>
+            </div>
+          </div>
+        <?php endif; ?>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="assets.cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-i18n="assets.settings.save">Save Settings</button>
+      </div>
+    </form>
   </div>
 </div>
 <?php endif; ?>
