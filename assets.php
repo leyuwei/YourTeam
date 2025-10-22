@@ -124,6 +124,53 @@ function flatten_json_keys($data, string $prefix = ''): array {
     return array_values(array_unique($results));
 }
 
+function extract_json_value($data, string $path)
+{
+    if ($path === '') {
+        return null;
+    }
+    if (!is_array($data)) {
+        return null;
+    }
+    if (!preg_match_all('/(\[[^\]]+\]|[^.\[\]]+)/', $path, $matches)) {
+        return null;
+    }
+    $segments = $matches[0];
+    $current = $data;
+    foreach ($segments as $segment) {
+        if ($segment === '') {
+            continue;
+        }
+        if (is_array($current)) {
+            if ($segment[0] === '[' && substr($segment, -1) === ']') {
+                $inner = substr($segment, 1, -1);
+                if ($inner === '') {
+                    return null;
+                }
+                if (array_key_exists($inner, $current)) {
+                    $current = $current[$inner];
+                    continue;
+                }
+                if (ctype_digit($inner)) {
+                    $index = (int)$inner;
+                    if (array_key_exists($index, $current)) {
+                        $current = $current[$index];
+                        continue;
+                    }
+                }
+                return null;
+            }
+            if (array_key_exists($segment, $current)) {
+                $current = $current[$segment];
+                continue;
+            }
+            return null;
+        }
+        return null;
+    }
+    return $current;
+}
+
 function fetch_remote_payload(string $url, int $timeout = 5): array {
     $error = null;
     $body = null;
@@ -332,6 +379,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'keys' => $flatKeys,
                 'mapping' => $assetSyncMapping,
                 'status' => $statusCode
+            ]);
+        } catch (Throwable $e) {
+            $msg = $e->getMessage();
+            if (strpos($msg, 'assets.') !== 0) {
+                $msg = 'assets.sync.errors.unknown';
+            }
+            asset_sync_json(['success' => false, 'message' => $msg]);
+        }
+    }
+    if ($action === 'sync_asset_fill') {
+        try {
+            if ($assetSyncApiPrefix === '') {
+                throw new RuntimeException('assets.sync.errors.prefix_missing');
+            }
+            if (!$assetSyncMapping || !is_array($assetSyncMapping) || count($assetSyncMapping) === 0) {
+                throw new RuntimeException('assets.sync.errors.mapping_missing');
+            }
+            $assetCodeInput = isset($_POST['asset_code']) ? trim((string)$_POST['asset_code']) : '';
+            if ($assetCodeInput === '') {
+                throw new RuntimeException('assets.sync.errors.asset_required');
+            }
+            $assetId = isset($_POST['asset_id']) && $_POST['asset_id'] !== '' ? (int)$_POST['asset_id'] : 0;
+            if (!$is_manager) {
+                if ($assetId <= 0) {
+                    throw new RuntimeException('assets.messages.permission_denied');
+                }
+                $ownershipStmt = $pdo->prepare('SELECT owner_member_id FROM assets WHERE id=?');
+                $ownershipStmt->execute([$assetId]);
+                $ownerId = $ownershipStmt->fetchColumn();
+                if ($ownerId === false || (int)$ownerId !== (int)$member_id) {
+                    throw new RuntimeException('assets.messages.permission_denied');
+                }
+            }
+            $suffix = normalize_asset_suffix($assetCodeInput, $assetCodePrefix);
+            if ($suffix === '') {
+                throw new RuntimeException('assets.sync.errors.asset_suffix_empty');
+            }
+            $url = $assetSyncApiPrefix . $suffix;
+            [$body, $fetchError, $statusCode] = fetch_remote_payload($url);
+            if ($fetchError !== null) {
+                throw new RuntimeException('assets.sync.errors.fetch_failed');
+            }
+            if ($statusCode !== null && $statusCode >= 400) {
+                throw new RuntimeException('assets.sync.errors.http');
+            }
+            if (!is_string($body) || trim($body) === '') {
+                throw new RuntimeException('assets.sync.errors.fetch_failed');
+            }
+            $decoded = json_decode($body, true);
+            if (!is_array($decoded)) {
+                throw new RuntimeException('assets.sync.errors.invalid_json');
+            }
+            $fields = [];
+            foreach ($assetSyncMapping as $attribute => $path) {
+                $path = trim((string)$path);
+                if ($path === '') {
+                    continue;
+                }
+                $value = extract_json_value($decoded, $path);
+                if ($value === null) {
+                    continue;
+                }
+                if (is_scalar($value)) {
+                    $stringValue = trim((string)$value);
+                } else {
+                    $encoded = json_encode($value, JSON_UNESCAPED_UNICODE);
+                    $stringValue = $encoded === false ? '' : $encoded;
+                }
+                if ($stringValue === '' && !(is_scalar($value) && (string)$value === '0')) {
+                    continue;
+                }
+                $fields[$attribute] = $stringValue;
+            }
+            asset_sync_json([
+                'success' => true,
+                'message' => 'assets.form.sync_status.success',
+                'fields' => $fields,
+                'url' => $url,
+                'suffix' => $suffix
             ]);
         } catch (Throwable $e) {
             $msg = $e->getMessage();
@@ -1209,7 +1335,7 @@ include 'header.php';
   </div>
 </div>
 
-<div class="modal fade" id="assetModal" tabindex="-1" data-asset-prefix="<?= htmlspecialchars($assetCodePrefix); ?>">
+<div class="modal fade" id="assetModal" tabindex="-1" data-asset-prefix="<?= htmlspecialchars($assetCodePrefix); ?>" data-sync-api="<?= htmlspecialchars($assetSyncApiPrefix); ?>" data-sync-ready="<?= ($assetSyncApiPrefix !== '' && !empty($assetSyncMapping)) ? '1' : '0'; ?>">
   <div class="modal-dialog modal-xl">
     <form class="modal-content" method="post" enctype="multipart/form-data" id="assetForm">
       <input type="hidden" name="action" value="save_asset">
@@ -1239,8 +1365,10 @@ include 'header.php';
             <div class="input-group">
               <span class="input-group-text<?= $assetCodePrefix === '' ? ' d-none' : ''; ?>" id="asset-code-prefix-display"><?= htmlspecialchars($assetCodePrefix); ?></span>
               <input type="text" class="form-control" name="asset_code_suffix" id="asset-code-suffix" data-i18n-placeholder="assets.form.asset_code_suffix_placeholder" placeholder="AUTO">
+              <button type="button" class="btn btn-outline-secondary" id="asset-sync-button" data-i18n="assets.form.sync">Sync</button>
             </div>
             <input type="hidden" name="asset_code_use_prefix" id="asset-code-use-prefix" value="<?= $assetCodePrefix !== '' ? '1' : '0'; ?>">
+            <div class="form-text d-none" id="asset-sync-status"></div>
           </div>
           <div class="col-md-4">
             <label class="form-label" data-i18n="assets.form.status">Status</label>
@@ -1401,6 +1529,8 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
   const assetOwnerField = document.getElementById('asset-owner');
   const assetOwnerCustomWrapper = document.getElementById('asset-owner-custom-wrapper');
   const assetOwnerCustomInput = document.getElementById('asset-owner-custom');
+  const assetSyncButton = document.getElementById('asset-sync-button');
+  const assetSyncStatus = document.getElementById('asset-sync-status');
   const syncFetchBtn = document.getElementById('syncFetchBtn');
   const syncSampleInput = document.getElementById('syncSampleInput');
   const syncSampleResult = document.getElementById('syncSampleResult');
@@ -1416,6 +1546,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
   } catch (err) {
     assetSyncMappingState = {};
   }
+  updateAssetModalSyncFlag();
   let syncAvailableKeys = [];
   let deleteTarget = null;
 
@@ -1444,6 +1575,451 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       applyTranslations();
     }
   };
+
+  function normalizeComparison(value) {
+    if (value === null || typeof value === 'undefined') {
+      return '';
+    }
+    let str = String(value);
+    str = str.replace(/[\u200B-\u200D\uFEFF]/g, '');
+    str = str.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (/^[+-]?\d+(?:\.\d+)?$/.test(str)) {
+      if (/^[+-]?\d+$/.test(str)) {
+        const parsed = parseInt(str, 10);
+        if (!Number.isNaN(parsed)) {
+          str = String(parsed);
+        }
+      } else {
+        const parsedFloat = parseFloat(str);
+        if (!Number.isNaN(parsedFloat)) {
+          str = String(parsedFloat);
+        }
+      }
+    }
+    return str;
+  }
+
+  function isRemoteEmptyValue(normalized) {
+    if (normalized === '') {
+      return true;
+    }
+    const empties = new Set(['none', 'null', 'n/a', 'na', 'undefined', '无', '無', '暂无', '沒有', '没有', 'empty', '--', '-']);
+    return empties.has(normalized);
+  }
+
+  function isMeaningfulValue(value) {
+    if (value === null || typeof value === 'undefined') {
+      return false;
+    }
+    const normalized = normalizeComparison(value);
+    if (normalized === '') {
+      return false;
+    }
+    return !isRemoteEmptyValue(normalized);
+  }
+
+  function setAssetFormSyncStatus(level, key) {
+    if (!assetSyncStatus) {
+      return;
+    }
+    assetSyncStatus.classList.remove('d-none', 'text-danger', 'text-success', 'text-info', 'text-muted');
+    if (!key) {
+      assetSyncStatus.classList.add('d-none');
+      assetSyncStatus.textContent = '';
+      assetSyncStatus.removeAttribute('data-i18n');
+      return;
+    }
+    if (level === 'success') {
+      assetSyncStatus.classList.add('text-success');
+    } else if (level === 'error') {
+      assetSyncStatus.classList.add('text-danger');
+    } else {
+      assetSyncStatus.classList.add('text-info');
+    }
+    assetSyncStatus.setAttribute('data-i18n', key);
+    assetSyncStatus.textContent = translate(getLang(), key, key);
+    applyTranslationsSafe();
+  }
+
+  function applyRemoteImage(url) {
+    const preview = document.getElementById('asset-image-preview');
+    if (!preview) {
+      return;
+    }
+    const trimmed = typeof url === 'string' ? url.trim() : '';
+    if (trimmed === '') {
+      return;
+    }
+    const lower = trimmed.toLowerCase();
+    if (!(lower.startsWith('http://') || lower.startsWith('https://'))) {
+      return;
+    }
+    let wrapper = preview.querySelector('[data-sync-image="1"]');
+    if (!wrapper) {
+      wrapper = document.createElement('div');
+      wrapper.setAttribute('data-sync-image', '1');
+      wrapper.className = 'mt-2';
+      preview.appendChild(wrapper);
+    }
+    wrapper.innerHTML = '';
+    const link = document.createElement('a');
+    link.href = trimmed;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.setAttribute('data-i18n', 'assets.form.image_remote');
+    link.textContent = translate(getLang(), 'assets.form.image_remote', 'Synced image preview');
+    wrapper.appendChild(link);
+    const img = document.createElement('img');
+    img.src = trimmed;
+    img.alt = link.textContent;
+    img.className = 'img-thumbnail mt-1';
+    img.style.maxHeight = '60px';
+    wrapper.appendChild(img);
+    applyTranslationsSafe();
+  }
+
+  function applyStatusValue(value) {
+    const statusSelect = document.getElementById('asset-status');
+    if (!statusSelect || !isMeaningfulValue(value)) {
+      return false;
+    }
+    const normalized = normalizeComparison(value);
+    const statuses = [
+      { value: 'in_use', key: 'assets.status.in_use', synonyms: ['in-use', 'using', 'active', 'operational'] },
+      { value: 'maintenance', key: 'assets.status.maintenance', synonyms: ['maintenance', 'maintaining', 'repair', 'servicing', 'under-maintenance'] },
+      { value: 'pending', key: 'assets.status.pending', synonyms: ['pending', 'pending allocation', 'awaiting', '待分配'] },
+      { value: 'lost', key: 'assets.status.lost', synonyms: ['lost', 'missing', '丢失', '遗失'] },
+      { value: 'retired', key: 'assets.status.retired', synonyms: ['retired', 'disposed', '报废', '退役'] }
+    ];
+    const languages = ['en', 'zh', getLang()];
+    for (const status of statuses) {
+      const candidates = new Set();
+      candidates.add(normalizeComparison(status.value));
+      candidates.add(normalizeComparison(status.value.replace(/_/g, ' ')));
+      status.synonyms.forEach(s => candidates.add(normalizeComparison(s)));
+      languages.forEach(lang => {
+        candidates.add(normalizeComparison(translate(lang, status.key, status.value)));
+      });
+      if (candidates.has(normalized)) {
+        statusSelect.value = status.value;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function applyOwnerValue(value) {
+    if (!assetOwnerField) {
+      return false;
+    }
+    if (!isMeaningfulValue(value)) {
+      assetOwnerField.value = '';
+      if (assetOwnerCustomInput) {
+        assetOwnerCustomInput.value = '';
+      }
+      updateOwnerCustomVisibility();
+      return true;
+    }
+    const original = String(value).trim();
+    const normalized = normalizeComparison(original);
+    const options = Array.from(assetOwnerField.options || []);
+    let match = options.find(option => option.value && normalizeComparison(option.value) === normalized);
+    if (!match) {
+      match = options.find(option => option.value && normalizeComparison(option.textContent || '') === normalized);
+    }
+    if (match && match.value && match.value !== '__external__') {
+      assetOwnerField.value = match.value;
+      if (assetOwnerCustomInput) {
+        assetOwnerCustomInput.value = '';
+      }
+      updateOwnerCustomVisibility();
+      return true;
+    }
+    assetOwnerField.value = '__external__';
+    updateOwnerCustomVisibility();
+    if (assetOwnerCustomInput) {
+      assetOwnerCustomInput.value = original;
+    }
+    return true;
+  }
+
+  function applyOfficeValue(value) {
+    const officeSelect = document.getElementById('asset-office');
+    if (!officeSelect) {
+      return '';
+    }
+    if (!isMeaningfulValue(value)) {
+      officeSelect.value = '';
+      filterSeats('');
+      return '';
+    }
+    const original = String(value).trim();
+    const normalized = normalizeComparison(original);
+    const options = Array.from(officeSelect.options || []).filter(option => option.value);
+    const buildCandidates = option => {
+      const texts = new Set();
+      const name = option.getAttribute('data-office-name') || '';
+      const region = option.getAttribute('data-office-region') || '';
+      const location = option.getAttribute('data-office-location') || '';
+      texts.add(option.value);
+      texts.add(option.textContent || '');
+      if (name) texts.add(name);
+      if (region) texts.add(region);
+      if (location) texts.add(location);
+      const combos = [];
+      if (name && region) combos.push(`${name} ${region}`, `${region} ${name}`, `${name}-${region}`, `${name}·${region}`, `${name}/${region}`);
+      if (name && location) combos.push(`${name} ${location}`, `${location} ${name}`, `${name}-${location}`, `${name}·${location}`, `${name}/${location}`);
+      if (region && location) combos.push(`${region} ${location}`, `${location} ${region}`, `${region}-${location}`, `${region}·${location}`, `${region}/${location}`);
+      if (name && region && location) {
+        combos.push(`${name} ${region} ${location}`, `${name}·${region}·${location}`, `${name}-${region}-${location}`, `${name}/${region}/${location}`);
+      }
+      combos.forEach(item => texts.add(item));
+      return Array.from(texts).map(normalizeComparison).filter(Boolean);
+    };
+    let match = null;
+    for (const option of options) {
+      const candidates = buildCandidates(option);
+      if (candidates.includes(normalized)) {
+        match = option;
+        break;
+      }
+    }
+    if (!match) {
+      for (const option of options) {
+        const name = option.getAttribute('data-office-name') || '';
+        const region = option.getAttribute('data-office-region') || '';
+        const location = option.getAttribute('data-office-location') || '';
+        const possible = [name, region, location, option.textContent || ''];
+        const hasPartial = possible.some(text => {
+          const norm = normalizeComparison(text);
+          if (!norm) return false;
+          return normalized.includes(norm) || norm.includes(normalized);
+        });
+        if (hasPartial) {
+          match = option;
+          break;
+        }
+      }
+    }
+    if (match) {
+      officeSelect.value = match.value;
+      filterSeats(match.value);
+      return match.value;
+    }
+    return officeSelect.value || '';
+  }
+
+  function applySeatValue(value, selectedOfficeId) {
+    const seatSelect = document.getElementById('asset-seat');
+    if (!seatSelect) {
+      return '';
+    }
+    if (!isMeaningfulValue(value)) {
+      seatSelect.value = '';
+      return '';
+    }
+    const normalized = normalizeComparison(value);
+    const options = Array.from(seatSelect.options || []).filter(option => option.value);
+    let match = options.find(option => normalizeComparison(option.value) === normalized);
+    if (!match) {
+      match = options.find(option => normalizeComparison(option.textContent || '') === normalized);
+    }
+    if (!match) {
+      const possibleSeat = seatOptions.find(option => {
+        const valueNorm = normalizeComparison(option.value);
+        const textNorm = normalizeComparison(option.textContent || '');
+        return (valueNorm && valueNorm === normalized) || (textNorm && textNorm === normalized);
+      });
+      if (possibleSeat) {
+        const targetOffice = possibleSeat.getAttribute('data-office') || '';
+        if (targetOffice && targetOffice !== selectedOfficeId) {
+          const officeSelect = document.getElementById('asset-office');
+          if (officeSelect) {
+            officeSelect.value = targetOffice;
+            filterSeats(targetOffice);
+            return applySeatValue(value, targetOffice);
+          }
+        }
+      }
+      if (!match) {
+        match = options.find(option => {
+          const textNorm = normalizeComparison(option.textContent || '');
+          return textNorm && (textNorm.includes(normalized) || normalized.includes(textNorm));
+        });
+      }
+    }
+    if (match) {
+      seatSelect.value = match.value;
+      return match.value;
+    }
+    return '';
+  }
+
+  function applySyncedFields(fields) {
+    if (!fields || typeof fields !== 'object') {
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'asset_code_suffix') && assetCodeSuffixInput) {
+      let remoteCode = fields.asset_code_suffix;
+      if (remoteCode !== null && typeof remoteCode !== 'undefined') {
+        remoteCode = String(remoteCode);
+        const trimmed = remoteCode.trim();
+        if (trimmed !== '') {
+          const prefixValue = assetModal ? (assetModal.getAttribute('data-asset-prefix') || '') : '';
+          let suffixValue = trimmed;
+          let usesPrefix = assetCodeUsePrefixInput ? assetCodeUsePrefixInput.value === '1' : (assetCodeSuffixInput.dataset.usesPrefix === '1');
+          if (prefixValue && trimmed.startsWith(prefixValue)) {
+            suffixValue = trimmed.substring(prefixValue.length);
+            usesPrefix = true;
+          }
+          assetCodeSuffixInput.value = suffixValue;
+          assetCodeSuffixInput.dataset.original = suffixValue;
+          if (prefixValue) {
+            assetCodeSuffixInput.dataset.usesPrefix = usesPrefix ? '1' : '0';
+            if (assetCodeUsePrefixInput) {
+              assetCodeUsePrefixInput.value = usesPrefix ? '1' : '0';
+            }
+          }
+        }
+      }
+    }
+    const categoryField = document.getElementById('asset-category');
+    if (categoryField && isMeaningfulValue(fields.category)) {
+      categoryField.value = String(fields.category).trim();
+    }
+    const modelField = document.getElementById('asset-model');
+    if (modelField && isMeaningfulValue(fields.model)) {
+      modelField.value = String(fields.model).trim();
+    }
+    const organizationField = document.getElementById('asset-organization');
+    if (organizationField && isMeaningfulValue(fields.organization)) {
+      organizationField.value = String(fields.organization).trim();
+    }
+    const remarksField = document.getElementById('asset-remarks');
+    if (remarksField && isMeaningfulValue(fields.remarks)) {
+      remarksField.value = String(fields.remarks).trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'status')) {
+      applyStatusValue(fields.status);
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'owner_name')) {
+      applyOwnerValue(fields.owner_name);
+    }
+    let selectedOfficeId = '';
+    if (Object.prototype.hasOwnProperty.call(fields, 'office_label')) {
+      selectedOfficeId = applyOfficeValue(fields.office_label);
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'seat_label')) {
+      applySeatValue(fields.seat_label, selectedOfficeId);
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, 'image_url')) {
+      applyRemoteImage(fields.image_url);
+    }
+    updateOwnerCustomVisibility();
+    applyTranslationsSafe();
+  }
+
+  function buildAssetCodeForSync() {
+    if (!assetCodeSuffixInput) {
+      return '';
+    }
+    const prefixValue = assetModal ? (assetModal.getAttribute('data-asset-prefix') || '') : '';
+    let suffix = assetCodeSuffixInput.value ? assetCodeSuffixInput.value.trim() : '';
+    let usesPrefix = assetCodeUsePrefixInput ? assetCodeUsePrefixInput.value === '1' : (assetCodeSuffixInput.dataset.usesPrefix === '1');
+    if (!suffix && assetCodeSuffixInput.dataset.original) {
+      suffix = assetCodeSuffixInput.dataset.original.trim();
+    }
+    if (!suffix) {
+      return '';
+    }
+    if (prefixValue) {
+      if (suffix.startsWith(prefixValue)) {
+        return suffix;
+      }
+      if (usesPrefix) {
+        return prefixValue + suffix;
+      }
+    }
+    return suffix;
+  }
+
+  function updateAssetModalSyncFlag() {
+    if (!assetModal) {
+      return;
+    }
+    const apiPrefix = (assetModal.getAttribute('data-sync-api') || '').trim();
+    const hasMapping = assetSyncMappingState && Object.keys(assetSyncMappingState).length > 0;
+    const ready = apiPrefix !== '' && hasMapping;
+    assetModal.setAttribute('data-sync-ready', ready ? '1' : '0');
+    if (assetSyncButton) {
+      assetSyncButton.disabled = !ready;
+      assetSyncButton.classList.toggle('disabled', !ready);
+      if (ready) {
+        assetSyncButton.removeAttribute('aria-disabled');
+      } else {
+        assetSyncButton.setAttribute('aria-disabled', 'true');
+      }
+    }
+  }
+
+  function performAssetSync() {
+    if (!assetModal || !assetSyncButton) {
+      return;
+    }
+    const apiPrefix = (assetModal.getAttribute('data-sync-api') || '').trim();
+    if (!apiPrefix) {
+      setAssetFormSyncStatus('error', 'assets.sync.errors.prefix_missing');
+      return;
+    }
+    const hasMapping = assetSyncMappingState && Object.keys(assetSyncMappingState).length > 0;
+    if (!hasMapping) {
+      setAssetFormSyncStatus('error', 'assets.sync.errors.mapping_missing');
+      return;
+    }
+    const assetCode = buildAssetCodeForSync();
+    if (!assetCode) {
+      setAssetFormSyncStatus('error', 'assets.sync.errors.asset_required');
+      return;
+    }
+    const params = new URLSearchParams();
+    params.set('action', 'sync_asset_fill');
+    params.set('asset_code', assetCode);
+    const assetIdField = document.getElementById('asset-id');
+    if (assetIdField && assetIdField.value) {
+      params.set('asset_id', assetIdField.value);
+    }
+    setAssetFormSyncStatus('info', 'assets.form.sync_status.loading');
+    assetSyncButton.disabled = true;
+    assetSyncButton.classList.add('disabled');
+    fetch('assets.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (!data || typeof data !== 'object') {
+          setAssetFormSyncStatus('error', 'assets.form.sync_status.error');
+          return;
+        }
+        if (!data.success) {
+          const messageKey = typeof data.message === 'string' && data.message ? data.message : 'assets.form.sync_status.error';
+          setAssetFormSyncStatus('error', messageKey);
+          return;
+        }
+        if (data.fields && typeof data.fields === 'object') {
+          applySyncedFields(data.fields);
+        }
+        const successKey = typeof data.message === 'string' && data.message ? data.message : 'assets.form.sync_status.success';
+        setAssetFormSyncStatus('success', successKey);
+      })
+      .catch(() => {
+        setAssetFormSyncStatus('error', 'assets.form.sync_status.error');
+      })
+      .finally(() => {
+        updateAssetModalSyncFlag();
+      });
+  }
 
   function updateSyncStatus(level, key) {
     if (!syncStatusEl) return;
@@ -1586,6 +2162,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
         }
         if (data.mapping && typeof data.mapping === 'object') {
           assetSyncMappingState = Object.assign({}, data.mapping);
+          updateAssetModalSyncFlag();
         }
         syncAvailableKeys = Array.isArray(data.keys)
           ? data.keys.map(value => (typeof value === 'string' ? value.trim() : '')).filter(value => value !== '')
@@ -1666,6 +2243,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
           } else {
             assetSyncMappingState = Object.assign({}, payload);
           }
+          updateAssetModalSyncFlag();
           populateSyncSelects(syncAvailableKeys.length ? syncAvailableKeys : Object.values(assetSyncMappingState || {}));
           updateSyncStatus('success', data.message || 'assets.sync.status.saved');
         })
@@ -1684,11 +2262,29 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
     });
   }
 
+  if (assetSyncButton) {
+    assetSyncButton.addEventListener('click', () => {
+      if (assetSyncButton.disabled) {
+        const apiPrefix = (assetModal ? (assetModal.getAttribute('data-sync-api') || '') : '').trim();
+        const hasMapping = assetSyncMappingState && Object.keys(assetSyncMappingState).length > 0;
+        if (!apiPrefix) {
+          setAssetFormSyncStatus('error', 'assets.sync.errors.prefix_missing');
+        } else if (!hasMapping) {
+          setAssetFormSyncStatus('error', 'assets.sync.errors.mapping_missing');
+        }
+        return;
+      }
+      performAssetSync();
+    });
+  }
+
   if (assetModal) {
     assetModal.addEventListener('show.bs.modal', event => {
       const button = event.relatedTarget;
       const mode = button?.getAttribute('data-mode') || 'create';
       const role = button?.getAttribute('data-member-role') || 'manager';
+      setAssetFormSyncStatus('', '');
+      updateAssetModalSyncFlag();
       const form = document.getElementById('assetForm');
       form.reset();
       document.getElementById('asset-id').value = '';
@@ -1857,6 +2453,9 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
           assetOwnerCustomInput.value = '';
         }
       }
+    });
+    assetModal.addEventListener('hidden.bs.modal', () => {
+      setAssetFormSyncStatus('', '');
     });
   }
 
