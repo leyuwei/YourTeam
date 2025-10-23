@@ -616,7 +616,12 @@ const translations = {
     'assets.assignments.status': 'Status',
     'assets.assignments.updated_at': 'Updated',
     'assets.assignments.none': 'No member asset data',
-    'assets.assignments.member_empty': 'No assets assigned.'
+    'assets.assignments.member_empty': 'No assets assigned.',
+    'assets.assignments.badge': '{code} - {category} - {model}',
+    'assets.assignments.owner_external': 'External / Others',
+    'assets.assignments.owner_missing': 'Unassigned',
+    'assets.assignments.other_title': 'Other Asset Records',
+    'assets.assignments.other_none': 'No additional assets pending review.'
   ,
   'reimburse.title': 'Reimbursement Batches',
   'reimburse.add_batch': 'Add Batch',
@@ -1312,7 +1317,12 @@ const translations = {
     'assets.assignments.status': '资产状态',
     'assets.assignments.updated_at': '更新时间',
     'assets.assignments.none': '暂无在岗成员资产记录',
-    'assets.assignments.member_empty': '暂无负责资产。'
+    'assets.assignments.member_empty': '暂无负责资产。',
+    'assets.assignments.badge': '{code} - {category} - {model}',
+    'assets.assignments.owner_external': '其他人员',
+    'assets.assignments.owner_missing': '暂无责任人',
+    'assets.assignments.other_title': '其他成员资产列表',
+    'assets.assignments.other_none': '暂无需要核对的资产记录。'
   ,
   'reimburse.title': '报销批次',
   'reimburse.add_batch': '新增批次',

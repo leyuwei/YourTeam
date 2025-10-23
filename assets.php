@@ -247,6 +247,34 @@ function limit_text_length(string $value, int $max): string {
     return $value;
 }
 
+function asset_normalize_category_key($value): string {
+    $string = is_string($value) ? $value : (string)$value;
+    $trimmed = trim($string);
+    if ($trimmed === '') {
+        return '';
+    }
+    if (function_exists('mb_strtolower')) {
+        return mb_strtolower($trimmed, 'UTF-8');
+    }
+    return strtolower($trimmed);
+}
+
+function asset_hex_to_rgba(string $hex, float $alpha): string {
+    $clean = ltrim($hex, '#');
+    if (strlen($clean) === 3) {
+        $clean = $clean[0] . $clean[0] . $clean[1] . $clean[1] . $clean[2] . $clean[2];
+    }
+    if (!preg_match('/^[0-9a-fA-F]{6}$/', $clean)) {
+        $alphaClamped = max(0, min(1, $alpha));
+        return 'rgba(0, 0, 0, ' . $alphaClamped . ')';
+    }
+    $r = hexdec(substr($clean, 0, 2));
+    $g = hexdec(substr($clean, 2, 2));
+    $b = hexdec(substr($clean, 4, 2));
+    $alphaClamped = max(0, min(1, $alpha));
+    return sprintf('rgba(%d, %d, %d, %.3f)', $r, $g, $b, $alphaClamped);
+}
+
 function match_asset_status($value): string {
     $default = 'pending';
     if (!is_string($value) || trim($value) === '') {
@@ -1349,13 +1377,45 @@ if ($is_manager) {
 $assetQuery = 'SELECT a.*, io.order_number, io.arrival_date, m.name AS owner_name, o.name AS office_name, s.label AS seat_label FROM assets a JOIN asset_inbound_orders io ON a.inbound_order_id=io.id LEFT JOIN members m ON a.owner_member_id=m.id LEFT JOIN offices o ON a.current_office_id=o.id LEFT JOIN office_seats s ON a.current_seat_id=s.id';
 $params = [];
 if (!$is_manager && $member_id) {
-    $assetQuery .= ' WHERE a.owner_member_id = ?';
+    $assetQuery .= ' WHERE (a.owner_member_id = ? OR a.status IN (?, ?))';
     $params[] = $member_id;
+    $params[] = 'pending';
+    $params[] = 'lost';
 }
 $assetQuery .= ' ORDER BY io.arrival_date DESC, a.id DESC';
 $stmt = $pdo->prepare($assetQuery);
 $stmt->execute($params);
 $assets = $stmt->fetchAll();
+
+$categoryColorPalette = [
+    ['bg' => '#f4f1ff', 'text' => '#433878'],
+    ['bg' => '#eef7ff', 'text' => '#1d4f91'],
+    ['bg' => '#fff4e7', 'text' => '#8b4513'],
+    ['bg' => '#f2fff2', 'text' => '#1b5e20'],
+    ['bg' => '#fff0f5', 'text' => '#9d174d'],
+    ['bg' => '#f0f9ff', 'text' => '#0f4c81'],
+    ['bg' => '#fff7ed', 'text' => '#9c4221'],
+    ['bg' => '#f4fffb', 'text' => '#0f766e']
+];
+$categoryColorMap = [];
+$paletteIndex = 0;
+foreach ($assets as $assetRow) {
+    $rawCategory = isset($assetRow['category']) ? (string)$assetRow['category'] : '';
+    $category = trim($rawCategory);
+    $key = asset_normalize_category_key($category);
+    if ($key === '') {
+        continue;
+    }
+    if (!isset($categoryColorMap[$key])) {
+        $paletteItem = $categoryColorPalette[$paletteIndex % count($categoryColorPalette)];
+        $paletteIndex++;
+        $categoryColorMap[$key] = [
+            'bg' => $paletteItem['bg'],
+            'text' => $paletteItem['text'],
+            'border' => asset_hex_to_rgba($paletteItem['text'], 0.24)
+        ];
+    }
+}
 
 $categoryStats = [];
 $statusStats = [];
@@ -1376,8 +1436,10 @@ $members = $pdo->query('SELECT id, name FROM members ORDER BY name')->fetchAll()
 $offices = $pdo->query('SELECT id, name, location_description, region FROM offices ORDER BY name')->fetchAll();
 $seats = $pdo->query('SELECT id, office_id, label FROM office_seats ORDER BY label')->fetchAll();
 $memberAssets = [];
+$otherMemberAssets = [];
 if ($is_manager) {
     $memberAssetStmt = $pdo->query('SELECT m.id AS member_id, m.name AS member_name, a.id AS asset_id, a.asset_code, a.category, a.model, a.organization, a.status, a.updated_at, o.name AS office_name, s.label AS seat_label FROM members m LEFT JOIN assets a ON a.owner_member_id = m.id LEFT JOIN offices o ON a.current_office_id = o.id LEFT JOIN office_seats s ON a.current_seat_id = s.id WHERE m.status = "in_work" ORDER BY m.name ASC, a.asset_code ASC, a.id ASC');
+    $activeAssetIds = [];
     foreach ($memberAssetStmt->fetchAll() as $row) {
         $memberId = (int)$row['member_id'];
         if (!isset($memberAssets[$memberId])) {
@@ -1397,8 +1459,24 @@ if ($is_manager) {
                 'status' => $row['status'],
                 'updated_at' => $row['updated_at']
             ];
+            $activeAssetIds[] = (int)$row['asset_id'];
         }
     }
+    $activeAssetIds = array_values(array_unique($activeAssetIds));
+    $placeholders = '';
+    $otherParams = [];
+    if ($activeAssetIds) {
+        $placeholders = implode(',', array_fill(0, count($activeAssetIds), '?'));
+    }
+    $otherQuery = 'SELECT a.id, a.asset_code, a.category, a.model, a.organization, a.status, a.updated_at, a.owner_member_id, a.owner_external_name, m.name AS owner_name, m.status AS owner_status, o.name AS office_name, s.label AS seat_label FROM assets a LEFT JOIN members m ON a.owner_member_id = m.id LEFT JOIN offices o ON a.current_office_id = o.id LEFT JOIN office_seats s ON a.current_seat_id = s.id WHERE (a.owner_member_id IS NULL OR m.status IS NULL OR m.status <> "in_work" OR (a.owner_external_name IS NOT NULL AND TRIM(a.owner_external_name) <> ""))';
+    if ($placeholders !== '') {
+        $otherQuery .= ' AND a.id NOT IN (' . $placeholders . ')';
+        $otherParams = $activeAssetIds;
+    }
+    $otherQuery .= ' ORDER BY a.updated_at DESC, a.id DESC';
+    $otherStmt = $pdo->prepare($otherQuery);
+    $otherStmt->execute($otherParams);
+    $otherMemberAssets = $otherStmt->fetchAll();
 }
 
 include 'header.php';
@@ -1416,16 +1494,25 @@ include 'header.php';
 <?php endif; ?>
 <?php if ($is_manager): ?>
 <div class="asset-stats mb-4">
-  <div class="row g-3">
-    <div class="col-12">
-      <div class="card shadow-sm">
+  <div class="row g-3 align-items-stretch">
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm h-100 asset-stats-card asset-stats-card-category">
         <div class="card-body">
           <h5 class="card-title" data-i18n="assets.stats.by_category">By Category</h5>
           <div class="d-flex flex-wrap gap-3" id="assetCategoryStats">
             <?php if ($categoryStats): ?>
               <?php foreach ($categoryStats as $row): ?>
-              <div class="stats-chip">
-                <div class="stats-label"><?= htmlspecialchars($row['category'] ?: '-'); ?></div>
+              <?php
+                $categoryLabel = isset($row['category']) ? trim((string)$row['category']) : '';
+                $categoryKey = asset_normalize_category_key($categoryLabel);
+                $chipAttributes = '';
+                if ($categoryKey !== '' && isset($categoryColorMap[$categoryKey])) {
+                    $colorData = $categoryColorMap[$categoryKey];
+                    $chipAttributes = ' data-category-chip="1" style="--asset-category-bg: ' . htmlspecialchars($colorData['bg']) . '; --asset-category-text: ' . htmlspecialchars($colorData['text']) . '; --asset-category-border: ' . htmlspecialchars($colorData['border']) . ';"';
+                }
+              ?>
+              <div class="stats-chip"<?= $chipAttributes; ?>>
+                <div class="stats-label"><?= htmlspecialchars($categoryLabel === '' ? '-' : $categoryLabel); ?></div>
                 <div class="stats-value"><?= (int)$row['total']; ?></div>
               </div>
               <?php endforeach; ?>
@@ -1436,8 +1523,8 @@ include 'header.php';
         </div>
       </div>
     </div>
-    <div class="col-12">
-      <div class="card shadow-sm">
+    <div class="col-12 col-lg-6">
+      <div class="card shadow-sm h-100 asset-stats-card asset-stats-card-status">
         <div class="card-body">
           <h5 class="card-title" data-i18n="assets.stats.by_status">By Status</h5>
           <div class="d-flex flex-wrap gap-3" id="assetStatusStats">
@@ -1547,13 +1634,29 @@ include 'header.php';
           <?php if ($assets): ?>
             <?php foreach ($assets as $asset): ?>
             <?php $canEdit = $is_manager || (int)$asset['owner_member_id'] === (int)$member_id; ?>
-            <tr data-asset-id="<?= (int)$asset['id']; ?>">
+            <?php
+              $categoryRaw = isset($asset['category']) ? (string)$asset['category'] : '';
+              $categoryTrim = trim($categoryRaw);
+              $categoryKey = asset_normalize_category_key($categoryTrim);
+              $rowAttributes = '';
+              if ($categoryKey !== '' && isset($categoryColorMap[$categoryKey])) {
+                  $colorData = $categoryColorMap[$categoryKey];
+                  $rowAttributes = sprintf(
+                      ' data-category-color="1" style="--asset-category-bg: %s; --asset-category-text: %s; --asset-category-border: %s;"',
+                      htmlspecialchars($colorData['bg']),
+                      htmlspecialchars($colorData['text']),
+                      htmlspecialchars($colorData['border'])
+                  );
+              }
+            ?>
+            <tr class="asset-row" data-asset-id="<?= (int)$asset['id']; ?>"<?= $rowAttributes; ?>>
               <?php if ($is_manager): ?>
               <td><?= htmlspecialchars($asset['order_number']); ?></td>
               <?php endif; ?>
               <td><?= htmlspecialchars($asset['asset_code']); ?></td>
-              <td><?= htmlspecialchars($asset['category']); ?></td>
-              <td><?= htmlspecialchars($asset['model']); ?></td>
+              <td><?= htmlspecialchars($categoryTrim === '' ? '-' : $categoryTrim); ?></td>
+              <?php $modelLabel = isset($asset['model']) ? trim((string)$asset['model']) : ''; ?>
+              <td><?= htmlspecialchars($modelLabel === '' ? '-' : $modelLabel); ?></td>
               <?php $organizationLabel = trim($asset['organization'] ?? ''); ?>
               <td><?= htmlspecialchars($organizationLabel === '' ? '-' : $organizationLabel); ?></td>
               <?php
@@ -1636,51 +1739,135 @@ include 'header.php';
   <div class="card-header">
     <h3 class="mb-0" data-i18n="assets.assignments.title">Member Asset Responsibilities</h3>
   </div>
+  <div class="card-body">
+    <?php if ($memberAssets): ?>
+      <div class="member-assets-list">
+        <?php foreach ($memberAssets as $record): ?>
+        <div class="member-assets-row">
+          <div class="member-assets-name"><?= htmlspecialchars($record['member_name']); ?></div>
+          <div class="member-assets-badges">
+            <?php if (!empty($record['assets'])): ?>
+              <?php foreach ($record['assets'] as $assignedAsset): ?>
+                <?php
+                  $badgeCode = isset($assignedAsset['asset_code']) ? trim((string)$assignedAsset['asset_code']) : '';
+                  $badgeCategoryRaw = isset($assignedAsset['category']) ? (string)$assignedAsset['category'] : '';
+                  $badgeCategory = trim($badgeCategoryRaw);
+                  $badgeModelRaw = isset($assignedAsset['model']) ? (string)$assignedAsset['model'] : '';
+                  $badgeModel = trim($badgeModelRaw);
+                  $badgeCategoryKey = asset_normalize_category_key($badgeCategory);
+                  $badgeAttributes = '';
+                  if ($badgeCategoryKey !== '' && isset($categoryColorMap[$badgeCategoryKey])) {
+                      $colorData = $categoryColorMap[$badgeCategoryKey];
+                      $badgeAttributes = sprintf(
+                          ' style="--asset-category-bg: %s; --asset-category-text: %s; --asset-category-border: %s;"',
+                          htmlspecialchars($colorData['bg']),
+                          htmlspecialchars($colorData['text']),
+                          htmlspecialchars($colorData['border'])
+                      );
+                  }
+                  $badgeParams = [
+                      'code' => $badgeCode === '' ? '-' : $badgeCode,
+                      'category' => $badgeCategory === '' ? '-' : $badgeCategory,
+                      'model' => $badgeModel === '' ? '-' : $badgeModel
+                  ];
+                ?>
+                <span class="asset-assignment-badge" data-i18n="assets.assignments.badge" data-i18n-params='<?= htmlspecialchars(json_encode($badgeParams, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)); ?>'<?= $badgeAttributes; ?>><?= htmlspecialchars(($badgeParams['code']) . ' - ' . ($badgeParams['category']) . ' - ' . ($badgeParams['model'])); ?></span>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <span class="member-assets-empty text-muted" data-i18n="assets.assignments.member_empty">No assets assigned.</span>
+            <?php endif; ?>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    <?php else: ?>
+      <div class="text-muted" data-i18n="assets.assignments.none">No member asset data</div>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($is_manager): ?>
+<div class="card mb-4">
+  <div class="card-header">
+    <h3 class="mb-0" data-i18n="assets.assignments.other_title">Other Asset Records</h3>
+  </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-striped table-hover mb-0 align-middle asset-table-nowrap">
+      <table class="table table-hover table-bordered mb-0 align-middle asset-table-nowrap">
         <thead class="table-light">
           <tr>
-            <th data-i18n="assets.assignments.member">Member</th>
-            <th data-i18n="assets.assignments.asset_code">Asset Code</th>
-            <th data-i18n="assets.assignments.organization">Owning Unit</th>
-            <th data-i18n="assets.assignments.category">Category</th>
-            <th data-i18n="assets.assignments.model">Model / Configuration</th>
-            <th data-i18n="assets.assignments.location">Location</th>
-            <th data-i18n="assets.assignments.status">Status</th>
-            <th data-i18n="assets.assignments.updated_at">Updated</th>
+            <th data-i18n="assets.table.asset_code">Asset Code</th>
+            <th data-i18n="assets.table.category">Category</th>
+            <th data-i18n="assets.table.model">Model</th>
+            <th data-i18n="assets.table.organization">Owning Unit</th>
+            <th data-i18n="assets.table.location">Location</th>
+            <th data-i18n="assets.table.owner">Responsible</th>
+            <th data-i18n="assets.table.status">Status</th>
+            <th data-i18n="assets.table.updated_at">Updated</th>
           </tr>
         </thead>
         <tbody>
-          <?php if ($memberAssets): ?>
-            <?php foreach ($memberAssets as $record): ?>
-              <?php if (!empty($record['assets'])): ?>
-                <?php foreach ($record['assets'] as $assignedAsset): ?>
-                  <?php
-                    $assignmentLocation = trim(($assignedAsset['office_name'] ? $assignedAsset['office_name'] : '') . ($assignedAsset['seat_label'] ? (' / ' . $assignedAsset['seat_label']) : ''));
-                    $assignmentOrg = trim((string)($assignedAsset['organization'] ?? ''));
-                  ?>
-                  <tr>
-                    <td><?= htmlspecialchars($record['member_name']); ?></td>
-                    <td><?= htmlspecialchars($assignedAsset['asset_code']); ?></td>
-                    <td><?= htmlspecialchars($assignmentOrg === '' ? '-' : $assignmentOrg); ?></td>
-                    <td><?= htmlspecialchars($assignedAsset['category'] ?? '-'); ?></td>
-                    <td><?= htmlspecialchars($assignedAsset['model'] ?? '-'); ?></td>
-                    <td><?= htmlspecialchars($assignmentLocation === '' ? '-' : $assignmentLocation); ?></td>
-                    <td><span data-i18n="assets.status.<?= htmlspecialchars($assignedAsset['status']); ?>"><?= htmlspecialchars($assignedAsset['status']); ?></span></td>
-                    <td><?= htmlspecialchars($assignedAsset['updated_at'] ?: '-'); ?></td>
-                  </tr>
-                <?php endforeach; ?>
-              <?php else: ?>
-                <tr>
-                  <td><?= htmlspecialchars($record['member_name']); ?></td>
-                  <td colspan="7" class="text-muted" data-i18n="assets.assignments.member_empty">No assets assigned.</td>
-                </tr>
-              <?php endif; ?>
+          <?php if ($otherMemberAssets): ?>
+            <?php foreach ($otherMemberAssets as $otherAsset): ?>
+              <?php
+                $otherCategoryRaw = isset($otherAsset['category']) ? (string)$otherAsset['category'] : '';
+                $otherCategory = trim($otherCategoryRaw);
+                $otherCategoryKey = asset_normalize_category_key($otherCategory);
+                $otherRowAttributes = '';
+                if ($otherCategoryKey !== '' && isset($categoryColorMap[$otherCategoryKey])) {
+                    $colorData = $categoryColorMap[$otherCategoryKey];
+                    $otherRowAttributes = sprintf(
+                        ' data-category-color="1" style="--asset-category-bg: %s; --asset-category-text: %s; --asset-category-border: %s;"',
+                        htmlspecialchars($colorData['bg']),
+                        htmlspecialchars($colorData['text']),
+                        htmlspecialchars($colorData['border'])
+                    );
+                }
+                $otherModelRaw = isset($otherAsset['model']) ? (string)$otherAsset['model'] : '';
+                $otherModel = trim($otherModelRaw);
+                $otherOrgRaw = isset($otherAsset['organization']) ? (string)$otherAsset['organization'] : '';
+                $otherOrg = trim($otherOrgRaw);
+                $officeName = isset($otherAsset['office_name']) ? trim((string)$otherAsset['office_name']) : '';
+                $seatLabel = isset($otherAsset['seat_label']) ? trim((string)$otherAsset['seat_label']) : '';
+                $locationParts = [];
+                if ($officeName !== '') {
+                    $locationParts[] = $officeName;
+                }
+                if ($seatLabel !== '') {
+                    $locationParts[] = $seatLabel;
+                }
+                $locationDisplay = $locationParts ? implode(' / ', $locationParts) : '-';
+                $ownerName = isset($otherAsset['owner_name']) ? trim((string)$otherAsset['owner_name']) : '';
+                $ownerExternal = isset($otherAsset['owner_external_name']) ? trim((string)$otherAsset['owner_external_name']) : '';
+                $ownerStatus = isset($otherAsset['owner_status']) ? trim((string)$otherAsset['owner_status']) : '';
+              ?>
+              <tr class="asset-row"<?= $otherRowAttributes; ?>>
+                <td><?= htmlspecialchars((string)$otherAsset['asset_code']); ?></td>
+                <td><?= htmlspecialchars($otherCategory === '' ? '-' : $otherCategory); ?></td>
+                <td><?= htmlspecialchars($otherModel === '' ? '-' : $otherModel); ?></td>
+                <td><?= htmlspecialchars($otherOrg === '' ? '-' : $otherOrg); ?></td>
+                <td><?= htmlspecialchars($locationDisplay); ?></td>
+                <td>
+                  <?php if ($ownerExternal !== ''): ?>
+                    <div class="fw-semibold"><?= htmlspecialchars($ownerExternal); ?></div>
+                    <span class="asset-owner-tag asset-owner-tag--external" data-i18n="assets.assignments.owner_external">External / Others</span>
+                  <?php elseif ($ownerName !== ''): ?>
+                    <div class="fw-semibold"><?= htmlspecialchars($ownerName); ?></div>
+                    <?php if ($ownerStatus !== '' && $ownerStatus !== 'in_work'): ?>
+                      <span class="asset-owner-tag asset-owner-tag--status" data-i18n="members.status.<?= htmlspecialchars($ownerStatus); ?>"><?= htmlspecialchars($ownerStatus); ?></span>
+                    <?php endif; ?>
+                  <?php else: ?>
+                    <span class="text-muted" data-i18n="assets.assignments.owner_missing">Unassigned</span>
+                  <?php endif; ?>
+                </td>
+                <td><span data-i18n="assets.status.<?= htmlspecialchars($otherAsset['status']); ?>"><?= htmlspecialchars($otherAsset['status']); ?></span></td>
+                <td><?= htmlspecialchars(isset($otherAsset['updated_at']) && $otherAsset['updated_at'] !== '' ? $otherAsset['updated_at'] : '-'); ?></td>
+              </tr>
             <?php endforeach; ?>
           <?php else: ?>
             <tr>
-              <td colspan="8" class="text-center" data-i18n="assets.assignments.none">No member asset data</td>
+              <td colspan="8" class="text-center text-muted" data-i18n="assets.assignments.other_none">No additional assets pending review.</td>
             </tr>
           <?php endif; ?>
         </tbody>
@@ -3026,7 +3213,7 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
         updateSyncAllRowStatus(rowMap, key, 'assets.sync_all.result.failed', 'error');
       }
       applyTranslationsSafe();
-      await delay(600);
+      await delay(240);
     }
     const summaryParams = { success: successCount, skipped: skipCount, failed: failCount };
     if (failCount > 0) {
