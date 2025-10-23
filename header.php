@@ -280,7 +280,25 @@
     border-color: var(--app-table-border);
   }
   .asset-row {
+    position: relative;
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+  .asset-row.asset-row-highlight {
+    animation: assetRowFlash 1.4s ease-in-out;
+  }
+  @keyframes assetRowFlash {
+    0% {
+      background-color: var(--app-highlight-surface);
+      box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+    }
+    50% {
+      background-color: var(--app-highlight-bg);
+      box-shadow: 0 0 0 3px var(--app-highlight-border);
+    }
+    100% {
+      background-color: inherit;
+      box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+    }
   }
   body:not(.theme-dark) tr.asset-row[data-category-color] {
     background-color: var(--asset-category-bg);
@@ -388,6 +406,9 @@
     border-radius: 999px;
     font-size: 0.85rem;
     font-weight: 500;
+    cursor: pointer;
+    appearance: none;
+    text-decoration: none;
     border: 1px solid var(--asset-category-border, rgba(15, 23, 42, 0.12));
     background-color: var(--asset-category-bg, rgba(148, 163, 184, 0.16));
     color: var(--asset-category-text, var(--app-text-color));
@@ -395,6 +416,10 @@
   }
   .asset-assignment-badge:hover {
     transform: translateY(-1px);
+  }
+  .asset-assignment-badge:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.35);
   }
   body.theme-dark .asset-assignment-badge {
     background-color: rgba(148, 163, 184, 0.22);
@@ -417,6 +442,44 @@
   .asset-owner-tag--external {
     background-color: rgba(168, 85, 247, 0.15);
     color: #6b21a8;
+  }
+
+  .asset-code-link {
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: var(--bs-link-color, #0d6efd);
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .asset-code-link:hover {
+    color: var(--bs-link-hover-color, #0a58ca);
+    text-decoration: none;
+  }
+  .asset-code-link:focus-visible {
+    outline: 2px solid var(--app-highlight-border);
+    outline-offset: 2px;
+  }
+  body.theme-dark .asset-code-link {
+    color: #93c5fd;
+  }
+  body.theme-dark .asset-code-link:hover {
+    color: #bfdbfe;
+  }
+
+  .asset-member-section {
+    padding: 1.5rem;
+  }
+  .asset-member-section + .asset-member-section {
+    border-top: 1px solid var(--app-table-border);
+  }
+  body.theme-dark .asset-member-section + .asset-member-section {
+    border-color: rgba(148, 163, 184, 0.25);
+  }
+  .asset-member-section .table-responsive {
+    margin-top: 1rem;
   }
   .asset-owner-tag--status {
     background-color: rgba(234, 179, 8, 0.2);

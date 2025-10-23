@@ -1387,6 +1387,19 @@ $stmt = $pdo->prepare($assetQuery);
 $stmt->execute($params);
 $assets = $stmt->fetchAll();
 
+$memberOwnedAssets = [];
+$otherVisibleAssets = [];
+if (!$is_manager && $member_id) {
+    foreach ($assets as $assetRow) {
+        $ownerId = isset($assetRow['owner_member_id']) ? (int)$assetRow['owner_member_id'] : 0;
+        if ($ownerId === (int)$member_id) {
+            $memberOwnedAssets[] = $assetRow;
+        } else {
+            $otherVisibleAssets[] = $assetRow;
+        }
+    }
+}
+
 $categoryColorPalette = [
     ['bg' => '#f4f1ff', 'text' => '#433878'],
     ['bg' => '#eef7ff', 'text' => '#1d4f91'],
@@ -1450,6 +1463,7 @@ if ($is_manager) {
         }
         if (!empty($row['asset_id'])) {
             $memberAssets[$memberId]['assets'][] = [
+                'asset_id' => (int)$row['asset_id'],
                 'asset_code' => $row['asset_code'],
                 'organization' => $row['organization'],
                 'category' => $row['category'],
@@ -1478,6 +1492,130 @@ if ($is_manager) {
     $otherStmt->execute($otherParams);
     $otherMemberAssets = $otherStmt->fetchAll();
 }
+
+function render_asset_table_header(bool $is_manager): void {
+    ?>
+    <thead class="table-light">
+      <tr>
+        <?php if ($is_manager): ?>
+        <th data-i18n="assets.table.order_number">Order #</th>
+        <?php endif; ?>
+        <th data-i18n="assets.table.asset_code">Asset Code</th>
+        <th data-i18n="assets.table.category">Category</th>
+        <th data-i18n="assets.table.model">Model</th>
+        <th data-i18n="assets.table.organization">Owning Unit</th>
+        <th data-i18n="assets.table.remarks">Remarks</th>
+        <th data-i18n="assets.table.location">Location</th>
+        <th data-i18n="assets.table.owner">Responsible</th>
+        <th data-i18n="assets.table.status">Status</th>
+        <th data-i18n="assets.table.image">Photo</th>
+        <th data-i18n="assets.table.updated_at">Updated</th>
+        <th data-i18n="assets.table.actions">Actions</th>
+      </tr>
+    </thead>
+    <?php
+}
+
+function render_asset_row(array $asset, bool $is_manager, ?int $member_id, array $categoryColorMap, string $assetLinkPrefix, string $assetCodePrefix): void {
+    $canEdit = $is_manager || ((int)($asset['owner_member_id'] ?? 0) === (int)$member_id);
+    $categoryRaw = isset($asset['category']) ? (string)$asset['category'] : '';
+    $categoryTrim = trim($categoryRaw);
+    $categoryKey = asset_normalize_category_key($categoryTrim);
+    $rowAttributes = '';
+    if ($categoryKey !== '' && isset($categoryColorMap[$categoryKey])) {
+        $colorData = $categoryColorMap[$categoryKey];
+        $rowAttributes = sprintf(
+            ' data-category-color="1" style="--asset-category-bg: %s; --asset-category-text: %s; --asset-category-border: %s;"',
+            htmlspecialchars($colorData['bg']),
+            htmlspecialchars($colorData['text']),
+            htmlspecialchars($colorData['border'])
+        );
+    }
+    $assetId = isset($asset['id']) ? (int)$asset['id'] : 0;
+    $orderNumber = isset($asset['order_number']) ? (string)$asset['order_number'] : '';
+    $modelLabel = isset($asset['model']) ? trim((string)$asset['model']) : '';
+    $organizationLabel = trim((string)($asset['organization'] ?? ''));
+    $remarksRaw = trim((string)($asset['remarks'] ?? ''));
+    $remarksSingle = $remarksRaw === '' ? '' : preg_replace("/\s+/u", ' ', $remarksRaw);
+    $officeName = isset($asset['office_name']) ? trim((string)$asset['office_name']) : '';
+    $seatLabel = isset($asset['seat_label']) ? trim((string)$asset['seat_label']) : '';
+    $locationLabel = trim(($officeName !== '' ? $officeName : '') . ($seatLabel !== '' ? (' / ' . $seatLabel) : ''));
+    $customOwner = trim((string)($asset['owner_external_name'] ?? ''));
+    $memberOwner = trim((string)($asset['owner_name'] ?? ''));
+    $ownerDisplay = $customOwner !== '' ? $customOwner : ($memberOwner !== '' ? $memberOwner : '-');
+    $timestampLabel = $asset['updated_at'] ?? $asset['created_at'] ?? '';
+    $gotoUrl = '';
+    if ($assetLinkPrefix !== '') {
+        $rawCode = (string)($asset['asset_code'] ?? '');
+        if ($rawCode !== '') {
+            $codeSuffix = normalize_asset_suffix($rawCode, $assetCodePrefix);
+            if ($codeSuffix !== '') {
+                $gotoUrl = $assetLinkPrefix . $codeSuffix;
+            }
+        }
+    }
+    ?>
+    <tr class="asset-row" data-asset-id="<?= $assetId; ?>"<?= $rowAttributes; ?>>
+      <?php if ($is_manager): ?>
+      <td><?= htmlspecialchars($orderNumber); ?></td>
+      <?php endif; ?>
+      <td><?= htmlspecialchars((string)($asset['asset_code'] ?? '')); ?></td>
+      <td><?= htmlspecialchars($categoryTrim === '' ? '-' : $categoryTrim); ?></td>
+      <td><?= htmlspecialchars($modelLabel === '' ? '-' : $modelLabel); ?></td>
+      <td><?= htmlspecialchars($organizationLabel === '' ? '-' : $organizationLabel); ?></td>
+      <td>
+        <?php if ($remarksSingle === ''): ?>
+          <span class="text-muted">-</span>
+        <?php else: ?>
+          <?= htmlspecialchars($remarksSingle); ?>
+        <?php endif; ?>
+      </td>
+      <td><?= htmlspecialchars($locationLabel === '' ? '-' : $locationLabel); ?></td>
+      <td><?= htmlspecialchars($ownerDisplay); ?></td>
+      <td><span data-i18n="assets.status.<?= htmlspecialchars($asset['status']); ?>"><?= htmlspecialchars($asset['status']); ?></span></td>
+      <td>
+        <?php if (!empty($asset['image_path'])): ?>
+          <a href="<?= htmlspecialchars($asset['image_path']); ?>" target="_blank"><img src="<?= htmlspecialchars($asset['image_path']); ?>" alt="asset" class="img-thumbnail" style="max-height:48px;"></a>
+        <?php else: ?>
+          <span class="text-muted">-</span>
+        <?php endif; ?>
+      </td>
+      <td><?= htmlspecialchars($timestampLabel === '' ? '-' : $timestampLabel); ?></td>
+      <td>
+        <?php if ($gotoUrl !== ''): ?>
+        <button type="button" class="btn btn-sm btn-outline-secondary me-1 qr-btn asset-goto" data-url="<?= htmlspecialchars($gotoUrl); ?>" data-i18n="assets.action.goto">GoTo</button>
+        <?php endif; ?>
+        <?php if ($canEdit): ?>
+        <button class="btn btn-sm btn-outline-primary asset-edit" data-bs-toggle="modal" data-bs-target="#assetModal" data-mode="edit" data-member-role="<?= $is_manager ? 'manager' : 'member'; ?>" data-asset='<?= json_encode($asset, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>' data-i18n="assets.action.edit">Edit</button>
+        <?php endif; ?>
+        <?php if ($is_manager): ?>
+        <button class="btn btn-sm btn-outline-danger asset-delete" data-id="<?= (int)$asset['id']; ?>" data-code="<?= htmlspecialchars($asset['asset_code'] ?? ''); ?>" data-bs-toggle="modal" data-bs-target="#deleteModal" data-target="asset" data-i18n="assets.action.delete">Delete</button>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <?php
+}
+
+function render_asset_table(array $assetList, bool $is_manager, ?int $member_id, array $categoryColorMap, string $assetLinkPrefix, string $assetCodePrefix, string $emptyKey = 'assets.none', string $emptyFallback = 'No assets', bool $markInventory = true): void {
+    ?>
+    <div class="table-responsive">
+      <table class="table table-hover table-bordered align-middle mb-0 asset-table-nowrap"<?= $markInventory ? ' data-asset-inventory="1"' : ''; ?>>
+        <?php render_asset_table_header($is_manager); ?>
+        <tbody>
+          <?php if ($assetList): ?>
+            <?php foreach ($assetList as $asset): ?>
+              <?php render_asset_row($asset, $is_manager, $member_id, $categoryColorMap, $assetLinkPrefix, $assetCodePrefix); ?>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <tr><td colspan="<?= $is_manager ? '12' : '11'; ?>" class="text-center text-muted" data-i18n="<?= htmlspecialchars($emptyKey); ?>"><?= htmlspecialchars($emptyFallback); ?></td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+    <?php
+}
+
+$currentMemberId = $member_id !== null ? (int)$member_id : null;
 
 include 'header.php';
 ?>
@@ -1610,119 +1748,22 @@ include 'header.php';
     <?php endif; ?>
   </div>
   <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover table-bordered align-middle mb-0 asset-table-nowrap">
-        <thead class="table-light">
-          <tr>
-            <?php if ($is_manager): ?>
-            <th data-i18n="assets.table.order_number">Order #</th>
-            <?php endif; ?>
-            <th data-i18n="assets.table.asset_code">Asset Code</th>
-            <th data-i18n="assets.table.category">Category</th>
-            <th data-i18n="assets.table.model">Model</th>
-            <th data-i18n="assets.table.organization">Owning Unit</th>
-            <th data-i18n="assets.table.remarks">Remarks</th>
-            <th data-i18n="assets.table.location">Location</th>
-            <th data-i18n="assets.table.owner">Responsible</th>
-            <th data-i18n="assets.table.status">Status</th>
-            <th data-i18n="assets.table.image">Photo</th>
-            <th data-i18n="assets.table.updated_at">Updated</th>
-            <th data-i18n="assets.table.actions">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php if ($assets): ?>
-            <?php foreach ($assets as $asset): ?>
-            <?php $canEdit = $is_manager || (int)$asset['owner_member_id'] === (int)$member_id; ?>
-            <?php
-              $categoryRaw = isset($asset['category']) ? (string)$asset['category'] : '';
-              $categoryTrim = trim($categoryRaw);
-              $categoryKey = asset_normalize_category_key($categoryTrim);
-              $rowAttributes = '';
-              if ($categoryKey !== '' && isset($categoryColorMap[$categoryKey])) {
-                  $colorData = $categoryColorMap[$categoryKey];
-                  $rowAttributes = sprintf(
-                      ' data-category-color="1" style="--asset-category-bg: %s; --asset-category-text: %s; --asset-category-border: %s;"',
-                      htmlspecialchars($colorData['bg']),
-                      htmlspecialchars($colorData['text']),
-                      htmlspecialchars($colorData['border'])
-                  );
-              }
-            ?>
-            <tr class="asset-row" data-asset-id="<?= (int)$asset['id']; ?>"<?= $rowAttributes; ?>>
-              <?php if ($is_manager): ?>
-              <td><?= htmlspecialchars($asset['order_number']); ?></td>
-              <?php endif; ?>
-              <td><?= htmlspecialchars($asset['asset_code']); ?></td>
-              <td><?= htmlspecialchars($categoryTrim === '' ? '-' : $categoryTrim); ?></td>
-              <?php $modelLabel = isset($asset['model']) ? trim((string)$asset['model']) : ''; ?>
-              <td><?= htmlspecialchars($modelLabel === '' ? '-' : $modelLabel); ?></td>
-              <?php $organizationLabel = trim($asset['organization'] ?? ''); ?>
-              <td><?= htmlspecialchars($organizationLabel === '' ? '-' : $organizationLabel); ?></td>
-              <?php
-                $remarksRaw = trim((string)($asset['remarks'] ?? ''));
-                $remarksSingle = $remarksRaw === '' ? '' : preg_replace("/\s+/u", ' ', $remarksRaw);
-              ?>
-              <td>
-                <?php if ($remarksSingle === ''): ?>
-                  <span class="text-muted">-</span>
-                <?php else: ?>
-                  <?= htmlspecialchars($remarksSingle); ?>
-                <?php endif; ?>
-              </td>
-              <?php
-                $locationLabel = trim(($asset['office_name'] ? $asset['office_name'] : '') . ($asset['seat_label'] ? (' / ' . $asset['seat_label']) : ''));
-              ?>
-              <td><?= htmlspecialchars($locationLabel === '' ? '-' : $locationLabel); ?></td>
-              <?php
-                $customOwner = trim((string)($asset['owner_external_name'] ?? ''));
-                $memberOwner = trim((string)($asset['owner_name'] ?? ''));
-                $ownerDisplay = $customOwner !== '' ? $customOwner : ($memberOwner !== '' ? $memberOwner : '-');
-              ?>
-              <td><?= htmlspecialchars($ownerDisplay); ?></td>
-              <td><span data-i18n="assets.status.<?= htmlspecialchars($asset['status']); ?>"><?= htmlspecialchars($asset['status']); ?></span></td>
-              <td>
-                <?php if (!empty($asset['image_path'])): ?>
-                  <a href="<?= htmlspecialchars($asset['image_path']); ?>" target="_blank"><img src="<?= htmlspecialchars($asset['image_path']); ?>" alt="asset" class="img-thumbnail" style="max-height:48px;"></a>
-                <?php else: ?>
-                  <span class="text-muted">-</span>
-                <?php endif; ?>
-              </td>
-              <?php
-                $timestampLabel = $asset['updated_at'] ?? $asset['created_at'] ?? '';
-              ?>
-              <td><?= htmlspecialchars($timestampLabel === '' ? '-' : $timestampLabel); ?></td>
-              <td>
-                <?php
-                  $gotoUrl = '';
-                  if ($assetLinkPrefix !== '') {
-                      $rawCode = (string)($asset['asset_code'] ?? '');
-                      if ($rawCode !== '') {
-                          $codeSuffix = normalize_asset_suffix($rawCode, $assetCodePrefix);
-                          if ($codeSuffix !== '') {
-                              $gotoUrl = $assetLinkPrefix . $codeSuffix;
-                          }
-                      }
-                  }
-                ?>
-                <?php if ($gotoUrl !== ''): ?>
-                <button type="button" class="btn btn-sm btn-outline-secondary me-1 qr-btn asset-goto" data-url="<?= htmlspecialchars($gotoUrl); ?>" data-i18n="assets.action.goto">GoTo</button>
-                <?php endif; ?>
-                <?php if ($canEdit): ?>
-                <button class="btn btn-sm btn-outline-primary asset-edit" data-bs-toggle="modal" data-bs-target="#assetModal" data-mode="edit" data-member-role="<?= $is_manager ? 'manager' : 'member'; ?>" data-asset='<?= json_encode($asset, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>' data-i18n="assets.action.edit">Edit</button>
-                <?php endif; ?>
-                <?php if ($is_manager): ?>
-                <button class="btn btn-sm btn-outline-danger asset-delete" data-id="<?= (int)$asset['id']; ?>" data-code="<?= htmlspecialchars($asset['asset_code']); ?>" data-bs-toggle="modal" data-bs-target="#deleteModal" data-target="asset" data-i18n="assets.action.delete">Delete</button>
-                <?php endif; ?>
-              </td>
-            </tr>
-            <?php endforeach; ?>
-          <?php else: ?>
-            <tr><td colspan="<?= $is_manager ? '12' : '11'; ?>" class="text-center" data-i18n="assets.none">No assets</td></tr>
-          <?php endif; ?>
-        </tbody>
-      </table>
-    </div>
+    <?php if ($is_manager): ?>
+      <?php render_asset_table($assets, true, $currentMemberId, $categoryColorMap, $assetLinkPrefix, $assetCodePrefix); ?>
+    <?php else: ?>
+      <div class="asset-member-section">
+        <div class="asset-member-section-header">
+          <h5 class="mb-2" data-i18n="assets.list.mine">Assets I Manage</h5>
+        </div>
+        <?php render_asset_table($memberOwnedAssets, false, $currentMemberId, $categoryColorMap, $assetLinkPrefix, $assetCodePrefix, 'assets.list.mine_empty', 'No assets assigned to you right now.'); ?>
+      </div>
+      <div class="asset-member-section">
+        <div class="asset-member-section-header">
+          <h5 class="mb-2" data-i18n="assets.list.unassigned">Pending or Lost Assets</h5>
+        </div>
+        <?php render_asset_table($otherVisibleAssets, false, $currentMemberId, $categoryColorMap, $assetLinkPrefix, $assetCodePrefix, 'assets.list.unassigned_empty', 'No pending or lost assets at the moment.'); ?>
+      </div>
+    <?php endif; ?>
   </div>
 </div>
 <form id="deleteInboundForm" method="post" class="d-none">
@@ -1755,10 +1796,10 @@ include 'header.php';
                   $badgeModelRaw = isset($assignedAsset['model']) ? (string)$assignedAsset['model'] : '';
                   $badgeModel = trim($badgeModelRaw);
                   $badgeCategoryKey = asset_normalize_category_key($badgeCategory);
-                  $badgeAttributes = '';
+                  $badgeStyleAttr = '';
                   if ($badgeCategoryKey !== '' && isset($categoryColorMap[$badgeCategoryKey])) {
                       $colorData = $categoryColorMap[$badgeCategoryKey];
-                      $badgeAttributes = sprintf(
+                      $badgeStyleAttr = sprintf(
                           ' style="--asset-category-bg: %s; --asset-category-text: %s; --asset-category-border: %s;"',
                           htmlspecialchars($colorData['bg']),
                           htmlspecialchars($colorData['text']),
@@ -1770,8 +1811,11 @@ include 'header.php';
                       'category' => $badgeCategory === '' ? '-' : $badgeCategory,
                       'model' => $badgeModel === '' ? '-' : $badgeModel
                   ];
+                  $badgeAssetId = isset($assignedAsset['asset_id']) ? (int)$assignedAsset['asset_id'] : 0;
+                  $badgeClasses = 'asset-assignment-badge' . ($badgeAssetId > 0 ? ' asset-focus-trigger' : '');
+                  $badgeDataAttr = $badgeAssetId > 0 ? ' data-asset-id="' . $badgeAssetId . '"' : '';
                 ?>
-                <span class="asset-assignment-badge" data-i18n="assets.assignments.badge" data-i18n-params='<?= htmlspecialchars(json_encode($badgeParams, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)); ?>'<?= $badgeAttributes; ?>><?= htmlspecialchars(($badgeParams['code']) . ' - ' . ($badgeParams['category']) . ' - ' . ($badgeParams['model'])); ?></span>
+                <button type="button" class="<?= htmlspecialchars($badgeClasses); ?>" data-i18n="assets.assignments.badge" data-i18n-params='<?= htmlspecialchars(json_encode($badgeParams, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)); ?>'<?= $badgeStyleAttr; ?><?= $badgeDataAttr; ?>><?= htmlspecialchars(($badgeParams['code']) . ' - ' . ($badgeParams['category']) . ' - ' . ($badgeParams['model'])); ?></button>
               <?php endforeach; ?>
             <?php else: ?>
               <span class="member-assets-empty text-muted" data-i18n="assets.assignments.member_empty">No assets assigned.</span>
@@ -1842,8 +1886,17 @@ include 'header.php';
                 $ownerExternal = isset($otherAsset['owner_external_name']) ? trim((string)$otherAsset['owner_external_name']) : '';
                 $ownerStatus = isset($otherAsset['owner_status']) ? trim((string)$otherAsset['owner_status']) : '';
               ?>
+              <?php $otherAssetId = isset($otherAsset['id']) ? (int)$otherAsset['id'] : 0; ?>
               <tr class="asset-row"<?= $otherRowAttributes; ?>>
-                <td><?= htmlspecialchars((string)$otherAsset['asset_code']); ?></td>
+                <td>
+                  <?php if ($otherAssetId > 0): ?>
+                    <button type="button" class="asset-code-link asset-focus-trigger" data-asset-id="<?= $otherAssetId; ?>">
+                      <?= htmlspecialchars((string)$otherAsset['asset_code']); ?>
+                    </button>
+                  <?php else: ?>
+                    <?= htmlspecialchars((string)$otherAsset['asset_code']); ?>
+                  <?php endif; ?>
+                </td>
                 <td><?= htmlspecialchars($otherCategory === '' ? '-' : $otherCategory); ?></td>
                 <td><?= htmlspecialchars($otherModel === '' ? '-' : $otherModel); ?></td>
                 <td><?= htmlspecialchars($otherOrg === '' ? '-' : $otherOrg); ?></td>
@@ -3577,6 +3630,45 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
       applyTranslationsSafe();
     });
   }
+
+  function focusAssetRowById(assetId) {
+    if (!assetId) {
+      return;
+    }
+    const tables = document.querySelectorAll('table[data-asset-inventory="1"]');
+    let targetRow = null;
+    tables.forEach(table => {
+      if (targetRow) {
+        return;
+      }
+      const candidate = table.querySelector(`.asset-row[data-asset-id="${assetId}"]`);
+      if (candidate) {
+        targetRow = candidate;
+      }
+    });
+    if (!targetRow) {
+      return;
+    }
+    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetRow.classList.remove('asset-row-highlight');
+    void targetRow.offsetWidth;
+    targetRow.classList.add('asset-row-highlight');
+    const removeHighlight = () => {
+      targetRow.classList.remove('asset-row-highlight');
+      targetRow.removeEventListener('animationend', removeHighlight);
+    };
+    targetRow.addEventListener('animationend', removeHighlight);
+    setTimeout(removeHighlight, 1600);
+  }
+
+  const assetFocusTriggers = document.querySelectorAll('.asset-focus-trigger[data-asset-id]');
+  assetFocusTriggers.forEach(trigger => {
+    trigger.addEventListener('click', event => {
+      event.preventDefault();
+      const assetId = trigger.getAttribute('data-asset-id');
+      focusAssetRowById(assetId);
+    });
+  });
 
   if (deleteModal) {
     deleteModal.addEventListener('show.bs.modal', event => {
