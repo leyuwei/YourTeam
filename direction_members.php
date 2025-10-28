@@ -1,17 +1,49 @@
 <?php
-include 'header.php';
+include 'auth.php';
+
 $direction_id = $_GET['id'] ?? null;
-if(!$direction_id){
-    header('Location: directions.php');
+if (!$direction_id) {
+    if (isset($_GET['format']) && $_GET['format'] === 'json') {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'error', 'message' => 'Missing direction id']);
+    } else {
+        header('Location: directions.php');
+    }
     exit();
 }
+
 $direction_stmt = $pdo->prepare('SELECT * FROM research_directions WHERE id=?');
 $direction_stmt->execute([$direction_id]);
 $direction = $direction_stmt->fetch();
+
 $current_stmt = $pdo->prepare('SELECT m.id, m.campus_id, m.name FROM direction_members dm JOIN members m ON dm.member_id=m.id WHERE dm.direction_id=? ORDER BY dm.sort_order');
 $current_stmt->execute([$direction_id]);
 $current_members = $current_stmt->fetchAll();
 $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
+
+if (isset($_GET['format']) && $_GET['format'] === 'json') {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'status' => 'ok',
+        'direction' => [
+            'id' => $direction['id'] ?? null,
+            'title' => $direction['title'] ?? '',
+        ],
+        'members' => array_map(fn($m) => [
+            'id' => $m['id'],
+            'campus_id' => $m['campus_id'],
+            'name' => $m['name'],
+        ], $current_members),
+        'available_members' => array_map(fn($m) => [
+            'id' => $m['id'],
+            'campus_id' => $m['campus_id'],
+            'name' => $m['name'],
+        ], $members),
+    ]);
+    exit();
+}
+
+include 'header.php';
 ?>
 <h2><span data-i18n="direction_members.title_prefix">Direction Members -</span> <?= htmlspecialchars($direction['title']); ?></h2>
 <table class="table table-bordered">
