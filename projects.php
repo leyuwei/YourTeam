@@ -34,7 +34,7 @@ if($status){
 <div class="d-flex justify-content-between mb-3">
   <h2 class="bold-target" data-i18n="projects.title">Projects</h2>
   <div>
-    <a class="btn btn-success" href="project_edit.php" data-i18n="projects.add">Add Project</a>
+    <button type="button" class="btn btn-success" id="addProjectBtn" data-i18n="projects.add">Add Project</button>
   </div>
 </div>
 <form class="row g-3 mb-3" method="get">
