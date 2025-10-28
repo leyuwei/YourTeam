@@ -1,42 +1,106 @@
 <?php
-include 'header.php';
-$id = $_GET['id'] ?? null;
-$project = ['title'=>'','description'=>'','bg_color'=>'#ffffff','begin_date'=>'','end_date'=>'','status'=>'todo'];
-$error = '';
-if($id){
+include_once 'auth.php';
+
+$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? '';
+$isAjax = (
+    (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') ||
+    (strpos($acceptHeader, 'application/json') !== false)
+);
+
+$id = $_GET['id'] ?? ($_POST['id'] ?? null);
+$project = [
+    'title' => '',
+    'description' => '',
+    'bg_color' => '#ffffff',
+    'begin_date' => '',
+    'end_date' => '',
+    'status' => 'todo'
+];
+$errorKey = '';
+
+if ($id) {
     $stmt = $pdo->prepare('SELECT * FROM projects WHERE id=?');
     $stmt->execute([$id]);
-    $project = $stmt->fetch();
-}
-if($_SERVER['REQUEST_METHOD']==='POST'){
-    $title = $_POST['title'];
-    $description = $_POST['description'];
-    $bg_color = $_POST['bg_color'];
-    $begin_date = $_POST['begin_date'];
-    $end_date = $_POST['end_date'];
-    $status = $_POST['status'];
-    if($begin_date && $end_date && strtotime($end_date) <= strtotime($begin_date)){
-        $error = 'End date must be after begin date';
+    $existing = $stmt->fetch();
+    if ($existing) {
+        $project = $existing;
     } else {
-        if($id){
+        $id = null;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $title = trim($_POST['title'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $bg_color = $_POST['bg_color'] ?? '#ffffff';
+    $begin_date = $_POST['begin_date'] ?? '';
+    $end_date = $_POST['end_date'] ?? '';
+    $status = $_POST['status'] ?? 'todo';
+
+    if ($begin_date && $end_date && strtotime($end_date) <= strtotime($begin_date)) {
+        $errorKey = 'project_edit.error_range';
+    } elseif ($title === '') {
+        $errorKey = 'project_edit.error_title_required';
+    } else {
+        if ($id) {
             $stmt = $pdo->prepare('UPDATE projects SET title=?, description=?, bg_color=?, begin_date=?, end_date=?, status=? WHERE id=?');
-            $stmt->execute([$title,$description,$bg_color,$begin_date,$end_date,$status,$id]);
+            $stmt->execute([$title, $description, $bg_color, $begin_date, $end_date, $status, $id]);
         } else {
             $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM projects');
             $nextOrder = $orderStmt->fetchColumn();
             $stmt = $pdo->prepare('INSERT INTO projects(title,description,bg_color,begin_date,end_date,status,sort_order) VALUES (?,?,?,?,?,?,?)');
-            $stmt->execute([$title,$description,$bg_color,$begin_date,$end_date,$status,$nextOrder]);
+            $stmt->execute([$title, $description, $bg_color, $begin_date, $end_date, $status, $nextOrder]);
+            $id = $pdo->lastInsertId();
         }
+
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'ok', 'id' => $id]);
+            exit();
+        }
+
         header('Location: projects.php');
         exit();
     }
+
+    if ($isAjax) {
+        header('Content-Type: application/json', true, 422);
+        echo json_encode([
+            'status' => 'error',
+            'error_key' => $errorKey ?: 'project_edit.error_generic'
+        ]);
+        exit();
+    }
+
+    $project = array_merge($project, [
+        'title' => $title,
+        'description' => $description,
+        'bg_color' => $bg_color,
+        'begin_date' => $begin_date,
+        'end_date' => $end_date,
+        'status' => $status
+    ]);
 }
+
+if ($isAjax && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'status' => 'ok',
+        'project' => $project,
+    ], JSON_UNESCAPED_UNICODE);
+    exit();
+}
+
+include 'header.php';
 ?>
-<h2 data-i18n="<?php echo $id? 'project_edit.title_edit':'project_edit.title_add'; ?>">
-  <?php echo $id? 'Edit Project':'Add Project'; ?>
+<h2 data-i18n="<?php echo $id ? 'project_edit.title_edit' : 'project_edit.title_add'; ?>">
+  <?php echo $id ? 'Edit Project' : 'Add Project'; ?>
 </h2>
-<?php if($error): ?><div class="alert alert-danger" data-i18n="project_edit.error_range"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
+<?php if ($errorKey): ?>
+  <div class="alert alert-danger" data-i18n="<?php echo htmlspecialchars($errorKey); ?>"><?php echo htmlspecialchars($errorKey); ?></div>
+<?php endif; ?>
 <form method="post">
+  <input type="hidden" name="id" value="<?php echo htmlspecialchars($id ?? ''); ?>">
   <div class="mb-3">
     <label class="form-label" data-i18n="project_edit.label_title">Project Title</label>
     <input type="text" name="title" class="form-control" value="<?php echo htmlspecialchars($project['title']); ?>" required>
@@ -76,7 +140,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         'finished'=> ['key'=>'projects.status.finished', 'text'=>'Finished']
       ];
       foreach($statuses as $key=>$info){
-          $sel = $project['status']==$key?'selected':'';
+          $sel = $project['status']===$key?'selected':'';
           echo "<option value='$key' data-i18n='{$info['key']}' $sel>{$info['text']}</option>";
       }
       ?>

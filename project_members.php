@@ -1,20 +1,82 @@
 <?php
-include 'header.php';
-$project_id = $_GET['id'] ?? null;
-if(!$project_id){
+include_once 'auth.php';
+
+$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? '';
+$isAjax = (
+    (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') ||
+    (strpos($acceptHeader, 'application/json') !== false)
+);
+
+$project_id = $_GET['id'] ?? ($_POST['project_id'] ?? null);
+if (!$project_id) {
+    if ($isAjax) {
+        header('Content-Type: application/json', true, 400);
+        echo json_encode(['status' => 'error', 'error' => 'missing_project'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
     header('Location: projects.php');
     exit();
 }
-$project = $pdo->prepare('SELECT * FROM projects WHERE id=?');
-$project->execute([$project_id]);
-$project = $project->fetch();
-$active = $pdo->prepare('SELECT l.id, m.campus_id, m.name, l.join_time FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? AND l.exit_time IS NULL ORDER BY l.sort_order');
-$active->execute([$project_id]);
-$active_members = $active->fetchAll();
-$logs = $pdo->prepare('SELECT l.*, m.name, m.campus_id FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? ORDER BY l.join_time');
-$logs->execute([$project_id]);
-$logs = $logs->fetchAll();
+
+$projectStmt = $pdo->prepare('SELECT * FROM projects WHERE id=?');
+$projectStmt->execute([$project_id]);
+$project = $projectStmt->fetch();
+if (!$project) {
+    if ($isAjax) {
+        header('Content-Type: application/json', true, 404);
+        echo json_encode(['status' => 'error', 'error' => 'project_not_found'], JSON_UNESCAPED_UNICODE);
+        exit();
+    }
+    header('Location: projects.php');
+    exit();
+}
+
+$activeStmt = $pdo->prepare('SELECT l.id, m.campus_id, m.name, l.join_time FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? AND l.exit_time IS NULL ORDER BY l.sort_order');
+$activeStmt->execute([$project_id]);
+$active_members = $activeStmt->fetchAll();
+
+$logsStmt = $pdo->prepare('SELECT l.*, m.name, m.campus_id FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? ORDER BY l.join_time');
+$logsStmt->execute([$project_id]);
+$logs = $logsStmt->fetchAll();
+
 $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
+
+if ($isAjax) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'status' => 'ok',
+        'project' => [
+            'id' => (int)$project['id'],
+            'title' => $project['title']
+        ],
+        'active_members' => array_map(static function ($row) {
+            return [
+                'id' => (int)$row['id'],
+                'campus_id' => $row['campus_id'],
+                'name' => $row['name'],
+                'join_time' => $row['join_time'],
+            ];
+        }, $active_members),
+        'history' => array_map(static function ($row) {
+            return [
+                'name' => $row['name'],
+                'campus_id' => $row['campus_id'],
+                'join_time' => $row['join_time'],
+                'exit_time' => $row['exit_time'],
+            ];
+        }, $logs),
+        'members' => array_map(static function ($row) {
+            return [
+                'id' => (int)$row['id'],
+                'campus_id' => $row['campus_id'],
+                'name' => $row['name'],
+            ];
+        }, $members),
+    ], JSON_UNESCAPED_UNICODE);
+    exit();
+}
+
+include 'header.php';
 ?>
 <h2><span data-i18n="project_members.title_prefix">Project Members -</span> <?php echo htmlspecialchars($project['title']); ?></h2>
 <h4 data-i18n="project_members.current_members">Current Members</h4>
@@ -71,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function() {
     handle: '.drag-handle',
     animation: 150,
     onEnd: function() {
-      const order = Array.from(document.querySelectorAll('#memberList tr')).map((row, index) => ({id: row.dataset.id, position: index}));
+      const order = Array.from(document.querySelectorAll('#memberList tr')).map((row, index) => ({id: row.dataset.id, position:index}));
       fetch('project_member_order.php', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
