@@ -91,15 +91,20 @@ if($status){
     align-items: baseline;
     flex-wrap: nowrap;
     gap: 0.75rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .project-member-item {
     display: inline-flex;
     align-items: baseline;
     gap: 0.25rem;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .project-member-separator {
     color: var(--app-muted-text);
+    flex-shrink: 0;
   }
 </style>
 <div class="table-responsive project-table-wrapper">
@@ -366,10 +371,86 @@ document.addEventListener('DOMContentLoaded', function(){
     }
     return key;
   };
+
+  function getModalInstance(element) {
+    if (!element) return null;
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+      return null;
+    }
+    return bootstrap.Modal.getOrCreateInstance(element);
+  }
+
+  function ensureFallbackId(element) {
+    if (!element) return null;
+    if (!element.dataset.fallbackId) {
+      element.dataset.fallbackId = 'fallback-' + Math.random().toString(36).slice(2);
+    }
+    return element.dataset.fallbackId;
+  }
+
+  function manualShowModal(element) {
+    if (!element) return;
+    if (element.dataset.fallbackVisible === 'true') return;
+    const fallbackId = ensureFallbackId(element);
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop fade show';
+    backdrop.dataset.fallbackId = fallbackId;
+    document.body.appendChild(backdrop);
+    element.classList.add('show');
+    element.style.display = 'block';
+    element.setAttribute('aria-hidden', 'false');
+    element.setAttribute('aria-modal', 'true');
+    document.body.classList.add('modal-open');
+    document.body.style.overflow = 'hidden';
+    element.dataset.fallbackVisible = 'true';
+  }
+
+  function manualHideModal(element) {
+    if (!element || element.dataset.fallbackVisible !== 'true') return;
+    const fallbackId = element.dataset.fallbackId;
+    element.classList.remove('show');
+    element.style.display = 'none';
+    element.setAttribute('aria-hidden', 'true');
+    element.removeAttribute('aria-modal');
+    if (fallbackId) {
+      document.querySelectorAll('.modal-backdrop[data-fallback-id="' + fallbackId + '"]').forEach(node => node.remove());
+    }
+    element.dataset.fallbackVisible = 'false';
+    if (!document.querySelector('.modal[data-fallback-visible="true"]')) {
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+    }
+  }
+
+  function showModalElement(element) {
+    const instance = getModalInstance(element);
+    if (instance) {
+      instance.show();
+      return;
+    }
+    manualShowModal(element);
+  }
+
+  function hideModalElement(element) {
+    const instance = getModalInstance(element);
+    if (instance) {
+      instance.hide();
+      return;
+    }
+    manualHideModal(element);
+  }
+
+  document.querySelectorAll('[data-bs-dismiss="modal"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const modalEl = btn.closest('.modal');
+      if (!modalEl) return;
+      if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+        manualHideModal(modalEl);
+      }
+    });
+  });
+
   const projectModalEl = document.getElementById('projectModal');
-  const projectModal = (projectModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal)
-    ? new bootstrap.Modal(projectModalEl)
-    : null;
   const projectForm = document.getElementById('projectForm');
   const projectFormError = document.getElementById('projectFormError');
   const projectModalLabel = document.getElementById('projectModalLabel');
@@ -411,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   document.getElementById('addProjectBtn')?.addEventListener('click', () => {
     setProjectModal('add', null);
-    projectModal?.show();
+    showModalElement(projectModalEl);
   });
 
   document.querySelectorAll('.project-edit-btn').forEach(btn => {
@@ -426,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function(){
         }
       }
       setProjectModal('edit', data);
-      projectModal?.show();
+      showModalElement(projectModalEl);
     });
   });
 
@@ -447,7 +528,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }).then(resp => resp.json())
       .then(data => {
         if(data.status === 'ok'){
-          projectModal?.hide();
+          hideModalElement(projectModalEl);
           window.location.reload();
         } else {
           showProjectError(data.error_key || 'project_edit.error_generic');
@@ -459,9 +540,6 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 
   const memberModalEl = document.getElementById('projectMembersModal');
-  const memberModal = (memberModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal)
-    ? new bootstrap.Modal(memberModalEl)
-    : null;
   const memberError = document.getElementById('projectMembersError');
   const memberTitle = document.getElementById('projectMembersModalLabel');
   const memberListBody = document.getElementById('projectMembersActive');
@@ -470,9 +548,6 @@ document.addEventListener('DOMContentLoaded', function(){
   const memberSelect = memberAddForm?.querySelector('select[name="member_id"]');
   const memberJoinInput = memberAddForm?.querySelector('input[name="join_time"]');
   const removeModalEl = document.getElementById('projectMemberRemoveModal');
-  const removeModal = (removeModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal)
-    ? new bootstrap.Modal(removeModalEl)
-    : null;
   const removeForm = document.getElementById('projectMemberRemoveForm');
   const removeError = document.getElementById('projectMemberRemoveError');
   const removeText = document.getElementById('projectMemberRemoveText');
@@ -494,7 +569,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if (!memberListBody) return;
     memberListBody.querySelectorAll('.project-member-remove').forEach(btn => {
       btn.addEventListener('click', () => {
-        if (!removeForm || !removeModal) return;
+        if (!removeForm) return;
         const logId = btn.getAttribute('data-log-id');
         const memberName = btn.getAttribute('data-member-name') || '';
         removeForm.querySelector('input[name="log_id"]').value = logId || '';
@@ -503,7 +578,7 @@ document.addEventListener('DOMContentLoaded', function(){
         const template = translate('project_members.remove_instruction', '{name}');
         removeText.textContent = template.replace('{name}', memberName);
         removeError?.classList.add('d-none');
-        removeModal.show();
+        showModalElement(removeModalEl);
       });
     });
   }
@@ -598,7 +673,7 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   function renderMemberModal(data) {
-    if (!memberModal) return;
+    if (!memberModalEl) return;
     const fallbackPrefix = translate('project_members.title_prefix', '').trim();
     const template = translate(
       'project_members.modal_title',
@@ -652,7 +727,7 @@ document.addEventListener('DOMContentLoaded', function(){
     clearMemberError();
     if (showModal) {
       resetMemberModal();
-      memberModal?.show();
+      showModalElement(memberModalEl);
     }
     fetch(`project_members.php?id=${projectId}`, {
       headers: {
@@ -663,21 +738,12 @@ document.addEventListener('DOMContentLoaded', function(){
       .then(data => {
         if (data.status === 'ok') {
           renderMemberModal(data);
-          if (showModal && memberModalEl && !memberModalEl.classList.contains('show')) {
-            memberModal?.show();
-          }
         } else {
           showMemberError('project_members.error_load');
-          if (showModal && memberModalEl && !memberModalEl.classList.contains('show')) {
-            memberModal?.show();
-          }
         }
       })
       .catch(() => {
         showMemberError('project_members.error_load');
-        if (showModal && memberModalEl && !memberModalEl.classList.contains('show')) {
-          memberModal?.show();
-        }
       });
   }
 
@@ -720,7 +786,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }).then(resp => resp.json())
       .then(data => {
         if (data.status === 'ok') {
-          removeModal?.hide();
+          hideModalElement(removeModalEl);
           loadMembers(currentProjectId);
         } else {
           const key = data.error_key || 'project_members.error_remove';
