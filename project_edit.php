@@ -10,7 +10,12 @@ if ($wantsJson) {
 } else {
     include 'header.php';
 }
-$id = $_GET['id'] ?? null;
+$id = $_GET['id'] ?? ($_POST['id'] ?? null);
+if ($id === '' || $id === false) {
+    $id = null;
+} elseif ($id !== null) {
+    $id = (int)$id;
+}
 $project = ['title'=>'','description'=>'','bg_color'=>'#ffffff','begin_date'=>'','end_date'=>'','status'=>'todo'];
 $error = '';
 if($id){
