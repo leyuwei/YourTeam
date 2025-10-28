@@ -1,20 +1,73 @@
 <?php
-include 'header.php';
+$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? '';
+$requestedWith = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '');
+$wantsJson = str_contains($acceptHeader, 'application/json') || $requestedWith === 'xmlhttprequest' || ($_GET['format'] ?? '') === 'json';
+if($wantsJson){
+    include 'auth.php';
+} else {
+    include 'header.php';
+}
 $project_id = $_GET['id'] ?? null;
 if(!$project_id){
+    if($wantsJson){
+        header('Content-Type: application/json');
+        echo json_encode(['status'=>'error','message'=>'project_members.missing_project']);
+        exit();
+    }
     header('Location: projects.php');
     exit();
 }
-$project = $pdo->prepare('SELECT * FROM projects WHERE id=?');
-$project->execute([$project_id]);
-$project = $project->fetch();
-$active = $pdo->prepare('SELECT l.id, m.campus_id, m.name, l.join_time FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? AND l.exit_time IS NULL ORDER BY l.sort_order');
+$projectStmt = $pdo->prepare('SELECT id, title FROM projects WHERE id=?');
+$projectStmt->execute([$project_id]);
+$project = $projectStmt->fetch();
+if(!$project){
+    if($wantsJson){
+        header('Content-Type: application/json');
+        echo json_encode(['status'=>'error','message'=>'project_edit.not_found']);
+        exit();
+    }
+    header('Location: projects.php');
+    exit();
+}
+$active = $pdo->prepare('SELECT l.id, l.member_id, m.campus_id, m.name, l.join_time FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? AND l.exit_time IS NULL ORDER BY l.sort_order');
 $active->execute([$project_id]);
 $active_members = $active->fetchAll();
-$logs = $pdo->prepare('SELECT l.*, m.name, m.campus_id FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? ORDER BY l.join_time');
-$logs->execute([$project_id]);
-$logs = $logs->fetchAll();
+$logsStmt = $pdo->prepare('SELECT l.id, l.member_id, l.join_time, l.exit_time, m.name, m.campus_id FROM project_member_log l JOIN members m ON l.member_id=m.id WHERE l.project_id=? ORDER BY l.join_time');
+$logsStmt->execute([$project_id]);
+$logs = $logsStmt->fetchAll();
 $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited' ORDER BY name")->fetchAll();
+
+if($wantsJson){
+    header('Content-Type: application/json');
+    $currentMembers = array_map(fn($row) => [
+        'log_id' => $row['id'],
+        'member_id' => $row['member_id'],
+        'campus_id' => $row['campus_id'],
+        'name' => $row['name'],
+        'join_time' => $row['join_time']
+    ], $active_members);
+    $history = array_map(fn($row) => [
+        'log_id' => $row['id'],
+        'member_id' => $row['member_id'],
+        'campus_id' => $row['campus_id'],
+        'name' => $row['name'],
+        'join_time' => $row['join_time'],
+        'exit_time' => $row['exit_time']
+    ], $logs);
+    $availableMembers = array_map(fn($row) => [
+        'id' => $row['id'],
+        'campus_id' => $row['campus_id'],
+        'name' => $row['name']
+    ], $members);
+    echo json_encode([
+        'status' => 'ok',
+        'project' => $project,
+        'members' => $currentMembers,
+        'history' => $history,
+        'available_members' => $availableMembers
+    ]);
+    exit();
+}
 ?>
 <h2><span data-i18n="project_members.title_prefix">Project Members -</span> <?php echo htmlspecialchars($project['title']); ?></h2>
 <h4 data-i18n="project_members.current_members">Current Members</h4>
