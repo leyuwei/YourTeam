@@ -451,8 +451,7 @@ const translations = {
     'account.msg.password_updated': 'Password updated successfully',
     'account.msg.current_incorrect': 'Current password is incorrect',
     'account.msg.manager_added': 'Manager added',
-    'account.msg.manager_add_error': 'Error adding manager'
-  ,
+    'account.msg.manager_add_error': 'Error adding manager',
     'assets.title': 'Assets',
     'assets.stats.by_category': 'By Category',
     'assets.stats.by_status': 'By Status',
@@ -1172,8 +1171,7 @@ const translations = {
     'account.msg.password_updated': '密码更新成功',
     'account.msg.current_incorrect': '当前密码错误',
     'account.msg.manager_added': '管理员已添加',
-    'account.msg.manager_add_error': '添加管理员出错'
-  ,
+    'account.msg.manager_add_error': '添加管理员出错',
     'assets.title': '固定资产',
     'assets.stats.by_category': '按类别统计',
     'assets.stats.by_status': '按状态统计',

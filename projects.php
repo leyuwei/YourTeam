@@ -71,23 +71,39 @@ if($status){
   .project-table td.fixed-column {
     white-space: nowrap;
   }
-  .project-table td.members-column,
-  .project-table th.members-column {
-    white-space: normal;
-  }
+  .project-table th.members-column,
   .project-table td.members-column {
-    min-width: 220px;
+    white-space: nowrap;
+    width: 40%;
+    max-width: 480px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .project-table .drag-handle {
     cursor: move;
     white-space: nowrap;
+    width: 2.5rem;
+    text-align: center;
+    color: var(--app-muted-text);
   }
-  .project-member-item:not(:last-child) {
-    margin-bottom: 0.25rem;
+  .project-members-inline {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+  }
+  .project-member-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    white-space: nowrap;
+  }
+  .project-member-separator {
+    color: var(--app-muted-text);
   }
 </style>
 <div class="table-responsive project-table-wrapper">
-<table class="table table-bordered project-table">
+<table class="table table-bordered table-hover align-middle project-table">
   <thead>
   <tr>
     <th class="fixed-column"></th>
@@ -103,13 +119,24 @@ if($status){
   <?php foreach($projects as $p): ?>
   <?php
     $memberList = [];
+    $memberSummaryParts = [];
     if ($p['member_data']) {
         foreach(explode(';', $p['member_data']) as $md){
             if(!$md) continue;
             list($mid,$mname,$mdegree,$myear) = explode('|',$md);
-            $memberList[] = ['id'=>$mid,'name'=>$mname,'degree'=>$mdegree,'year'=>$myear];
+            $detailPieces = array_filter([$mdegree ?? '', $myear ?? ''], function($value) {
+                return $value !== '';
+            });
+            $detailText = $detailPieces ? '(' . implode(', ', $detailPieces) . ')' : '';
+            $memberList[] = [
+                'id' => $mid,
+                'name' => $mname,
+                'detail' => $detailText
+            ];
+            $memberSummaryParts[] = trim($mname . ' ' . $detailText);
         }
     }
+    $memberSummary = implode(' • ', $memberSummaryParts);
     $rowColor = $p['bg_color'] ? htmlspecialchars($p['bg_color']) : '';
     $projectPayload = [
         'id' => (int)$p['id'],
@@ -125,16 +152,24 @@ if($status){
   <tr data-id="<?= $p['id']; ?>" data-project="<?= $projectAttr; ?>"<?= $rowColor ? ' data-custom-bg="'.$rowColor.'" style="background-color:'.$rowColor.';"' : ''; ?>>
     <td class="drag-handle fixed-column">&#9776;</td>
     <td class="bold-target fixed-column"><?= htmlspecialchars($p['title']); ?></td>
-    <td class="members-column">
+    <td class="members-column"<?= $memberSummary ? ' title="'.htmlspecialchars($memberSummary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'"' : ''; ?>>
       <?php if($memberList): ?>
-        <?php foreach($memberList as $m): ?>
-          <div class="project-member-item">
-            <span class="member-name bold-target" data-bs-toggle="tooltip" title="<?= htmlspecialchars($memberDirections[$m['id']] ?? '') ?>"<?php if(empty($memberDirections[$m['id']])) echo ' data-i18n-title="projects.no_direction"'; ?>>
+        <?php $totalMembers = count($memberList); ?>
+        <div class="project-members-inline">
+        <?php foreach($memberList as $index => $m): ?>
+          <span class="project-member-item">
+            <span class="member-name bold-target" data-bs-toggle="tooltip" title="<?= htmlspecialchars($memberDirections[$m['id']] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"<?php if(empty($memberDirections[$m['id']])) echo ' data-i18n-title="projects.no_direction"'; ?>>
               <?= htmlspecialchars($m['name']); ?>
-              <span class="member-detail text-muted">(<?= htmlspecialchars($m['degree']); ?>,<?= htmlspecialchars($m['year']); ?>)</span>
             </span>
-          </div>
+            <?php if($m['detail'] !== ''): ?>
+              <span class="member-detail text-muted"><?= htmlspecialchars($m['detail']); ?></span>
+            <?php endif; ?>
+          </span>
+          <?php if($index < $totalMembers - 1): ?>
+            <span class="project-member-separator">•</span>
+          <?php endif; ?>
         <?php endforeach; ?>
+        </div>
       <?php else: ?>
         <em data-i18n="directions.none">None</em>
       <?php endif; ?>
@@ -317,8 +352,24 @@ if($status){
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   const langGetter = () => document.documentElement.lang || 'zh';
+  const translationsMap = (typeof translations !== 'undefined')
+    ? translations
+    : ((typeof window !== 'undefined' && window.translations) ? window.translations : { zh: {}, en: {} });
+  const translate = (key, fallback = null) => {
+    const lang = langGetter();
+    const langMap = translationsMap[lang] || {};
+    if (Object.prototype.hasOwnProperty.call(langMap, key)) {
+      return langMap[key];
+    }
+    if (fallback !== null) {
+      return fallback;
+    }
+    return key;
+  };
   const projectModalEl = document.getElementById('projectModal');
-  const projectModal = projectModalEl ? new bootstrap.Modal(projectModalEl) : null;
+  const projectModal = (projectModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal)
+    ? new bootstrap.Modal(projectModalEl)
+    : null;
   const projectForm = document.getElementById('projectForm');
   const projectFormError = document.getElementById('projectFormError');
   const projectModalLabel = document.getElementById('projectModalLabel');
@@ -333,17 +384,15 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function showProjectError(key) {
     if (!projectFormError) return;
-    const lang = langGetter();
-    const message = translations[lang][key] || key;
+    const message = translate(key, key);
     projectFormError.textContent = message;
     projectFormError.classList.remove('d-none');
   }
 
   function setProjectModal(mode, data) {
     if (!projectModalLabel || !projectForm) return;
-    const lang = langGetter();
     const titleKey = mode === 'edit' ? 'project_edit.title_edit' : 'project_edit.title_add';
-    projectModalLabel.textContent = translations[lang][titleKey] || '';
+    projectModalLabel.textContent = translate(titleKey, '');
     projectFormError?.classList.add('d-none');
     projectForm.reset();
     if (projectColorInput) {
@@ -410,7 +459,9 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 
   const memberModalEl = document.getElementById('projectMembersModal');
-  const memberModal = memberModalEl ? new bootstrap.Modal(memberModalEl) : null;
+  const memberModal = (memberModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal)
+    ? new bootstrap.Modal(memberModalEl)
+    : null;
   const memberError = document.getElementById('projectMembersError');
   const memberTitle = document.getElementById('projectMembersModalLabel');
   const memberListBody = document.getElementById('projectMembersActive');
@@ -419,7 +470,9 @@ document.addEventListener('DOMContentLoaded', function(){
   const memberSelect = memberAddForm?.querySelector('select[name="member_id"]');
   const memberJoinInput = memberAddForm?.querySelector('input[name="join_time"]');
   const removeModalEl = document.getElementById('projectMemberRemoveModal');
-  const removeModal = removeModalEl ? new bootstrap.Modal(removeModalEl) : null;
+  const removeModal = (removeModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal)
+    ? new bootstrap.Modal(removeModalEl)
+    : null;
   const removeForm = document.getElementById('projectMemberRemoveForm');
   const removeError = document.getElementById('projectMemberRemoveError');
   const removeText = document.getElementById('projectMemberRemoveText');
@@ -428,7 +481,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function showMemberError(key) {
     if (!memberError) return;
-    const message = translations[langGetter()][key] || key;
+    const message = translate(key, key);
     memberError.textContent = message;
     memberError.classList.remove('d-none');
   }
@@ -447,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function(){
         removeForm.querySelector('input[name="log_id"]').value = logId || '';
         removeForm.querySelector('input[name="project_id"]').value = currentProjectId || '';
         removeForm.querySelector('input[name="exit_time"]').value = '';
-        const template = translations[langGetter()]['project_members.remove_instruction'] || '{name}';
+        const template = translate('project_members.remove_instruction', '{name}');
         removeText.textContent = template.replace('{name}', memberName);
         removeError?.classList.add('d-none');
         removeModal.show();
@@ -462,13 +515,12 @@ document.addEventListener('DOMContentLoaded', function(){
       memberSortable.destroy();
       memberSortable = null;
     }
-    const lang = langGetter();
     if (!activeMembers.length) {
       const row = document.createElement('tr');
       const cell = document.createElement('td');
       cell.colSpan = 5;
       cell.className = 'text-center text-muted';
-      cell.textContent = translations[lang]['project_members.current_empty'] || '';
+      cell.textContent = translate('project_members.current_empty', '');
       row.appendChild(cell);
       memberListBody.appendChild(row);
       return;
@@ -491,42 +543,43 @@ document.addEventListener('DOMContentLoaded', function(){
       removeBtn.className = 'btn btn-sm btn-danger project-member-remove';
       removeBtn.setAttribute('data-log-id', member.id);
       removeBtn.setAttribute('data-member-name', member.name || '');
-      removeBtn.textContent = translations[lang]['project_members.remove'];
+      removeBtn.textContent = translate('project_members.remove', 'Remove');
       actionCell.appendChild(removeBtn);
       row.append(handleCell, campusCell, nameCell, joinCell, actionCell);
       memberListBody.appendChild(row);
     });
-    memberSortable = Sortable.create(memberListBody, {
-      handle: '.drag-handle',
-      animation: 150,
-      onEnd: function(){
-        const order = Array.from(memberListBody.querySelectorAll('tr')).map((row, index) => ({id: row.dataset.id, position: index}));
-        fetch('project_member_order.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({order: order})
-        }).then(resp => resp.json())
-          .then(data => {
-            if (data.status !== 'ok') {
-              showMemberError('project_members.error_reorder');
-            }
-          })
-          .catch(() => showMemberError('project_members.error_reorder'));
-      }
-    });
+    if (typeof Sortable !== 'undefined') {
+      memberSortable = Sortable.create(memberListBody, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: function(){
+          const order = Array.from(memberListBody.querySelectorAll('tr')).map((row, index) => ({id: row.dataset.id, position: index}));
+          fetch('project_member_order.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({order: order})
+          }).then(resp => resp.json())
+            .then(data => {
+              if (data.status !== 'ok') {
+                showMemberError('project_members.error_reorder');
+              }
+            })
+            .catch(() => showMemberError('project_members.error_reorder'));
+        }
+      });
+    }
     attachRemoveHandlers();
   }
 
   function renderHistory(history) {
     if (!memberHistoryBody) return;
     memberHistoryBody.innerHTML = '';
-    const lang = langGetter();
     if (!history.length) {
       const row = document.createElement('tr');
       const cell = document.createElement('td');
       cell.colSpan = 3;
       cell.className = 'text-center text-muted';
-      cell.textContent = translations[lang]['project_members.history_empty'] || '';
+      cell.textContent = translate('project_members.history_empty', '');
       row.appendChild(cell);
       memberHistoryBody.appendChild(row);
       return;
@@ -546,8 +599,11 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function renderMemberModal(data) {
     if (!memberModal) return;
-    const lang = langGetter();
-    const template = translations[lang]['project_members.modal_title'] || `${translations[lang]['project_members.title_prefix'] || ''} {title}`;
+    const fallbackPrefix = translate('project_members.title_prefix', '').trim();
+    const template = translate(
+      'project_members.modal_title',
+      fallbackPrefix ? `${fallbackPrefix} {title}` : '{title}'
+    );
     memberTitle.textContent = template.replace('{title}', data.project.title || '');
     clearMemberError();
     currentProjectId = data.project.id;
@@ -555,7 +611,7 @@ document.addEventListener('DOMContentLoaded', function(){
       memberSelect.innerHTML = '';
       const placeholderOption = document.createElement('option');
       placeholderOption.value = '';
-      placeholderOption.textContent = translations[lang]['project_members.select_member'] || '';
+      placeholderOption.textContent = translate('project_members.select_member', '');
       memberSelect.appendChild(placeholderOption);
       data.members.forEach(member => {
         const option = document.createElement('option');
@@ -668,45 +724,52 @@ document.addEventListener('DOMContentLoaded', function(){
           loadMembers(currentProjectId);
         } else {
           const key = data.error_key || 'project_members.error_remove';
-          const message = translations[langGetter()][key] || key;
+          const message = translate(key, key);
           removeError.textContent = message;
           removeError.classList.remove('d-none');
         }
       })
       .catch(() => {
-        const message = translations[langGetter()]['project_members.error_remove'] || '';
+        const message = translate('project_members.error_remove', '');
         removeError.textContent = message;
         removeError.classList.remove('d-none');
       });
   });
 
-  Sortable.create(document.getElementById('projectList'), {
-    handle: '.drag-handle',
-    animation: 150,
-    onEnd: function(){
-      const order = Array.from(document.querySelectorAll('#projectList tr')).map((row, index) => ({id: row.dataset.id, position: index}));
-      fetch('project_order.php', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({order: order})
-      });
-    }
-  });
+  const projectListEl = document.getElementById('projectList');
+  if (typeof Sortable !== 'undefined' && projectListEl) {
+    Sortable.create(projectListEl, {
+      handle: '.drag-handle',
+      animation: 150,
+      onEnd: function(){
+        const order = Array.from(projectListEl.querySelectorAll('tr')).map((row, index) => ({id: row.dataset.id, position: index}));
+        fetch('project_order.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({order: order})
+        });
+      }
+    });
+  }
 
-  document.getElementById('detailToggle').addEventListener('change', function(){
+  const detailToggle = document.getElementById('detailToggle');
+  detailToggle?.addEventListener('change', function(){
     document.querySelectorAll('.member-detail').forEach(span => {
       span.style.display = this.checked ? 'inline' : 'none';
     });
   });
 
-  document.getElementById('boldToggle').addEventListener('change', function(){
+  const boldToggle = document.getElementById('boldToggle');
+  boldToggle?.addEventListener('change', function(){
     document.querySelectorAll('.bold-target').forEach(el => {
       el.classList.toggle('fw-bold', this.checked);
     });
   });
 
-  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-  tooltipTriggerList.map(function (tooltipTriggerEl) { return new bootstrap.Tooltip(tooltipTriggerEl); });
+  if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function (tooltipTriggerEl) { new bootstrap.Tooltip(tooltipTriggerEl); });
+  }
 });
 </script>
 <?php include 'footer.php'; ?>
