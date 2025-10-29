@@ -286,6 +286,14 @@ document.addEventListener('DOMContentLoaded', function(){
     const memberDirectionIdInput = document.getElementById('memberDirectionId');
     const memberTitle = document.getElementById('memberModalDirectionTitle');
     let memberSortable = null;
+    let memberModalNeedsRefresh = false;
+
+    memberModalEl.addEventListener('hidden.bs.modal', () => {
+      if (memberModalNeedsRefresh) {
+        window.location.reload();
+      }
+      memberModalNeedsRefresh = false;
+    });
 
     const setupMemberSortable = () => {
       if (memberSortable) {
@@ -306,6 +314,7 @@ document.addEventListener('DOMContentLoaded', function(){
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({direction_id: memberDirectionIdInput.value, order})
           });
+          memberModalNeedsRefresh = true;
         }
       });
     };
@@ -423,6 +432,7 @@ document.addEventListener('DOMContentLoaded', function(){
             if (typeof applyTranslations === 'function') {
               applyTranslations();
             }
+            memberModalNeedsRefresh = true;
           }
         })
         .catch(error => console.error(error));
@@ -469,6 +479,7 @@ document.addEventListener('DOMContentLoaded', function(){
             if (typeof applyTranslations === 'function') {
               applyTranslations();
             }
+            memberModalNeedsRefresh = true;
           }
         })
         .catch(error => console.error(error));

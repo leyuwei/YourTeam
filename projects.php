@@ -154,5 +154,15 @@ document.addEventListener('DOMContentLoaded', function(){
   const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
   tooltipTriggerList.map(function (tooltipTriggerEl) { return new bootstrap.Tooltip(tooltipTriggerEl); });
 });
+
+window.addEventListener('pageshow', function(event){
+  const navigationEntries = (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function')
+    ? performance.getEntriesByType('navigation')
+    : [];
+  const navigationType = navigationEntries.length > 0 ? navigationEntries[0].type : '';
+  if (event.persisted || navigationType === 'back_forward') {
+    window.location.reload();
+  }
+});
 </script>
 <?php include 'footer.php'; ?>
