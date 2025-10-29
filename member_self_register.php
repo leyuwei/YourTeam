@@ -4,6 +4,7 @@ require_once 'member_extra_helpers.php';
 $error = '';
 $msg = '';
 $extraAttributes = getMemberExtraAttributes($pdo);
+$submittedExtraValues = [];
 if(isset($_POST['action']) && $_POST['action'] === 'register'){
     $campus_id = trim($_POST['campus_id']);
     $name = trim($_POST['name']);
@@ -18,13 +19,26 @@ if(isset($_POST['action']) && $_POST['action'] === 'register'){
     $department = trim($_POST['department']) ?: null;
     $workplace = trim($_POST['workplace']) ?: null;
     $homeplace = trim($_POST['homeplace']) ?: null;
+    if(isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs'])){
+        foreach($_POST['extra_attrs'] as $attrId => $value){
+            $attrId = (int)$attrId;
+            if($attrId <= 0){
+                continue;
+            }
+            if(is_array($value)){
+                $value = '';
+            }
+            $submittedExtraValues[$attrId] = trim((string)$value);
+        }
+    }
     try {
         $orderStmt = $pdo->query('SELECT COALESCE(MAX(sort_order),-1)+1 FROM members');
         $nextOrder = $orderStmt->fetchColumn();
         $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,'in_work',$nextOrder]);
         $newMemberId = (int)$pdo->lastInsertId();
-        ensureMemberExtraValues($pdo, $newMemberId, [], $extraAttributes);
+        ensureMemberExtraValues($pdo, $newMemberId, $submittedExtraValues, $extraAttributes);
+        $submittedExtraValues = [];
         $msg = '注册成功。';
     } catch (Exception $e) {
         $error = '注册失败，请检查输入后再试。';
@@ -96,6 +110,27 @@ if(isset($_POST['action']) && $_POST['action'] === 'register'){
     <label class="form-label">家庭地址</label>
     <input type="text" name="homeplace" class="form-control" required>
   </div>
+  <?php if(!empty($extraAttributes)): ?>
+    <hr class="my-4">
+    <h4 class="mt-4" data-i18n="members.extra.section_title">额外属性</h4>
+    <?php foreach($extraAttributes as $attr):
+      $attrId = (int)($attr['id'] ?? 0);
+      if($attrId <= 0){
+          continue;
+      }
+      $nameZh = (string)($attr['name_zh'] ?? '');
+      $nameEn = (string)($attr['name_en'] ?? '');
+      $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('属性' . $attrId));
+      $value = array_key_exists($attrId, $submittedExtraValues)
+        ? $submittedExtraValues[$attrId]
+        : (string)($attr['default_value'] ?? '');
+    ?>
+    <div class="mb-3">
+      <label class="form-label" data-extra-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-extra-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($display); ?></label>
+      <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($value, ENT_QUOTES); ?>">
+    </div>
+    <?php endforeach; ?>
+  <?php endif; ?>
   <button type="submit" id="submitBtn" class="btn btn-primary" disabled>提交信息</button>
 </form>
 <script>
@@ -108,5 +143,8 @@ if(isset($_POST['action']) && $_POST['action'] === 'register'){
   form.querySelectorAll('input[required]').forEach(i => i.addEventListener('input', checkRequired));
   checkRequired();
 </script>
+<script src="./style/bootstrap.bundle.min.js"></script>
+<script src="team_name.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
