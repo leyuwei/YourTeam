@@ -1,6 +1,21 @@
 <?php
-include 'header.php';
-$id = $_GET['id'] ?? null;
+$wantsJson = false;
+$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? '';
+$requestedWith = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '');
+if (str_contains($acceptHeader, 'application/json') || $requestedWith === 'xmlhttprequest') {
+    $wantsJson = true;
+}
+if ($wantsJson) {
+    include 'auth.php';
+} else {
+    include 'header.php';
+}
+$id = $_GET['id'] ?? ($_POST['id'] ?? null);
+if ($id === '' || $id === false) {
+    $id = null;
+} elseif ($id !== null) {
+    $id = (int)$id;
+}
 $project = ['title'=>'','description'=>'','bg_color'=>'#ffffff','begin_date'=>'','end_date'=>'','status'=>'todo'];
 $error = '';
 if($id){
@@ -16,7 +31,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $end_date = $_POST['end_date'];
     $status = $_POST['status'];
     if($begin_date && $end_date && strtotime($end_date) <= strtotime($begin_date)){
-        $error = 'End date must be after begin date';
+        $error = 'project_edit.error_range';
     } else {
         if($id){
             $stmt = $pdo->prepare('UPDATE projects SET title=?, description=?, bg_color=?, begin_date=?, end_date=?, status=? WHERE id=?');
@@ -27,15 +42,42 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             $stmt = $pdo->prepare('INSERT INTO projects(title,description,bg_color,begin_date,end_date,status,sort_order) VALUES (?,?,?,?,?,?,?)');
             $stmt->execute([$title,$description,$bg_color,$begin_date,$end_date,$status,$nextOrder]);
         }
+        if($wantsJson){
+            header('Content-Type: application/json');
+            echo json_encode(['status'=>'ok']);
+            exit();
+        }
         header('Location: projects.php');
         exit();
     }
+    if($wantsJson){
+        header('Content-Type: application/json');
+        echo json_encode(['status'=>'error','message'=>$error]);
+        exit();
+    }
+}
+?>
+<?php if($wantsJson){
+    header('Content-Type: application/json');
+    if($id && !$project){
+        echo json_encode(['status'=>'error','message'=>'project_edit.not_found']);
+    } else {
+        echo json_encode([
+            'status' => 'ok',
+            'project' => $project
+        ]);
+    }
+    exit();
 }
 ?>
 <h2 data-i18n="<?php echo $id? 'project_edit.title_edit':'project_edit.title_add'; ?>">
   <?php echo $id? 'Edit Project':'Add Project'; ?>
 </h2>
-<?php if($error): ?><div class="alert alert-danger" data-i18n="project_edit.error_range"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
+<?php if($error): ?>
+  <div class="alert alert-danger" data-i18n="<?php echo htmlspecialchars($error); ?>">
+    <?php echo $error === 'project_edit.error_range' ? 'End date must be after begin date' : htmlspecialchars($error); ?>
+  </div>
+<?php endif; ?>
 <form method="post">
   <div class="mb-3">
     <label class="form-label" data-i18n="project_edit.label_title">Project Title</label>
