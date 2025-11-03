@@ -306,6 +306,18 @@ const translations = {
     'todolist.assessment': 'Assessment',
     'todolist.assessment.generate': 'Generate',
     'todolist.assessment.no_items': 'No todo items',
+    'todolist.assessment.export_txt': 'Export TXT',
+    'todolist.assessment.prompts.title': 'AI Prompt Suggestions',
+    'todolist.assessment.prompts.helper_badge': 'AI Assistant',
+    'todolist.assessment.prompts.description': 'Copy one of the prompts below and ask your AI assistant to summarise key accomplishments between {start} and {end} for each category, merging differently worded entries that refer to the same work.',
+    'todolist.assessment.prompts.item1': 'Act as a professional weekly report assistant. Based on my todo records between {start} and {end}, list the most impactful highlights under "Work", "Personal", and "Long Term". Be mindful that similar wording may describe the same task—merge them into consolidated bullet points.',
+    'todolist.assessment.prompts.item2': 'Review my todos from {start} to {end} and create a retrospective. Summarise the important achievements in the "Work", "Personal", and "Long Term" categories, connecting items that are essentially the same activity even if phrased differently. Present each insight as a clear bullet.',
+    'todolist.assessment.prompts.item3': 'From the todo entries recorded between {start} and {end}, identify the representative actions for each of the three categories. Group together descriptions that refer to the same effort and output a bullet list of the key items per category.',
+    'todolist.assessment.prompts.copy': 'Copy Prompt',
+    'todolist.assessment.prompts.copied': 'Copied!',
+    'todolist.assessment.prompts.copy_error': 'Copy failed, please copy manually.',
+    'todolist.assessment.status.done': 'Completed',
+    'todolist.assessment.status.todo': 'Pending',
     'todolist.copy_next': 'Cut to Next Week',
     'todolist.copy_item': 'Copy',
     'todolist.status.pending': 'Saving…',
@@ -1018,6 +1030,18 @@ const translations = {
     'todolist.assessment': '待办统计',
     'todolist.assessment.generate': '统计',
     'todolist.assessment.no_items': '无待办事项',
+    'todolist.assessment.export_txt': '导出TXT',
+    'todolist.assessment.prompts.title': 'AI 提示词备选',
+    'todolist.assessment.prompts.helper_badge': 'AI 助手',
+    'todolist.assessment.prompts.description': '复制以下任一提示词，指示 AI 工具总结在 {start} 至 {end} 期间三大分类中的关键事项，并关联归纳描述不同但本质相同的事务。',
+    'todolist.assessment.prompts.item1': '请扮演专业周报整理助手，基于我在 {start} 至 {end} 期间记录的待办事项，分别在“工作”“私人”“长期”三类下列出最具价值的事件，注意识别不同描述但属于同一事务的情况并合并。',
+    'todolist.assessment.prompts.item2': '请帮我复盘 {start} 到 {end} 的待办记录，按照“工作”“私人”“长期”归纳关键成果，并将措辞不同但实为同一件事的条目整合成统一结论，逐条列出。',
+    'todolist.assessment.prompts.item3': '基于 {start} - {end} 区间的待办事项，请总结三大分类下最具代表性的行动；若同一事务出现多个描述，请关联合并后再输出每类的要点列表。',
+    'todolist.assessment.prompts.copy': '复制提示词',
+    'todolist.assessment.prompts.copied': '已复制！',
+    'todolist.assessment.prompts.copy_error': '复制失败，请手动复制。',
+    'todolist.assessment.status.done': '已完成',
+    'todolist.assessment.status.todo': '未完成',
     'todolist.copy_next': '鸽下周',
     'todolist.copy_item': '复制',
     'todolist.status.pending': '保存中…',
@@ -1437,22 +1461,33 @@ function doubleConfirm(message) {
 
 function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).catch(fallback);
-  } else {
-    fallback();
+    return navigator.clipboard
+      .writeText(text)
+      .then(() => true)
+      .catch(() => fallback());
   }
+  return Promise.resolve(fallback());
+
   function fallback() {
     const textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.top = '0';
+    textarea.style.left = '0';
+    textarea.style.width = '1px';
+    textarea.style.height = '1px';
     document.body.appendChild(textarea);
     textarea.focus();
     textarea.select();
+    let success = false;
     try {
-      document.execCommand('copy');
-    } finally {
-      textarea.remove();
+      success = document.execCommand('copy');
+    } catch (err) {
+      success = false;
     }
+    textarea.remove();
+    return success;
   }
 }
 
@@ -1838,6 +1873,63 @@ function initApp() {
       applyTheme();
       applyTranslations();
       refreshNavOverflow?.();
+    });
+  }
+
+  const exportAssessmentBtn = document.getElementById('exportAssessment');
+  if (exportAssessmentBtn) {
+    exportAssessmentBtn.addEventListener('click', () => {
+      const lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
+      const startInput = document.querySelector('form input[name="start"]');
+      const endInput = document.querySelector('form input[name="end"]');
+      const params = new URLSearchParams();
+      if (startInput?.value) {
+        params.set('start', startInput.value);
+      }
+      if (endInput?.value) {
+        params.set('end', endInput.value);
+      }
+      params.set('export', 'txt');
+      params.set('lang', lang);
+      window.location.href = `todolist_assessment.php?${params.toString()}`;
+    });
+  }
+
+  const promptCopyButtons = document.querySelectorAll('.copy-prompt');
+  if (promptCopyButtons.length) {
+    promptCopyButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        const target = targetId ? document.getElementById(targetId) : null;
+        if (!target) return;
+        const text = target.textContent?.trim();
+        if (!text) return;
+        const lang = localStorage.getItem('lang') || 'zh';
+        const dict = translations[lang] || translations.zh;
+        const copyLabel = dict['todolist.assessment.prompts.copy'] || btn.textContent || 'Copy';
+        const copiedLabel = dict['todolist.assessment.prompts.copied'] || 'Copied!';
+        const errorLabel = dict['todolist.assessment.prompts.copy_error'] || 'Copy failed, please copy manually.';
+        btn.disabled = true;
+        copyText(text)
+          .then(success => {
+            if (success) {
+              btn.textContent = copiedLabel;
+            } else {
+              btn.textContent = errorLabel;
+              alert(errorLabel);
+            }
+          })
+          .catch(() => {
+            btn.textContent = errorLabel;
+            alert(errorLabel);
+          })
+          .finally(() => {
+            setTimeout(() => {
+              btn.textContent = copyLabel;
+              btn.disabled = false;
+            }, 2000);
+          });
+      });
     });
   }
 
