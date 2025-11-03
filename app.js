@@ -1925,11 +1925,43 @@ function initApp() {
       params.set('export', 'txt');
       params.set('lang', lang);
 
+      const downloadUrl = `todolist_assessment.php?${params.toString()}`;
+      const restoreButton = () => {
+        exportAssessmentBtn.disabled = false;
+        exportAssessmentBtn.textContent = defaultLabel;
+      };
+      const openInNewTab = () => {
+        const newWindow = window.open(downloadUrl, '_blank', 'noopener=yes');
+        if (newWindow) {
+          try {
+            newWindow.opener = null;
+          } catch (err) {
+            // ignore inability to clear opener
+          }
+          setTimeout(restoreButton, 300);
+          return true;
+        }
+        window.location.href = downloadUrl;
+        return false;
+      };
+
       exportAssessmentBtn.disabled = true;
       exportAssessmentBtn.textContent = exportingLabel;
 
       try {
-        const response = await fetch(`todolist_assessment.php?${params.toString()}`, {
+        const supportsBlobDownload =
+          typeof fetch === 'function' &&
+          typeof window.Blob !== 'undefined' &&
+          typeof window.URL !== 'undefined' &&
+          typeof window.URL.createObjectURL === 'function' &&
+          window.isSecureContext !== false;
+
+        if (!supportsBlobDownload) {
+          openInNewTab();
+          return;
+        }
+
+        const response = await fetch(downloadUrl, {
           credentials: 'same-origin',
           headers: {
             'X-Requested-With': 'XMLHttpRequest'
@@ -1968,12 +2000,11 @@ function initApp() {
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
+        restoreButton();
       } catch (error) {
         console.error('Failed to export assessment', error);
         alert(errorLabel);
-      } finally {
-        exportAssessmentBtn.disabled = false;
-        exportAssessmentBtn.textContent = defaultLabel;
+        openInNewTab();
       }
     });
   }
