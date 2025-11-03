@@ -306,7 +306,7 @@ const translations = {
     'todolist.assessment': 'Assessment',
     'todolist.assessment.generate': 'Generate',
     'todolist.assessment.no_items': 'No todo items',
-    'todolist.assessment.export_txt': 'Export TXT',
+    'todolist.assessment.export_excel': 'Export Excel',
     'todolist.assessment.exporting': 'Exporting…',
     'todolist.assessment.export_error': 'Export failed, please try again.',
     'todolist.assessment.export_missing_range': 'Please select both start and end dates before exporting.',
@@ -1035,7 +1035,7 @@ const translations = {
     'todolist.assessment': '待办统计',
     'todolist.assessment.generate': '统计',
     'todolist.assessment.no_items': '无待办事项',
-    'todolist.assessment.export_txt': '导出TXT',
+    'todolist.assessment.export_excel': '导出Excel',
     'todolist.assessment.exporting': '正在导出…',
     'todolist.assessment.export_error': '导出失败，请重试。',
     'todolist.assessment.export_missing_range': '请先选择开始和结束日期，再导出。',
@@ -1901,12 +1901,11 @@ function initApp() {
   const exportAssessmentBtn = document.getElementById('exportAssessment');
   const assessmentForm = document.getElementById('assessmentFilterForm');
   if (exportAssessmentBtn && assessmentForm) {
-    exportAssessmentBtn.addEventListener('click', async () => {
+    exportAssessmentBtn.addEventListener('click', () => {
       const lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
       const dict = translations[lang] || translations.zh;
-      const defaultLabel = dict['todolist.assessment.export_txt'] || exportAssessmentBtn.textContent || 'Export TXT';
+      const defaultLabel = dict['todolist.assessment.export_excel'] || exportAssessmentBtn.textContent || 'Export Excel';
       const exportingLabel = dict['todolist.assessment.exporting'] || 'Exporting…';
-      const errorLabel = dict['todolist.assessment.export_error'] || 'Export failed, please try again.';
       const missingRangeLabel = dict['todolist.assessment.export_missing_range'] || 'Please select both start and end dates before exporting.';
       const formData = new FormData(assessmentForm);
       const start = (formData.get('start') || '').toString().trim();
@@ -1922,89 +1921,28 @@ function initApp() {
           params.set(key, value.trim());
         }
       });
-      params.set('export', 'txt');
+      params.set('export', 'xlsx');
       params.set('lang', lang);
 
       const downloadUrl = `todolist_assessment.php?${params.toString()}`;
+      exportAssessmentBtn.disabled = true;
+      exportAssessmentBtn.textContent = exportingLabel;
+
       const restoreButton = () => {
         exportAssessmentBtn.disabled = false;
         exportAssessmentBtn.textContent = defaultLabel;
       };
-      const openInNewTab = () => {
-        const newWindow = window.open(downloadUrl, '_blank', 'noopener=yes');
-        if (newWindow) {
-          try {
-            newWindow.opener = null;
-          } catch (err) {
-            // ignore inability to clear opener
-          }
-          setTimeout(restoreButton, 300);
-          return true;
+
+      const newWindow = window.open(downloadUrl, '_blank', 'noopener=yes');
+      if (newWindow) {
+        try {
+          newWindow.opener = null;
+        } catch (err) {
+          // ignore inability to clear opener
         }
+        setTimeout(restoreButton, 1200);
+      } else {
         window.location.href = downloadUrl;
-        return false;
-      };
-
-      exportAssessmentBtn.disabled = true;
-      exportAssessmentBtn.textContent = exportingLabel;
-
-      try {
-        const supportsBlobDownload =
-          typeof fetch === 'function' &&
-          typeof window.Blob !== 'undefined' &&
-          typeof window.URL !== 'undefined' &&
-          typeof window.URL.createObjectURL === 'function' &&
-          window.isSecureContext !== false;
-
-        if (!supportsBlobDownload) {
-          openInNewTab();
-          return;
-        }
-
-        const response = await fetch(downloadUrl, {
-          credentials: 'same-origin',
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        const disposition = response.headers.get('Content-Disposition') || '';
-        let filename = `todolist_${start}_${end}.txt`;
-        const utfMatch = disposition.match(/filename\*=(?:UTF-8'')?([^;]+)/i);
-        const simpleMatch = disposition.match(/filename="?([^";]+)"?/i);
-        let extracted = null;
-        if (utfMatch && utfMatch[1]) {
-          extracted = utfMatch[1];
-        } else if (simpleMatch && simpleMatch[1]) {
-          extracted = simpleMatch[1];
-        }
-        if (extracted) {
-          extracted = extracted.trim().replace(/^"|"$/g, '');
-          try {
-            filename = decodeURIComponent(extracted);
-          } catch (err) {
-            filename = extracted;
-          }
-        }
-        filename = filename.replace(/[\\/:*?"<>|]/g, '_');
-
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-        restoreButton();
-      } catch (error) {
-        console.error('Failed to export assessment', error);
-        alert(errorLabel);
-        openInNewTab();
       }
     });
   }
