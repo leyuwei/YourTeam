@@ -112,9 +112,26 @@ if($is_manager || $batch['in_charge_member_id']==$member_id){
     $stmt->execute([$id,$member_id]);
 }
 $receipts = $stmt->fetchAll();
+$logs = [];
+$totalLogs = 0;
+$logPage = 1;
+$totalLogPages = 1;
 if($is_manager){
-    $logStmt=$pdo->prepare("SELECT operator_name, action, created_at FROM reimbursement_batch_logs WHERE batch_id=? ORDER BY created_at DESC");
-    $logStmt->execute([$id]);
+    $logsPerPage = 10;
+    $logPage = max(1, (int)($_GET['log_page'] ?? 1));
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reimbursement_batch_logs WHERE batch_id=?");
+    $countStmt->execute([$id]);
+    $totalLogs = (int)$countStmt->fetchColumn();
+    $totalLogPages = max(1, (int)ceil($totalLogs / $logsPerPage));
+    if($logPage > $totalLogPages){
+        $logPage = $totalLogPages;
+    }
+    $offset = ($logPage - 1) * $logsPerPage;
+    $logStmt=$pdo->prepare("SELECT operator_name, action, created_at FROM reimbursement_batch_logs WHERE batch_id=:batch_id ORDER BY created_at DESC LIMIT :limit OFFSET :offset");
+    $logStmt->bindValue(':batch_id', $id, PDO::PARAM_INT);
+    $logStmt->bindValue(':limit', $logsPerPage, PDO::PARAM_INT);
+    $logStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $logStmt->execute();
     $logs=$logStmt->fetchAll();
 }
 ?>
@@ -204,13 +221,31 @@ if($is_manager){
 <tr><td><span data-i18n="reimburse.category.<?= $ct['category']; ?>"><?= htmlspecialchars($ct['category']); ?></span></td><td><?= htmlspecialchars($ct['total']); ?></td></tr>
 <?php endforeach; ?>
 </table>
-<?php if($is_manager && !empty($logs)): ?>
+<?php if($is_manager): ?>
 <h4 data-i18n="reimburse.batch.logs">Change Log</h4>
+<?php if(!empty($logs)): ?>
 <ul class="list-group mb-3">
   <?php foreach($logs as $log): ?>
   <li class="list-group-item"><small><?= htmlspecialchars($log['created_at']); ?> - <?= htmlspecialchars($log['operator_name']); ?>: <?= htmlspecialchars($log['action']); ?></small></li>
   <?php endforeach; ?>
 </ul>
+<?php else: ?>
+<div class="alert alert-info" data-i18n="reimburse.batch.logs.empty">No log entries</div>
+<?php endif; ?>
+<?php if($totalLogPages > 1): ?>
+<?php $prevPage = max(1, $logPage - 1); $nextPage = min($totalLogPages, $logPage + 1); ?>
+<nav aria-label="Batch log pagination">
+  <ul class="pagination pagination-sm">
+    <li class="page-item<?= $logPage <= 1 ? ' disabled' : ''; ?>">
+      <a class="page-link" href="<?= htmlspecialchars('reimbursement_batch.php?'.http_build_query(['id'=>$id,'log_page'=>$prevPage])); ?>" data-i18n="reimburse.batch.logs.prev">Previous</a>
+    </li>
+    <li class="page-item disabled"><span class="page-link"><span data-i18n="reimburse.batch.logs.page_label">Page</span> <?= $logPage; ?>/<?= $totalLogPages; ?></span></li>
+    <li class="page-item<?= $logPage >= $totalLogPages ? ' disabled' : ''; ?>">
+      <a class="page-link" href="<?= htmlspecialchars('reimbursement_batch.php?'.http_build_query(['id'=>$id,'log_page'=>$nextPage])); ?>" data-i18n="reimburse.batch.logs.next">Next</a>
+    </li>
+  </ul>
+</nav>
+<?php endif; ?>
 <?php endif; ?>
 <form method="post" class="mt-3" id="batchForm">
   <?php if($batch['status']=='open'): ?>

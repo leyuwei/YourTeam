@@ -40,6 +40,15 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']
 }
 
 $batches = $pdo->query("SELECT b.*, m.name AS in_charge_name, (SELECT COUNT(*) FROM reimbursement_receipts r WHERE r.batch_id=b.id) AS receipt_count FROM reimbursement_batches b LEFT JOIN members m ON b.in_charge_member_id=m.id ORDER BY (b.status='completed'), b.deadline ASC")->fetchAll();
+$activeBatches = [];
+$completedBatches = [];
+foreach($batches as $batch){
+    if($batch['status'] === 'completed'){
+        $completedBatches[] = $batch;
+    } else {
+        $activeBatches[] = $batch;
+    }
+}
 $members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll();
 $announcement = $pdo->query("SELECT content_en, content_zh FROM reimbursement_announcement WHERE id=1")
                 ->fetch(PDO::FETCH_ASSOC);
@@ -85,7 +94,10 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
 </style>
 <table class="table table-bordered">
 <tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.limit">Limit</th><th data-i18n="reimburse.batch.allowed_types">Allowed Types</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
-<?php foreach($batches as $b): ?>
+<?php if(empty($activeBatches)): ?>
+<tr><td colspan="<?= $is_manager ? 7 : 8; ?>" data-i18n="reimburse.active.none">No active batches</td></tr>
+<?php endif; ?>
+<?php foreach($activeBatches as $b): ?>
 <?php
   $statusClass = '';
   if ($b['status'] === 'completed') {
@@ -143,6 +155,89 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
 </tr>
 <?php endforeach; ?>
 </table>
+
+<?php if(!empty($completedBatches)): ?>
+<div class="mt-4">
+  <button class="btn btn-outline-secondary" type="button" id="toggleCompletedBatches" data-bs-toggle="collapse" data-bs-target="#completedBatches" aria-expanded="false" aria-controls="completedBatches" data-i18n="reimburse.completed.show">Show completed batches</button>
+  <div class="collapse mt-3" id="completedBatches">
+    <h3 data-i18n="reimburse.completed.title">Completed Batches</h3>
+    <table class="table table-bordered">
+    <tr><th data-i18n="reimburse.table_title">Title</th><th data-i18n="reimburse.table_deadline">Deadline</th><th data-i18n="reimburse.table_incharge">In Charge</th><th data-i18n="reimburse.batch.status">Status</th><th data-i18n="reimburse.batch.limit">Limit</th><th data-i18n="reimburse.batch.allowed_types">Allowed Types</th><?php if(!$is_manager) echo '<th data-i18n="reimburse.table_myreceipts">My Receipts</th>'; ?><th data-i18n="reimburse.table_actions">Actions</th></tr>
+    <?php foreach($completedBatches as $b): ?>
+    <?php
+      $statusClass = '';
+      if ($b['status'] === 'completed') {
+          $statusClass = 'batch-completed';
+      } elseif ($b['status'] === 'locked') {
+          $statusClass = 'batch-locked';
+      }
+    ?>
+    <tr class="reimbursement-row <?= $statusClass; ?>">
+      <td><?= htmlspecialchars($b['title']); ?></td>
+      <td><?= htmlspecialchars($b['deadline']); ?></td>
+      <td><?= htmlspecialchars($b['in_charge_name']); ?></td>
+      <td><span data-i18n="reimburse.status.<?= $b['status']; ?>"><?= htmlspecialchars($b['status']); ?></span></td>
+      <td><?= htmlspecialchars($b['price_limit']); ?></td>
+      <td>
+        <?php
+          if($b['allowed_types']){
+            $types = explode(',', $b['allowed_types']);
+            foreach($types as $t){
+              echo '<span data-i18n="reimburse.category.'.$t.'">'.$t.'</span> ';
+            }
+          } else {
+            echo '<span data-i18n="reimburse.batch.none">None</span>';
+          }
+        ?>
+      </td>
+      <?php if(!$is_manager): ?>
+      <td>
+        <?php
+          $stmt = $pdo->prepare("SELECT * FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND status<>'refused' ORDER BY id DESC");
+          $stmt->execute([$b['id'],$member_id]);
+          $urs = $stmt->fetchAll();
+          if($urs){
+            echo '<ul class="list-group list-group-flush mb-0">';
+            foreach($urs as $r){
+              echo '<li class="list-group-item px-2 py-1"><a href="reimburse_uploads/'.$b['id'].'/'.urlencode($r['stored_filename']).'" target="_blank">'.htmlspecialchars($r['stored_filename']).'</a><br><small>'.htmlspecialchars($r['description']).' - <span data-i18n="reimburse.category.'.$r['category'].'">'.htmlspecialchars($r['category']).'</span> - '.htmlspecialchars($r['price']).' - '.htmlspecialchars($r['uploaded_at']).'</small></li>';
+            }
+            echo '</ul>';
+          } else {
+            echo '<span data-i18n="reimburse.batch.none">None</span>';
+          }
+        ?>
+      </td>
+      <?php endif; ?>
+      <td>
+        <a class="btn btn-sm btn-primary" href="reimbursement_batch.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_details">Details</a>
+        <?php if($is_manager || $b['in_charge_member_id']==$member_id): ?>
+        <a class="btn btn-sm btn-info" href="reimbursement_download.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_download">Download</a>
+        <?php endif; ?>
+        <?php if($is_manager): ?>
+        <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-types="<?= htmlspecialchars($b['allowed_types']); ?>" data-i18n="reimburse.action_edit">Edit</button>
+        <a class="btn btn-sm btn-danger" href="reimbursement_batch_delete.php?id=<?= $b['id']; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_delete_batch']);">Delete</a>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <?php endforeach; ?>
+    </table>
+  </div>
+</div>
+<?php endif; ?>
+<script>
+const completedToggle=document.getElementById('toggleCompletedBatches');
+const completedContainer=document.getElementById('completedBatches');
+if(completedToggle && completedContainer){
+  const updateText=(state)=>{
+    const lang=document.documentElement.lang||'zh';
+    const key=state==='show' ? 'reimburse.completed.show' : 'reimburse.completed.hide';
+    completedToggle.textContent=translations[lang][key];
+  };
+  completedContainer.addEventListener('show.bs.collapse',()=>updateText('hide'));
+  completedContainer.addEventListener('hide.bs.collapse',()=>updateText('show'));
+  updateText('show');
+}
+</script>
 <?php if(!$is_manager): ?>
 <?php
   $stmt = $pdo->prepare("SELECT r.*, b.title AS batch_title FROM reimbursement_receipts r JOIN reimbursement_batches b ON r.batch_id=b.id WHERE r.member_id=? AND r.status='refused' ORDER BY r.id DESC");
