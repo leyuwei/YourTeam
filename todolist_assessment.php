@@ -4,7 +4,7 @@ $user_id = $_SESSION['role']==='manager' ? $_SESSION['manager_id'] : $_SESSION['
 $role = $_SESSION['role'];
 $start = $_GET['start'] ?? date('Y-m-01');
 $end = $_GET['end'] ?? date('Y-m-d');
-$requested_export = isset($_GET['export']) && $_GET['export'] === 'xlsx';
+$requested_export = isset($_GET['export']) && $_GET['export'] === 'txt';
 // initialize records and stats per category
 $records = ['work'=>[], 'personal'=>[], 'longterm'=>[]];
 $stats = ['work'=>['done'=>0,'total'=>0], 'personal'=>['done'=>0,'total'=>0], 'longterm'=>['done'=>0,'total'=>0]];
@@ -54,11 +54,6 @@ $prompt_params_json = json_encode([
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 
 if($requested_export){
-    if(!class_exists('ZipArchive')){
-        http_response_code(500);
-        echo 'ZipArchive extension is required to export Excel files.';
-        exit;
-    }
     $lang = $_GET['lang'] ?? 'zh';
     $lang = $lang === 'en' ? 'en' : 'zh';
     $categoryTitles = [
@@ -73,284 +68,55 @@ if($requested_export){
         'en' => ['done' => 'Completed', 'todo' => 'Pending'],
         'zh' => ['done' => '已完成', 'todo' => '未完成'],
     ];
-    $headers = [
-        'en' => ['Category', 'Date', 'Weekday', 'Item', 'Status', 'Progress'],
-        'zh' => ['分类', '日期', '周几', '事项', '状态', '进度'],
-    ];
     $rangeLabel = $lang === 'en' ? 'Date Range' : '统计范围';
-    $noItemsLabel = $lang === 'en' ? 'No todo items in this category' : '该分类暂无待办事项';
-    $sheetNames = ['en' => 'Todo Assessment', 'zh' => '待办统计'];
     $overallEmptyLabel = $lang === 'en' ? 'No todo items' : '暂无待办事项';
-    $rows = [];
-    $rows[] = [$rangeLabel, sprintf('%s - %s', $start, $end)];
-    $columnCount = count($headers[$lang]);
-    $rows[] = array_fill(0, $columnCount, '');
-    $rows[] = $headers[$lang];
+    $noItemsLabel = $lang === 'en' ? 'No todo items in this category' : '该分类暂无待办事项';
+    $titleLabel = $lang === 'en' ? 'Todo Assessment' : '待办统计';
+
+    $lines = [];
+    $lines[] = $titleLabel;
+    $lines[] = sprintf('%s: %s - %s', $rangeLabel, $start, $end);
+    $lines[] = '';
+
     if($total_all>0){
         foreach(['work','personal','longterm'] as $cat){
             $catTitle = $categoryTitles[$lang][$cat] ?? $cat;
             $progress = sprintf('%d/%d', $stats[$cat]['done'], $stats[$cat]['total']);
+            $lines[] = sprintf('%s (%s)', $catTitle, $progress);
             if(!empty($records[$cat])){
-                foreach($records[$cat] as $index => $item){
+                foreach($records[$cat] as $item){
                     $badgeDate = $item['item_date_formatted'] ?? ($item['item_date'] ?? '');
                     $weekdayKey = $item['weekday_key'] ?? 'mon';
                     $weekdayText = $weekdayLabels[$lang][$weekdayKey] ?? $weekdayKey;
                     $statusKey = $item['is_done'] ? 'done' : 'todo';
                     $statusText = $statusLabels[$lang][$statusKey] ?? $statusKey;
-                    $rows[] = [
-                        $catTitle,
-                        $badgeDate,
-                        $weekdayText,
-                        (string)($item['content'] ?? ''),
-                        $statusText,
-                        $index === 0 ? $progress : ''
-                    ];
+                    $content = (string)($item['content'] ?? '');
+                    $content = trim(preg_replace('/\s+/u', ' ', $content));
+                    $badge = sprintf('[%s %s]', $badgeDate, $weekdayText);
+                    $lines[] = sprintf('- %s %s: %s', $badge, $statusText, $content);
                 }
             } else {
-                $rows[] = [$catTitle, '', '', $noItemsLabel, '', $progress];
+                $lines[] = '- ' . $noItemsLabel;
             }
-            $rows[] = array_fill(0, $columnCount, '');
+            $lines[] = '';
         }
     } else {
-        $rows[] = array_fill(0, $columnCount, '');
-        $rows[] = ['', '', '', $overallEmptyLabel, '', ''];
+        $lines[] = $overallEmptyLabel;
     }
 
-    $sheetName = $sheetNames[$lang] ?? 'Assessment';
-    try {
-        $tmpFile = buildAssessmentXlsx($rows, $sheetName);
-    } catch (RuntimeException $e) {
-        http_response_code(500);
-        echo 'Unable to generate export file.';
-        exit;
-    }
-    $filenameBase = sprintf('todolist_%s_%s.xlsx', $start, $end);
+    $content = "\xEF\xBB\xBF" . implode(PHP_EOL, $lines);
+    $filenameBase = sprintf('todolist_%s_%s.txt', $start, $end);
     $safeFilename = preg_replace('/[^A-Za-z0-9\-_.]/', '_', $filenameBase);
     if($safeFilename === '' || $safeFilename === null){
-        $safeFilename = 'todolist.xlsx';
+        $safeFilename = 'todolist.txt';
     }
-    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+    header('Content-Type: text/plain; charset=UTF-8');
     header('Content-Disposition: attachment; filename="' . $safeFilename . '"; filename*=UTF-8\'\'' . rawurlencode($filenameBase));
-    header('Cache-Control: max-age=0');
-    header('Content-Length: ' . filesize($tmpFile));
-    readfile($tmpFile);
-    @unlink($tmpFile);
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Content-Length: ' . strlen($content));
+    echo $content;
     exit;
-}
-
-function buildAssessmentXlsx(array $rows, string $sheetName): string
-{
-    $timestamp = gmdate('Y-m-d\TH:i:s\Z');
-    $normalizedSheetName = sanitizeAssessmentSheetName($sheetName);
-    $columnCount = 0;
-    foreach($rows as &$row){
-        $row = array_map(function($value){
-            if($value === null){
-                return '';
-            }
-            if(is_bool($value)){
-                return $value ? 'TRUE' : 'FALSE';
-            }
-            if(is_scalar($value)){
-                return (string)$value;
-            }
-            return '';
-        }, $row);
-        $columnCount = max($columnCount, count($row));
-    }
-    unset($row);
-    if($columnCount === 0){
-        $columnCount = 1;
-        $rows = [['']];
-    }
-    foreach($rows as &$row){
-        $row = array_pad($row, $columnCount, '');
-    }
-    unset($row);
-
-    $sheetXml = buildAssessmentSheetXml($rows);
-    $workbookXml = buildAssessmentWorkbookXml($normalizedSheetName);
-    $workbookRelsXml = buildAssessmentWorkbookRelsXml();
-    $contentTypesXml = buildAssessmentContentTypesXml();
-    $rootRelsXml = buildAssessmentRootRelsXml();
-    $stylesXml = buildAssessmentStylesXml();
-    $appXml = buildAssessmentAppXml($normalizedSheetName);
-    $coreXml = buildAssessmentCoreXml($timestamp);
-
-    $tmpFile = tempnam(sys_get_temp_dir(), 'assessment');
-    if($tmpFile === false){
-        throw new RuntimeException('Unable to allocate temporary file.');
-    }
-    $zip = new ZipArchive();
-    if($zip->open($tmpFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true){
-        @unlink($tmpFile);
-        throw new RuntimeException('Unable to create XLSX archive.');
-    }
-
-    $zip->addFromString('[Content_Types].xml', $contentTypesXml);
-    $zip->addFromString('_rels/.rels', $rootRelsXml);
-    $zip->addFromString('docProps/app.xml', $appXml);
-    $zip->addFromString('docProps/core.xml', $coreXml);
-    $zip->addFromString('xl/workbook.xml', $workbookXml);
-    $zip->addFromString('xl/_rels/workbook.xml.rels', $workbookRelsXml);
-    $zip->addFromString('xl/styles.xml', $stylesXml);
-    $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
-
-    $zip->close();
-
-    return $tmpFile;
-}
-
-function buildAssessmentSheetXml(array $rows): string
-{
-    $rowCount = count($rows);
-    $columnCount = $rowCount > 0 ? count($rows[0]) : 0;
-    if($columnCount === 0){
-        $columnCount = 1;
-        $rows = [['']];
-        $rowCount = 1;
-    }
-    $maxColumn = assessmentColumnName($columnCount);
-    $dimension = 'A1:' . $maxColumn . $rowCount;
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
-    $xml .= '<dimension ref="' . $dimension . '"/>';
-    $xml .= '<sheetViews><sheetView workbookViewId="0"/></sheetViews>';
-    $xml .= '<sheetFormatPr defaultRowHeight="15"/>';
-    $xml .= '<sheetData>';
-    foreach($rows as $rowIndex => $row){
-        $rowNumber = $rowIndex + 1;
-        $xml .= '<row r="' . $rowNumber . '">';
-        foreach($row as $columnIndex => $cellValue){
-            $cellRef = assessmentColumnName($columnIndex + 1) . $rowNumber;
-            $escaped = assessmentEscapeXml((string)$cellValue);
-            $xml .= '<c r="' . $cellRef . '" t="inlineStr"><is><t xml:space="preserve">' . $escaped . '</t></is></c>';
-        }
-        $xml .= '</row>';
-    }
-    $xml .= '</sheetData>';
-    $xml .= '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>';
-    $xml .= '</worksheet>';
-    return $xml;
-}
-
-function assessmentEscapeXml(string $value): string
-{
-    $value = str_replace(["\r\n", "\r"], "\n", $value);
-    return htmlspecialchars($value, ENT_XML1 | ENT_COMPAT, 'UTF-8');
-}
-
-function assessmentColumnName(int $index): string
-{
-    $name = '';
-    while($index > 0){
-        $index--;
-        $name = chr(($index % 26) + 65) . $name;
-        $index = intdiv($index, 26);
-    }
-    return $name === '' ? 'A' : $name;
-}
-
-function sanitizeAssessmentSheetName(string $name): string
-{
-    $name = preg_replace('/[\[\]:\\\/?*]/u', ' ', $name);
-    $name = trim($name);
-    if(function_exists('mb_substr')){
-        $name = mb_substr($name, 0, 31, 'UTF-8');
-    } else {
-        $name = substr($name, 0, 31);
-    }
-    if($name === ''){
-        $name = 'Sheet1';
-    }
-    return $name;
-}
-
-function buildAssessmentWorkbookXml(string $sheetName): string
-{
-    $escaped = assessmentEscapeXml($sheetName);
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
-    $xml .= '<fileVersion appName="Calc"/>';
-    $xml .= '<sheets>';
-    $xml .= '<sheet name="' . $escaped . '" sheetId="1" r:id="rId1"/>';
-    $xml .= '</sheets>';
-    $xml .= '</workbook>';
-    return $xml;
-}
-
-function buildAssessmentWorkbookRelsXml(): string
-{
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-    $xml .= '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>';
-    $xml .= '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
-    $xml .= '</Relationships>';
-    return $xml;
-}
-
-function buildAssessmentContentTypesXml(): string
-{
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">';
-    $xml .= '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>';
-    $xml .= '<Default Extension="xml" ContentType="application/xml"/>';
-    $xml .= '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>';
-    $xml .= '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
-    $xml .= '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
-    $xml .= '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>';
-    $xml .= '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>';
-    $xml .= '</Types>';
-    return $xml;
-}
-
-function buildAssessmentRootRelsXml(): string
-{
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-    $xml .= '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>';
-    $xml .= '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>';
-    $xml .= '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>';
-    $xml .= '</Relationships>';
-    return $xml;
-}
-
-function buildAssessmentStylesXml(): string
-{
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
-    $xml .= '<fonts count="1"><font><sz val="11"/><color theme="1"/><name val="Calibri"/><family val="2"/></font></fonts>';
-    $xml .= '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>';
-    $xml .= '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>';
-    $xml .= '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>';
-    $xml .= '<cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/></cellXfs>';
-    $xml .= '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>';
-    $xml .= '</styleSheet>';
-    return $xml;
-}
-
-function buildAssessmentAppXml(string $sheetName): string
-{
-    $escaped = assessmentEscapeXml($sheetName);
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">';
-    $xml .= '<Application>PHP</Application>';
-    $xml .= '<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs>';
-    $xml .= '<TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>' . $escaped . '</vt:lpstr></vt:vector></TitlesOfParts>';
-    $xml .= '</Properties>';
-    return $xml;
-}
-
-function buildAssessmentCoreXml(string $timestamp): string
-{
-    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    $xml .= '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">';
-    $xml .= '<dc:creator>YourTeam</dc:creator>';
-    $xml .= '<cp:lastModifiedBy>YourTeam</cp:lastModifiedBy>';
-    $xml .= '<dcterms:created xsi:type="dcterms:W3CDTF">' . $timestamp . '</dcterms:created>';
-    $xml .= '<dcterms:modified xsi:type="dcterms:W3CDTF">' . $timestamp . '</dcterms:modified>';
-    $xml .= '</cp:coreProperties>';
-    return $xml;
 }
 ?>
 <h2 class="text-center"><span data-i18n="todolist.assessment">待办统计</span></h2>
@@ -358,7 +124,7 @@ function buildAssessmentCoreXml(string $timestamp): string
   <input type="date" name="start" value="<?= htmlspecialchars($start); ?>" class="form-control w-auto">
   <input type="date" name="end" value="<?= htmlspecialchars($end); ?>" class="form-control w-auto">
   <button type="submit" class="btn btn-primary" data-i18n="todolist.assessment.generate">统计</button>
-  <button type="button" class="btn btn-outline-secondary" id="exportAssessment" data-i18n="todolist.assessment.export_excel">导出Excel</button>
+  <button type="button" class="btn btn-outline-secondary" id="exportAssessment" data-i18n="todolist.assessment.export_txt">导出TXT</button>
   <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#assessmentPromptModal" data-i18n="todolist.assessment.prompts.open">AI 提示词</button>
 </form>
 <?php if($total_all>0): ?>

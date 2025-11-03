@@ -306,7 +306,7 @@ const translations = {
     'todolist.assessment': 'Assessment',
     'todolist.assessment.generate': 'Generate',
     'todolist.assessment.no_items': 'No todo items',
-    'todolist.assessment.export_excel': 'Export Excel',
+    'todolist.assessment.export_txt': 'Export TXT',
     'todolist.assessment.exporting': 'Exporting…',
     'todolist.assessment.export_error': 'Export failed, please try again.',
     'todolist.assessment.export_missing_range': 'Please select both start and end dates before exporting.',
@@ -1035,7 +1035,7 @@ const translations = {
     'todolist.assessment': '待办统计',
     'todolist.assessment.generate': '统计',
     'todolist.assessment.no_items': '无待办事项',
-    'todolist.assessment.export_excel': '导出Excel',
+    'todolist.assessment.export_txt': '导出TXT',
     'todolist.assessment.exporting': '正在导出…',
     'todolist.assessment.export_error': '导出失败，请重试。',
     'todolist.assessment.export_missing_range': '请先选择开始和结束日期，再导出。',
@@ -1904,9 +1904,10 @@ function initApp() {
     exportAssessmentBtn.addEventListener('click', () => {
       const lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
       const dict = translations[lang] || translations.zh;
-      const defaultLabel = dict['todolist.assessment.export_excel'] || exportAssessmentBtn.textContent || 'Export Excel';
+      const defaultLabel = dict['todolist.assessment.export_txt'] || exportAssessmentBtn.textContent || 'Export TXT';
       const exportingLabel = dict['todolist.assessment.exporting'] || 'Exporting…';
       const missingRangeLabel = dict['todolist.assessment.export_missing_range'] || 'Please select both start and end dates before exporting.';
+      const errorLabel = dict['todolist.assessment.export_error'] || 'Export failed, please try again.';
       const formData = new FormData(assessmentForm);
       const start = (formData.get('start') || '').toString().trim();
       const end = (formData.get('end') || '').toString().trim();
@@ -1921,7 +1922,7 @@ function initApp() {
           params.set(key, value.trim());
         }
       });
-      params.set('export', 'xlsx');
+      params.set('export', 'txt');
       params.set('lang', lang);
 
       const downloadUrl = `todolist_assessment.php?${params.toString()}`;
@@ -1933,16 +1934,88 @@ function initApp() {
         exportAssessmentBtn.textContent = defaultLabel;
       };
 
-      const newWindow = window.open(downloadUrl, '_blank', 'noopener=yes');
-      if (newWindow) {
-        try {
-          newWindow.opener = null;
-        } catch (err) {
-          // ignore inability to clear opener
+      const fallbackDownload = () => {
+        if (typeof window.open === 'function') {
+          const newWindow = window.open(downloadUrl, '_blank', 'noopener=yes');
+          if (newWindow) {
+            try {
+              newWindow.opener = null;
+            } catch (err) {
+              // ignore inability to clear opener
+            }
+            return true;
+          }
         }
-        setTimeout(restoreButton, 1200);
+        if (typeof window.location !== 'undefined') {
+          window.location.href = downloadUrl;
+          return true;
+        }
+        return false;
+      };
+
+      const triggerDownload = (blob, filename) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          link.remove();
+        }, 1000);
+      };
+
+      const parseFilenameFromDisposition = disposition => {
+        if (!disposition) return null;
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match && utf8Match[1]) {
+          try {
+            return decodeURIComponent(utf8Match[1]);
+          } catch (err) {
+            return utf8Match[1];
+          }
+        }
+        const quotedMatch = disposition.match(/filename="?([^";]+)"?/i);
+        return quotedMatch && quotedMatch[1] ? quotedMatch[1] : null;
+      };
+
+      if (window.fetch) {
+        fetch(downloadUrl, { credentials: 'same-origin' })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('network');
+            }
+            const disposition = response.headers.get('Content-Disposition');
+            return response.blob().then(blob => ({ blob, disposition }));
+          })
+          .then(({ blob, disposition }) => {
+            const fallbackName = `todolist_${start}_${end}.txt`;
+            const filename = parseFilenameFromDisposition(disposition) || fallbackName;
+            triggerDownload(blob, filename);
+            setTimeout(restoreButton, 200);
+          })
+          .catch(() => {
+            const fallbackSucceeded = fallbackDownload();
+            if (!fallbackSucceeded) {
+              exportAssessmentBtn.disabled = false;
+              exportAssessmentBtn.textContent = errorLabel;
+              alert(errorLabel);
+              setTimeout(restoreButton, 1600);
+            } else {
+              setTimeout(restoreButton, 1200);
+            }
+          });
       } else {
-        window.location.href = downloadUrl;
+        const fallbackSucceeded = fallbackDownload();
+        if (!fallbackSucceeded) {
+          exportAssessmentBtn.disabled = false;
+          exportAssessmentBtn.textContent = errorLabel;
+          alert(errorLabel);
+          setTimeout(restoreButton, 1600);
+        } else {
+          setTimeout(restoreButton, 1200);
+        }
       }
     });
   }
