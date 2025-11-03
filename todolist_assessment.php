@@ -48,6 +48,10 @@ if(!empty($_GET['start']) && !empty($_GET['end'])){
     unset($rows);
 }
 $total_all = $stats['work']['total'] + $stats['personal']['total'] + $stats['longterm']['total'];
+$prompt_params_json = json_encode([
+    'start' => $start,
+    'end' => $end,
+], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 
 if($requested_export){
     $lang = $_GET['lang'] ?? 'zh';
@@ -99,11 +103,12 @@ if($requested_export){
 }
 ?>
 <h2 class="text-center"><span data-i18n="todolist.assessment">待办统计</span></h2>
-<form method="get" class="mb-3 d-flex flex-wrap align-items-center gap-2">
+<form method="get" class="mb-3 d-flex flex-wrap align-items-center gap-2" id="assessmentFilterForm">
   <input type="date" name="start" value="<?= htmlspecialchars($start); ?>" class="form-control w-auto">
   <input type="date" name="end" value="<?= htmlspecialchars($end); ?>" class="form-control w-auto">
   <button type="submit" class="btn btn-primary" data-i18n="todolist.assessment.generate">统计</button>
   <button type="button" class="btn btn-outline-secondary" id="exportAssessment" data-i18n="todolist.assessment.export_txt">导出TXT</button>
+  <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#assessmentPromptModal" data-i18n="todolist.assessment.prompts.open">AI 提示词</button>
 </form>
 <?php if($total_all>0): ?>
   <?php foreach(['work','personal','longterm'] as $cat): ?>
@@ -128,37 +133,44 @@ if($requested_export){
     <p class="text-muted" data-i18n="todolist.assessment.no_items">无待办事项</p>
     <?php endif; ?>
   <?php endforeach; ?>
-  <div class="card shadow-sm mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <span data-i18n="todolist.assessment.prompts.title">AI 提示词备选</span>
-      <span class="badge rounded-pill text-bg-light text-secondary" data-i18n="todolist.assessment.prompts.helper_badge">AI 助手</span>
-    </div>
-    <div class="card-body">
-      <p class="text-muted" data-i18n="todolist.assessment.prompts.description" data-i18n-params='<?= json_encode(['start'=>$start,'end'=>$end], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>'>请将以下提示词复制到你的 AI 工具中，帮助其总结在所选日期范围内三大类事项的重点。</p>
-      <div class="list-group">
-        <?php $promptParams = json_encode(['start'=>$start,'end'=>$end], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>
-        <div class="list-group-item">
-          <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-start">
-            <div class="prompt-text small flex-grow-1" style="white-space: pre-line;" id="prompt-text-1" data-i18n="todolist.assessment.prompts.item1" data-i18n-params='<?= $promptParams; ?>'>请扮演专业周报整理助手，基于我在所选日期范围内（<?= htmlspecialchars($start); ?> 至 <?= htmlspecialchars($end); ?>）记录的待办事项，将“工作”“私人”“长期”三类里的高价值事件逐条总结，注意不同描述下可能是同一件事，请进行关联归纳。</div>
-            <button type="button" class="btn btn-outline-primary btn-sm copy-prompt align-self-lg-start" data-target="prompt-text-1" data-i18n="todolist.assessment.prompts.copy">复制提示词</button>
-          </div>
-        </div>
-        <div class="list-group-item">
-          <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-start">
-            <div class="prompt-text small flex-grow-1" style="white-space: pre-line;" id="prompt-text-2" data-i18n="todolist.assessment.prompts.item2" data-i18n-params='<?= $promptParams; ?>'>请帮我对<?= htmlspecialchars($start); ?> 至 <?= htmlspecialchars($end); ?>期间的待办事项做复盘，分“工作”“私人”“长期”总结关键成果，识别重复描述的同一事务并合并成统一条目，清楚列出每条结论。</div>
-            <button type="button" class="btn btn-outline-primary btn-sm copy-prompt align-self-lg-start" data-target="prompt-text-2" data-i18n="todolist.assessment.prompts.copy">复制提示词</button>
-          </div>
-        </div>
-        <div class="list-group-item">
-          <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-start">
-            <div class="prompt-text small flex-grow-1" style="white-space: pre-line;" id="prompt-text-3" data-i18n="todolist.assessment.prompts.item3" data-i18n-params='<?= $promptParams; ?>'>基于我在<?= htmlspecialchars($start); ?> 到 <?= htmlspecialchars($end); ?>期间的待办记录，请总结三大分类下最有代表性的行动，要善于识别措辞不同但本质相同的事项并合并，最终按条目输出每类的重点事项清单。</div>
-            <button type="button" class="btn btn-outline-primary btn-sm copy-prompt align-self-lg-start" data-target="prompt-text-3" data-i18n="todolist.assessment.prompts.copy">复制提示词</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 <?php else: ?>
   <p class="text-muted" data-i18n="todolist.assessment.no_items">无待办事项</p>
 <?php endif; ?>
+<div class="modal fade" id="assessmentPromptModal" tabindex="-1" aria-labelledby="assessmentPromptModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="assessmentPromptModalLabel" data-i18n="todolist.assessment.prompts.title">AI 提示词备选</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭" data-i18n-attr="aria-label:todolist.assessment.prompts.close"></button>
+      </div>
+      <div class="modal-body">
+        <span class="badge rounded-pill text-bg-light text-secondary mb-3" data-i18n="todolist.assessment.prompts.helper_badge">AI 助手</span>
+        <p class="text-muted" data-i18n="todolist.assessment.prompts.description" data-i18n-params='<?= $prompt_params_json; ?>'>请将以下提示词复制到你的 AI 工具中，帮助其总结在所选日期范围内三大类事项的重点。</p>
+        <div class="list-group">
+          <div class="list-group-item">
+            <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-start">
+              <div class="prompt-text small flex-grow-1" style="white-space: pre-line;" id="prompt-text-1" data-i18n="todolist.assessment.prompts.item1" data-i18n-params='<?= $prompt_params_json; ?>'>请扮演专业周报整理助手，基于我在所选日期范围内（<?= htmlspecialchars($start); ?> 至 <?= htmlspecialchars($end); ?>）记录的待办事项，将“工作”“私人”“长期”三类里的高价值事件逐条总结，注意不同描述下可能是同一件事，请进行关联归纳。</div>
+              <button type="button" class="btn btn-outline-primary btn-sm copy-prompt align-self-lg-start" data-target="prompt-text-1" data-i18n="todolist.assessment.prompts.copy">复制提示词</button>
+            </div>
+          </div>
+          <div class="list-group-item">
+            <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-start">
+              <div class="prompt-text small flex-grow-1" style="white-space: pre-line;" id="prompt-text-2" data-i18n="todolist.assessment.prompts.item2" data-i18n-params='<?= $prompt_params_json; ?>'>请帮我对<?= htmlspecialchars($start); ?> 至 <?= htmlspecialchars($end); ?>期间的待办事项做复盘，分“工作”“私人”“长期”总结关键成果，识别重复描述的同一事务并合并成统一条目，清楚列出每条结论。</div>
+              <button type="button" class="btn btn-outline-primary btn-sm copy-prompt align-self-lg-start" data-target="prompt-text-2" data-i18n="todolist.assessment.prompts.copy">复制提示词</button>
+            </div>
+          </div>
+          <div class="list-group-item">
+            <div class="d-flex flex-column flex-lg-row gap-3 align-items-lg-start">
+              <div class="prompt-text small flex-grow-1" style="white-space: pre-line;" id="prompt-text-3" data-i18n="todolist.assessment.prompts.item3" data-i18n-params='<?= $prompt_params_json; ?>'>基于我在<?= htmlspecialchars($start); ?> 到 <?= htmlspecialchars($end); ?>期间的待办记录，请总结三大分类下最有代表性的行动，要善于识别措辞不同但本质相同的事项并合并，最终按条目输出每类的重点事项清单。</div>
+              <button type="button" class="btn btn-outline-primary btn-sm copy-prompt align-self-lg-start" data-target="prompt-text-3" data-i18n="todolist.assessment.prompts.copy">复制提示词</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="todolist.assessment.prompts.close">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
 <?php include 'footer.php'; ?>

@@ -307,8 +307,13 @@ const translations = {
     'todolist.assessment.generate': 'Generate',
     'todolist.assessment.no_items': 'No todo items',
     'todolist.assessment.export_txt': 'Export TXT',
+    'todolist.assessment.exporting': 'Exporting…',
+    'todolist.assessment.export_error': 'Export failed, please try again.',
+    'todolist.assessment.export_missing_range': 'Please select both start and end dates before exporting.',
     'todolist.assessment.prompts.title': 'AI Prompt Suggestions',
     'todolist.assessment.prompts.helper_badge': 'AI Assistant',
+    'todolist.assessment.prompts.open': 'AI Prompts',
+    'todolist.assessment.prompts.close': 'Close',
     'todolist.assessment.prompts.description': 'Copy one of the prompts below and ask your AI assistant to summarise key accomplishments between {start} and {end} for each category, merging differently worded entries that refer to the same work.',
     'todolist.assessment.prompts.item1': 'Act as a professional weekly report assistant. Based on my todo records between {start} and {end}, list the most impactful highlights under "Work", "Personal", and "Long Term". Be mindful that similar wording may describe the same task—merge them into consolidated bullet points.',
     'todolist.assessment.prompts.item2': 'Review my todos from {start} to {end} and create a retrospective. Summarise the important achievements in the "Work", "Personal", and "Long Term" categories, connecting items that are essentially the same activity even if phrased differently. Present each insight as a clear bullet.',
@@ -1031,8 +1036,13 @@ const translations = {
     'todolist.assessment.generate': '统计',
     'todolist.assessment.no_items': '无待办事项',
     'todolist.assessment.export_txt': '导出TXT',
+    'todolist.assessment.exporting': '正在导出…',
+    'todolist.assessment.export_error': '导出失败，请重试。',
+    'todolist.assessment.export_missing_range': '请先选择开始和结束日期，再导出。',
     'todolist.assessment.prompts.title': 'AI 提示词备选',
     'todolist.assessment.prompts.helper_badge': 'AI 助手',
+    'todolist.assessment.prompts.open': 'AI 提示词',
+    'todolist.assessment.prompts.close': '关闭',
     'todolist.assessment.prompts.description': '复制以下任一提示词，指示 AI 工具总结在 {start} 至 {end} 期间三大分类中的关键事项，并关联归纳描述不同但本质相同的事务。',
     'todolist.assessment.prompts.item1': '请扮演专业周报整理助手，基于我在 {start} 至 {end} 期间记录的待办事项，分别在“工作”“私人”“长期”三类下列出最具价值的事件，注意识别不同描述但属于同一事务的情况并合并。',
     'todolist.assessment.prompts.item2': '请帮我复盘 {start} 到 {end} 的待办记录，按照“工作”“私人”“长期”归纳关键成果，并将措辞不同但实为同一件事的条目整合成统一结论，逐条列出。',
@@ -1592,6 +1602,18 @@ function updateMobileViewClass() {
 function applyTranslations() {
   const lang = localStorage.getItem('lang') || 'zh';
   document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n-attr]').forEach(el => {
+    const mapping = el.getAttribute('data-i18n-attr');
+    if (!mapping) return;
+    mapping.split(',').forEach(pair => {
+      const [attr, key] = pair.split(':').map(part => part.trim());
+      if (!attr || !key) return;
+      const text = translations[lang][key];
+      if (typeof text === 'string') {
+        el.setAttribute(attr, text);
+      }
+    });
+  });
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     let text = translations[lang][key];
@@ -1877,21 +1899,82 @@ function initApp() {
   }
 
   const exportAssessmentBtn = document.getElementById('exportAssessment');
-  if (exportAssessmentBtn) {
-    exportAssessmentBtn.addEventListener('click', () => {
+  const assessmentForm = document.getElementById('assessmentFilterForm');
+  if (exportAssessmentBtn && assessmentForm) {
+    exportAssessmentBtn.addEventListener('click', async () => {
       const lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
-      const startInput = document.querySelector('form input[name="start"]');
-      const endInput = document.querySelector('form input[name="end"]');
+      const dict = translations[lang] || translations.zh;
+      const defaultLabel = dict['todolist.assessment.export_txt'] || exportAssessmentBtn.textContent || 'Export TXT';
+      const exportingLabel = dict['todolist.assessment.exporting'] || 'Exporting…';
+      const errorLabel = dict['todolist.assessment.export_error'] || 'Export failed, please try again.';
+      const missingRangeLabel = dict['todolist.assessment.export_missing_range'] || 'Please select both start and end dates before exporting.';
+      const formData = new FormData(assessmentForm);
+      const start = (formData.get('start') || '').toString().trim();
+      const end = (formData.get('end') || '').toString().trim();
+      if (!start || !end) {
+        alert(missingRangeLabel);
+        return;
+      }
+
       const params = new URLSearchParams();
-      if (startInput?.value) {
-        params.set('start', startInput.value);
-      }
-      if (endInput?.value) {
-        params.set('end', endInput.value);
-      }
+      formData.forEach((value, key) => {
+        if (typeof value === 'string' && value.trim() !== '') {
+          params.set(key, value.trim());
+        }
+      });
       params.set('export', 'txt');
       params.set('lang', lang);
-      window.location.href = `todolist_assessment.php?${params.toString()}`;
+
+      exportAssessmentBtn.disabled = true;
+      exportAssessmentBtn.textContent = exportingLabel;
+
+      try {
+        const response = await fetch(`todolist_assessment.php?${params.toString()}`, {
+          credentials: 'same-origin',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        let filename = `todolist_${start}_${end}.txt`;
+        const utfMatch = disposition.match(/filename\*=(?:UTF-8'')?([^;]+)/i);
+        const simpleMatch = disposition.match(/filename="?([^";]+)"?/i);
+        let extracted = null;
+        if (utfMatch && utfMatch[1]) {
+          extracted = utfMatch[1];
+        } else if (simpleMatch && simpleMatch[1]) {
+          extracted = simpleMatch[1];
+        }
+        if (extracted) {
+          extracted = extracted.trim().replace(/^"|"$/g, '');
+          try {
+            filename = decodeURIComponent(extracted);
+          } catch (err) {
+            filename = extracted;
+          }
+        }
+        filename = filename.replace(/[\\/:*?"<>|]/g, '_');
+
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Failed to export assessment', error);
+        alert(errorLabel);
+      } finally {
+        exportAssessmentBtn.disabled = false;
+        exportAssessmentBtn.textContent = defaultLabel;
+      }
     });
   }
 
