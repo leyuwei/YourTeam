@@ -13,7 +13,7 @@
 <style>
   :root {
     color-scheme: light;
-    --app-body-bg: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    --app-body-bg: linear-gradient(135deg, #e3f2ff, #f5fbff);
     --app-surface-bg: rgba(255, 255, 255, 0.85);
     --app-surface-border: rgba(0, 0, 0, 0.05);
     --app-text-color: #212529;
@@ -47,7 +47,7 @@
   }
   :root[data-bs-theme='dark'] {
     color-scheme: dark;
-    --app-body-bg: radial-gradient(circle at top, #1a1f2b, #0b0d13 55%, #000000);
+    --app-body-bg: #14161d;
     --app-surface-bg: rgba(15, 20, 28, 0.88);
     --app-surface-border: rgba(148, 163, 184, 0.2);
     --app-text-color: #e2e8f0;
@@ -82,8 +82,6 @@
   body {
     min-height: 100vh;
     background: var(--app-body-bg);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
     color: var(--app-text-color);
     transition: background 0.4s ease, color 0.4s ease;
   }
@@ -106,8 +104,6 @@
   .navbar {
     position: relative;
     background: var(--app-navbar-gradient);
-    background-size: 200% 200%;
-    animation: navGradient 15s ease infinite;
     transition: background 0.4s ease;
   }
   .navbar-brand,
@@ -189,16 +185,6 @@
     color: #fff;
     text-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
     animation: fadeIn 2s ease;
-  }
-  @keyframes navGradient {
-    0% {background-position: 0% 50%;}
-    50% {background-position: 100% 50%;}
-    100% {background-position: 0% 50%;}
-  }
-  @keyframes gradientBG {
-    0% {background-position: 0% 50%;}
-    50% {background-position: 100% 50%;}
-    100% {background-position: 0% 50%;}
   }
   @keyframes fadeIn {
     from {opacity: 0; transform: translateY(-20px);}
