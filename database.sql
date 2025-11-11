@@ -122,6 +122,15 @@ CREATE TABLE todolist_items (
   is_done TINYINT(1) DEFAULT 0,
   sort_order INT DEFAULT 0
 );
+
+CREATE TABLE todolist_common_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  user_role ENUM('manager','member') NOT NULL,
+  content VARCHAR(255) NOT NULL,
+  sort_order INT DEFAULT 0,
+  INDEX idx_todolist_common_user (user_id, user_role)
+);
 CREATE TABLE notifications (
   id INT AUTO_INCREMENT PRIMARY KEY,
   content TEXT NOT NULL,

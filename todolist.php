@@ -19,6 +19,9 @@ $items = [];
 foreach($stmt as $row){
     $items[$row['category']][$row['day']][] = $row;
 }
+$commonStmt = $pdo->prepare('SELECT id, content FROM todolist_common_items WHERE user_id=? AND user_role=? ORDER BY sort_order, id');
+$commonStmt->execute([$user_id,$role]);
+$common_items = $commonStmt->fetchAll(PDO::FETCH_ASSOC);
 $stats = ['work'=>['done'=>0,'total'=>0],
           'personal'=>['done'=>0,'total'=>0],
           'longterm'=>['done'=>0,'total'=>0]];
@@ -68,8 +71,29 @@ $today_key = strtolower(date('D'));
 .save-status[data-state='error']{color:#b02a37;border-color:rgba(220,53,69,0.28);}
 .save-status[data-state='error'] .status-indicator{animation:none;}
 .save-status .status-text{white-space:nowrap;}
+.common-suggestion-bar{position:fixed;left:0;top:0;z-index:1090;display:none;padding:0.65rem 0.75rem;border-radius:0.85rem;background:var(--app-surface-bg,#fff);border:1px solid rgba(13,110,253,0.24);box-shadow:0 1rem 2.5rem rgba(13,110,253,0.18);max-width:90vw;min-width:14rem;}
+.common-suggestion-inner{max-height:8.5rem;display:flex;flex-direction:column;gap:0.35rem;}
+.common-suggestion-header{font-size:0.75rem;letter-spacing:0.04em;font-weight:600;color:#6c757d;text-transform:uppercase;display:flex;align-items:center;gap:0.35rem;}
+.common-suggestion-header::before{content:'';width:0.65rem;height:0.65rem;border-radius:50%;background:#0d6efd;opacity:0.45;}
+.common-suggestion-list{display:flex;gap:0.5rem;overflow-x:auto;padding-bottom:0.2rem;scrollbar-width:thin;}
+.common-suggestion-list::-webkit-scrollbar{height:6px;}
+.common-suggestion-list::-webkit-scrollbar-track{background:rgba(13,110,253,0.08);border-radius:999px;}
+.common-suggestion-list::-webkit-scrollbar-thumb{background:rgba(13,110,253,0.35);border-radius:999px;}
+.common-suggestion-pill{flex:0 0 auto;border-radius:999px;border:1px solid rgba(13,110,253,0.38);background:rgba(13,110,253,0.08);color:#0d6efd;padding:0.25rem 0.75rem;font-size:0.85rem;line-height:1.1;white-space:nowrap;transition:background-color 0.2s ease,color 0.2s ease,border-color 0.2s ease;}
+.common-suggestion-pill:hover,.common-suggestion-pill:focus{background:rgba(13,110,253,0.2);border-color:rgba(13,110,253,0.55);color:#0a58ca;}
+.todo-common-highlight{background:linear-gradient(90deg,rgba(13,110,253,0.12),rgba(13,110,253,0.03));border-left:3px solid rgba(13,110,253,0.4);}
+.todo-common-highlight .item-content{background:rgba(13,110,253,0.08);border-color:rgba(13,110,253,0.38);box-shadow:none;}
+.todo-common-highlight .item-content:focus{box-shadow:0 0 0 0.2rem rgba(13,110,253,0.18);}
+.common-items-manager .common-item-row{display:flex;align-items:center;gap:0.5rem;}
+.common-items-manager .common-item-index{width:1.5rem;text-align:center;font-size:0.8rem;color:#6c757d;flex-shrink:0;}
+.common-items-manager .common-item-input{flex:1 1 auto;}
+.common-items-manager .btn-group{flex-shrink:0;}
+.common-items-manager .common-item-input.is-invalid{border-color:#dc3545;box-shadow:0 0 0 0.15rem rgba(220,53,69,0.25);}
+.common-items-manager-empty{display:none;}
+.common-items-manager-empty[data-visible="true"]{display:block;}
 @keyframes status-pulse{0%{box-shadow:0 0 0 0 rgba(13,110,253,0.45);}70%{box-shadow:0 0 0 10px rgba(13,110,253,0);}100%{box-shadow:0 0 0 0 rgba(13,110,253,0);}}
 @media (max-width:575.98px){.save-status{left:1rem;right:1rem;transform:none;justify-content:center;padding:0.65rem 1rem;border-radius:0.85rem;}.save-status .status-text{white-space:normal;text-align:center;}}
+@media (max-width:575.98px){.common-suggestion-bar{left:0.75rem!important;right:0.75rem!important;width:auto!important;}}
 @media print {
   @page { size: A4; margin: 10mm; }
   body { font-size: 12pt; }
@@ -98,6 +122,7 @@ $today_key = strtolower(date('D'));
   <a class="btn btn-success" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
   <a class="btn btn-info" href="todolist_assessment.php" data-i18n="todolist.assessment">待办统计</a>
   <button type="button" class="btn btn-secondary" id="copyNextWeek" data-i18n="todolist.copy_next">鸽下周</button>
+  <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#commonItemsModal" data-i18n="todolist.common.manage">常用事项</button>
   <button type="button" class="btn btn-outline-primary" onclick="printTodoList()" data-i18n="todolist.print">打印</button>
 </form>
 <div class="row">
@@ -217,10 +242,34 @@ $today_key = strtolower(date('D'));
     </ul>
   </div>
 </div>
+<div class="modal fade" id="commonItemsModal" tabindex="-1" aria-labelledby="commonItemsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="commonItemsModalLabel" data-i18n="todolist.common.title">常用事项库</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭" data-i18n-attr="aria-label:todolist.common.close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-3" data-i18n="todolist.common.description">维护常用事项，在填写待办时可快速插入。</p>
+        <div class="common-items-manager">
+          <ul class="list-group mb-3" id="commonItemsList"></ul>
+          <p class="text-muted common-items-manager-empty" id="commonItemsEmpty" data-visible="false" data-i18n="todolist.common.empty">暂无常用事项，请新增。</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="addCommonItem" data-i18n="todolist.common.add">新增常用事项</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="todolist.common.close">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="saveStatus" class="save-status" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true" data-state="pending" style="display:none;">
   <span class="status-indicator" aria-hidden="true"></span>
   <span class="status-text">保存中…</span>
 </div>
+<script>
+window.commonTodoItems = <?= json_encode($common_items, JSON_UNESCAPED_UNICODE); ?>;
+</script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
 window.addEventListener('DOMContentLoaded',()=>{
@@ -229,6 +278,274 @@ window.addEventListener('DOMContentLoaded',()=>{
   const statusEl=document.getElementById('saveStatus');
   const statusDefaults={pending:'保存中…',success:'已自动保存',error:'保存失败，请稍后重试'};
   let statusTimer=null;
+  let commonItems=Array.isArray(window.commonTodoItems)?window.commonTodoItems.map(item=>({id:item.id,content:item.content??''})):[];
+  let commonContentSet=new Set();
+  let suggestionBar=null;
+  let suggestionList=null;
+  let suggestionCurrentInput=null;
+  let suggestionHideTimer=null;
+  let suggestionInteracting=false;
+  const commonListEl=document.getElementById('commonItemsList');
+  const commonEmptyEl=document.getElementById('commonItemsEmpty');
+  const addCommonBtn=document.getElementById('addCommonItem');
+
+  function rebuildCommonContentSet(){
+    commonContentSet=new Set(commonItems.map(item=>String(item.content||'').trim()).filter(text=>text.length>0));
+  }
+  rebuildCommonContentSet();
+
+  function highlightItem(input){
+    if(!input) return;
+    const li=input.closest('li');
+    if(!li) return;
+    const value=String(input.value||'').trim();
+    if(value && commonContentSet.has(value)){
+      li.classList.add('todo-common-highlight');
+    }else{
+      li.classList.remove('todo-common-highlight');
+    }
+  }
+
+  function refreshCommonHighlights(){
+    document.querySelectorAll('.todolist .item-content').forEach(input=>highlightItem(input));
+  }
+
+  function ensureSuggestionBar(){
+    if(!enableEditing) return;
+    if(suggestionBar) return;
+    suggestionBar=document.createElement('div');
+    suggestionBar.className='common-suggestion-bar';
+    suggestionBar.innerHTML=`<div class="common-suggestion-inner"><div class="common-suggestion-header" data-i18n="todolist.common.suggestions">常用事项候选</div><div class="common-suggestion-list" role="list"></div></div>`;
+    suggestionList=suggestionBar.querySelector('.common-suggestion-list');
+    document.body.appendChild(suggestionBar);
+    if(typeof applyTranslations==='function'){
+      applyTranslations();
+    }
+    suggestionBar.addEventListener('mousedown',evt=>{
+      evt.preventDefault();
+      suggestionInteracting=true;
+    });
+    suggestionBar.addEventListener('mouseup',()=>{
+      suggestionInteracting=false;
+    });
+  }
+
+  function renderCommonSuggestions(){
+    ensureSuggestionBar();
+    if(!suggestionList) return;
+    suggestionList.innerHTML='';
+    if(commonItems.length===0){
+      if(suggestionBar){
+        suggestionBar.dataset.empty='1';
+        suggestionBar.style.display='none';
+      }
+      return;
+    }
+    if(suggestionBar){
+      suggestionBar.dataset.empty='0';
+    }
+    commonItems.forEach(item=>{
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.className='common-suggestion-pill';
+      btn.textContent=item.content;
+      btn.addEventListener('click',()=>{
+        if(!suggestionCurrentInput) return;
+        insertCommonText(suggestionCurrentInput,item.content||'');
+        suggestionCurrentInput.focus();
+      });
+      suggestionList.appendChild(btn);
+    });
+  }
+
+  function updateSuggestionPosition(){
+    if(!suggestionBar || !suggestionCurrentInput || suggestionBar.style.display==='none') return;
+    const rect=suggestionCurrentInput.getBoundingClientRect();
+    const gap=8;
+    const availableWidth=Math.min(rect.width,window.innerWidth-gap*2);
+    const maxLeft=window.innerWidth-availableWidth-gap;
+    const desiredLeft=Math.max(gap,Math.min(rect.left,maxLeft));
+    suggestionBar.style.width=`${availableWidth}px`;
+    suggestionBar.style.left=`${desiredLeft}px`;
+    suggestionBar.style.top=`${rect.bottom+gap}px`;
+  }
+
+  function showCommonSuggestionBar(input){
+    if(!enableEditing) return;
+    clearTimeout(suggestionHideTimer);
+    suggestionCurrentInput=input;
+    if(!commonItems.length){
+      hideCommonSuggestionBar();
+      return;
+    }
+    ensureSuggestionBar();
+    if(!suggestionBar) return;
+    suggestionBar.style.display='block';
+    suggestionBar.dataset.visible='1';
+    updateSuggestionPosition();
+  }
+
+  function hideCommonSuggestionBar(){
+    if(!suggestionBar) return;
+    suggestionBar.style.display='none';
+    suggestionBar.dataset.visible='0';
+    suggestionCurrentInput=null;
+  }
+
+  function scheduleHideSuggestionBar(){
+    clearTimeout(suggestionHideTimer);
+    suggestionHideTimer=setTimeout(()=>{
+      if(suggestionInteracting){
+        suggestionInteracting=false;
+        return;
+      }
+      hideCommonSuggestionBar();
+    },140);
+  }
+
+  function insertCommonText(input,text){
+    const value=String(input.value||'');
+    const start=input.selectionStart ?? value.length;
+    const end=input.selectionEnd ?? value.length;
+    const before=value.slice(0,start);
+    const after=value.slice(end);
+    const newValue=before+text+after;
+    input.value=newValue;
+    const cursor=start+text.length;
+    if(typeof input.setSelectionRange==='function'){
+      input.setSelectionRange(cursor,cursor);
+    }
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+
+  function renderCommonManagerList(){
+    if(!commonListEl) return;
+    commonListEl.innerHTML='';
+    commonItems.forEach((item,index)=>{
+      commonListEl.appendChild(buildCommonItemRow(item,index,false));
+    });
+    if(commonEmptyEl){
+      commonEmptyEl.dataset.visible=commonItems.length? 'false':'true';
+    }
+    if(typeof applyTranslations==='function'){
+      applyTranslations();
+    }
+  }
+
+  function buildCommonItemRow(item,index,isDraft){
+    const li=document.createElement('li');
+    li.className='list-group-item common-item-row';
+    li.dataset.id=item.id ?? '';
+    const indexEl=document.createElement('span');
+    indexEl.className='common-item-index';
+    indexEl.textContent=isDraft?'+':String(index+1);
+    li.appendChild(indexEl);
+    const input=document.createElement('input');
+    input.type='text';
+    input.maxLength=255;
+    input.className='form-control form-control-sm common-item-input';
+    input.value=item.content||'';
+    input.setAttribute('data-i18n-attr','placeholder:todolist.common.placeholder');
+    input.placeholder='请输入常用事项';
+    li.appendChild(input);
+    const btnGroup=document.createElement('div');
+    btnGroup.className='btn-group btn-group-sm';
+    const saveBtn=document.createElement('button');
+    saveBtn.type='button';
+    saveBtn.className='btn btn-primary save-common-item';
+    saveBtn.setAttribute('data-i18n','todolist.common.save');
+    saveBtn.textContent='保存';
+    const deleteBtn=document.createElement('button');
+    deleteBtn.type='button';
+    deleteBtn.className='btn btn-outline-danger delete-common-item';
+    deleteBtn.setAttribute('data-i18n','todolist.common.delete');
+    deleteBtn.textContent='删除';
+    btnGroup.append(saveBtn,deleteBtn);
+    li.appendChild(btnGroup);
+    input.addEventListener('input',()=>{
+      input.classList.remove('is-invalid');
+    });
+    input.addEventListener('keydown',evt=>{
+      if(evt.key==='Enter' && !evt.shiftKey){
+        evt.preventDefault();
+        saveBtn.click();
+      }
+    });
+    saveBtn.addEventListener('click',()=>{
+      const value=input.value.trim();
+      if(!value){
+        input.classList.add('is-invalid');
+        input.focus();
+        return;
+      }
+      if(isDraft){
+        postData({action:'common_create',content:value,sort_order:commonItems.length})
+          .then(r=>r.json())
+          .then(j=>{
+            commonItems.push({id:j.id,content:value});
+            rebuildCommonContentSet();
+            renderCommonManagerList();
+            renderCommonSuggestions();
+            refreshCommonHighlights();
+          });
+      }else{
+        postData({action:'common_update',id:item.id,content:value})
+          .then(()=>{
+            const target=commonItems.find(ci=>String(ci.id)===String(item.id));
+            if(target){
+              target.content=value;
+            }
+            rebuildCommonContentSet();
+            renderCommonManagerList();
+            renderCommonSuggestions();
+            refreshCommonHighlights();
+          });
+      }
+    });
+    deleteBtn.addEventListener('click',()=>{
+      if(isDraft){
+        li.remove();
+        if(commonEmptyEl && !commonItems.length && !commonListEl.children.length){
+          commonEmptyEl.dataset.visible='true';
+        }
+        return;
+      }
+      postData({action:'common_delete',id:item.id})
+        .then(()=>{
+          commonItems=commonItems.filter(ci=>String(ci.id)!==String(item.id));
+          rebuildCommonContentSet();
+          renderCommonManagerList();
+          renderCommonSuggestions();
+          refreshCommonHighlights();
+        });
+    });
+    return li;
+  }
+
+  function appendDraftCommonItem(){
+    if(!commonListEl) return;
+    const draftRow=buildCommonItemRow({id:null,content:''},commonItems.length,true);
+    commonListEl.appendChild(draftRow);
+    if(commonEmptyEl){
+      commonEmptyEl.dataset.visible='false';
+    }
+    if(typeof applyTranslations==='function'){
+      applyTranslations();
+    }
+    const input=draftRow.querySelector('.common-item-input');
+    if(input){
+      input.focus();
+    }
+  }
+
+  if(addCommonBtn){
+    addCommonBtn.addEventListener('click',appendDraftCommonItem);
+  }
+
+  window.addEventListener('resize',updateSuggestionPosition);
+  window.addEventListener('scroll',updateSuggestionPosition,true);
+  renderCommonManagerList();
+  renderCommonSuggestions();
   function getStatusMessage(state){
     const key='todolist.status.'+state;
     const lang=document.documentElement.lang||'zh';
@@ -325,11 +642,13 @@ window.addEventListener('DOMContentLoaded',()=>{
   function attach(li){
     const content=li.querySelector('.item-content');
     if(enableEditing){
-      content.addEventListener('input',()=>saveItem(li));
+      content.addEventListener('input',()=>{saveItem(li);highlightItem(content);});
+      content.addEventListener('focus',()=>{showCommonSuggestionBar(content);highlightItem(content);});
+      content.addEventListener('blur',scheduleHideSuggestionBar);
     }else{
       content.setAttribute('readonly',true);
     }
-    li.querySelector('.item-done').addEventListener('change',()=>saveItem(li));
+    li.querySelector('.item-done').addEventListener('change',()=>{saveItem(li);highlightItem(content);});
     if(enableEditing){
       const copyBtn=li.querySelector('.copy-item');
       if(copyBtn) copyBtn.addEventListener('click',()=>copyText(content.value));
@@ -356,6 +675,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     }else{
       li.querySelectorAll('.copy-item,.next-week-item,.tomorrow-item,.delete-item').forEach(btn=>btn.style.display='none');
     }
+    highlightItem(content);
   }
   document.querySelectorAll('.todolist').forEach(list=>{
     if(enableEditing){
@@ -428,6 +748,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     postData({action:'copy_next',week_start:'<?= $week_start; ?>'})
       .then(()=>{window.location='todolist.php?week=<?= $next_week_param; ?>';});
   });
+  refreshCommonHighlights();
   updateStats();
 });
 
