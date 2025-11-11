@@ -679,15 +679,25 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
   document.querySelectorAll('.todolist').forEach(list=>{
     if(enableEditing){
-      Sortable.create(list,{group:'todolist',animation:150,onEnd:function(evt){
-        saveItem(evt.item);
-        const lists=new Set([evt.from,evt.to]);
-        lists.forEach(l=>{
-          const order=Array.from(l.children).map((li,i)=>({id:li.dataset.id,position:i}));
-          postData({action:'order',order:order});
-        });
-        updateStats();
-      }});
+      Sortable.create(list,{
+        group:'todolist',
+        animation:150,
+        onChoose:function(){
+          hideCommonSuggestionBar();
+        },
+        onStart:function(){
+          hideCommonSuggestionBar();
+        },
+        onEnd:function(evt){
+          saveItem(evt.item);
+          const lists=new Set([evt.from,evt.to]);
+          lists.forEach(l=>{
+            const order=Array.from(l.children).map((li,i)=>({id:li.dataset.id,position:i}));
+            postData({action:'order',order:order});
+          });
+          updateStats();
+        }
+      });
     }
     list.querySelectorAll('li').forEach(attach);
   });
