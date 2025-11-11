@@ -4,6 +4,7 @@ $user_id = $_SESSION['role']==='manager' ? $_SESSION['manager_id'] : $_SESSION['
 $role = $_SESSION['role'];
 $data = json_decode(file_get_contents('php://input'), true);
 $action = $data['action'] ?? 'update';
+header('Content-Type: application/json');
 if($action === 'update'){
     $id = $data['id'] ?? null;
     $content = $data['content'] ?? '';
@@ -59,5 +60,52 @@ if($action === 'update'){
     $stmt = $pdo->prepare('UPDATE todolist_items SET week_start=?, day=? WHERE id=? AND user_id=? AND user_role=?');
     $stmt->execute([$new_week_start,$new_day,$id,$user_id,$role]);
     echo json_encode(['status'=>'ok','new_day'=>$new_day,'new_week_start'=>$new_week_start]);
+} elseif($action === 'common_create'){
+    $content = trim($data['content'] ?? '');
+    if($content === ''){
+        http_response_code(400);
+        echo json_encode(['error'=>'empty']);
+        exit;
+    }
+    $stmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order),-1)+1 AS next_order FROM todolist_common_items WHERE user_id=? AND user_role=?');
+    $stmt->execute([$user_id,$role]);
+    $next_order = (int)$stmt->fetchColumn();
+    $stmt = $pdo->prepare('INSERT INTO todolist_common_items (user_id,user_role,content,sort_order) VALUES (?,?,?,?)');
+    $stmt->execute([$user_id,$role,$content,$next_order]);
+    echo json_encode(['id'=>$pdo->lastInsertId()]);
+} elseif($action === 'common_update'){
+    $id = $data['id'] ?? null;
+    $content = trim($data['content'] ?? '');
+    if(!$id){
+        http_response_code(400);
+        echo json_encode(['error'=>'missing_id']);
+        exit;
+    }
+    if($content === ''){
+        http_response_code(400);
+        echo json_encode(['error'=>'empty']);
+        exit;
+    }
+    $stmt = $pdo->prepare('UPDATE todolist_common_items SET content=? WHERE id=? AND user_id=? AND user_role=?');
+    $stmt->execute([$content,$id,$user_id,$role]);
+    echo json_encode(['status'=>'ok']);
+} elseif($action === 'common_delete'){
+    $id = $data['id'] ?? null;
+    if(!$id){
+        http_response_code(400);
+        echo json_encode(['error'=>'missing_id']);
+        exit;
+    }
+    $stmt = $pdo->prepare('DELETE FROM todolist_common_items WHERE id=? AND user_id=? AND user_role=?');
+    $stmt->execute([$id,$user_id,$role]);
+    echo json_encode(['status'=>'ok']);
+} elseif($action === 'common_order'){
+    foreach(($data['order'] ?? []) as $o){
+        if(!isset($o['id'])) continue;
+        $position = isset($o['position']) ? (int)$o['position'] : 0;
+        $stmt = $pdo->prepare('UPDATE todolist_common_items SET sort_order=? WHERE id=? AND user_id=? AND user_role=?');
+        $stmt->execute([$position,$o['id'],$user_id,$role]);
+    }
+    echo json_encode(['status'=>'ok']);
 }
 ?>

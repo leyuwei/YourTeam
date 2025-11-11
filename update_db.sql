@@ -75,3 +75,12 @@ ALTER TABLE asset_settings
 INSERT INTO asset_settings (id, code_prefix, link_prefix, sync_api_prefix, sync_mapping)
 VALUES (1, 'ASSET-', '', '', NULL)
 ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix, sync_api_prefix = sync_api_prefix, sync_mapping = sync_mapping;
+
+CREATE TABLE IF NOT EXISTS todolist_common_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  user_role ENUM('manager','member') NOT NULL,
+  content VARCHAR(255) NOT NULL,
+  sort_order INT DEFAULT 0,
+  INDEX idx_todolist_common_user (user_id, user_role)
+);
