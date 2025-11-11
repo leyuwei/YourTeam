@@ -332,19 +332,29 @@ window.addEventListener('DOMContentLoaded',()=>{
 
   function renderCommonSuggestions(){
     ensureSuggestionBar();
-    if(!suggestionList) return;
+    if(!suggestionList) return 0;
     suggestionList.innerHTML='';
     if(commonItems.length===0){
       if(suggestionBar){
         suggestionBar.dataset.empty='1';
-        suggestionBar.style.display='none';
       }
-      return;
+      return 0;
+    }
+    const currentValue=suggestionCurrentInput?String(suggestionCurrentInput.value||'') : '';
+    const currentLower=currentValue.toLocaleLowerCase();
+    const availableItems=commonItems.filter(item=>{
+      const text=String(item.content||'').trim();
+      if(!text) return false;
+      if(!suggestionCurrentInput) return true;
+      return !currentLower.includes(text.toLocaleLowerCase());
+    });
+    if(!availableItems.length){
+      return 0;
     }
     if(suggestionBar){
       suggestionBar.dataset.empty='0';
     }
-    commonItems.forEach(item=>{
+    availableItems.forEach(item=>{
       const btn=document.createElement('button');
       btn.type='button';
       btn.className='common-suggestion-pill';
@@ -356,6 +366,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       });
       suggestionList.appendChild(btn);
     });
+    return availableItems.length;
   }
 
   function updateSuggestionPosition(){
@@ -374,12 +385,14 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(!enableEditing) return;
     clearTimeout(suggestionHideTimer);
     suggestionCurrentInput=input;
-    if(!commonItems.length){
-      hideCommonSuggestionBar();
+    const count=renderCommonSuggestions();
+    if(!suggestionBar || !count){
+      if(suggestionBar){
+        suggestionBar.style.display='none';
+        suggestionBar.dataset.visible='0';
+      }
       return;
     }
-    ensureSuggestionBar();
-    if(!suggestionBar) return;
     suggestionBar.style.display='block';
     suggestionBar.dataset.visible='1';
     updateSuggestionPosition();
@@ -642,7 +655,13 @@ window.addEventListener('DOMContentLoaded',()=>{
   function attach(li){
     const content=li.querySelector('.item-content');
     if(enableEditing){
-      content.addEventListener('input',()=>{saveItem(li);highlightItem(content);});
+      content.addEventListener('input',()=>{
+        saveItem(li);
+        highlightItem(content);
+        if(document.activeElement===content){
+          showCommonSuggestionBar(content);
+        }
+      });
       content.addEventListener('focus',()=>{showCommonSuggestionBar(content);highlightItem(content);});
       content.addEventListener('blur',scheduleHideSuggestionBar);
     }else{
