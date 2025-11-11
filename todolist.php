@@ -71,19 +71,25 @@ $today_key = strtolower(date('D'));
 .save-status[data-state='error']{color:#b02a37;border-color:rgba(220,53,69,0.28);}
 .save-status[data-state='error'] .status-indicator{animation:none;}
 .save-status .status-text{white-space:nowrap;}
-.common-suggestion-bar{position:fixed;left:0;top:0;z-index:1090;display:none;padding:0.65rem 0.75rem;border-radius:0.85rem;background:var(--app-surface-bg,#fff);border:1px solid rgba(13,110,253,0.24);box-shadow:0 1rem 2.5rem rgba(13,110,253,0.18);max-width:90vw;min-width:14rem;}
-.common-suggestion-inner{max-height:8.5rem;display:flex;flex-direction:column;gap:0.35rem;}
+.common-suggestion-bar{position:fixed;left:0;top:0;z-index:1090;display:none;padding:0.65rem 0.75rem;border-radius:0.85rem;background:var(--app-surface-bg,#fff);border:1px solid rgba(13,110,253,0.24);box-shadow:0 1rem 2.5rem rgba(13,110,253,0.18);max-width:90vw;min-width:14rem;overflow-x:hidden;}
+.common-suggestion-inner{display:flex;flex-direction:column;gap:0.35rem;}
 .common-suggestion-header{font-size:0.75rem;letter-spacing:0.04em;font-weight:600;color:#6c757d;text-transform:uppercase;display:flex;align-items:center;gap:0.35rem;}
 .common-suggestion-header::before{content:'';width:0.65rem;height:0.65rem;border-radius:50%;background:#0d6efd;opacity:0.45;}
-.common-suggestion-list{display:flex;gap:0.5rem;overflow-x:auto;padding-bottom:0.2rem;scrollbar-width:thin;}
-.common-suggestion-list::-webkit-scrollbar{height:6px;}
-.common-suggestion-list::-webkit-scrollbar-track{background:rgba(13,110,253,0.08);border-radius:999px;}
-.common-suggestion-list::-webkit-scrollbar-thumb{background:rgba(13,110,253,0.35);border-radius:999px;}
-.common-suggestion-pill{flex:0 0 auto;border-radius:999px;border:1px solid rgba(13,110,253,0.38);background:rgba(13,110,253,0.08);color:#0d6efd;padding:0.25rem 0.75rem;font-size:0.85rem;line-height:1.1;white-space:nowrap;transition:background-color 0.2s ease,color 0.2s ease,border-color 0.2s ease;}
+.common-suggestion-list{display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-start;padding-bottom:0.1rem;width:100%;}
+.common-suggestion-pill{flex:1 1 calc(50% - 0.5rem);min-width:8.5rem;max-width:100%;border-radius:999px;border:1px solid rgba(13,110,253,0.38);background:rgba(13,110,253,0.08);color:#0d6efd;padding:0.35rem 0.75rem;font-size:0.85rem;line-height:1.25;white-space:normal;word-break:break-word;text-align:left;transition:background-color 0.2s ease,color 0.2s ease,border-color 0.2s ease;}
 .common-suggestion-pill:hover,.common-suggestion-pill:focus{background:rgba(13,110,253,0.2);border-color:rgba(13,110,253,0.55);color:#0a58ca;}
 .todo-common-highlight{background:linear-gradient(90deg,rgba(13,110,253,0.12),rgba(13,110,253,0.03));border-left:3px solid rgba(13,110,253,0.4);}
-.todo-common-highlight .item-content{background:rgba(13,110,253,0.08);border-color:rgba(13,110,253,0.38);box-shadow:none;}
+.todo-common-highlight .item-content{border-color:rgba(13,110,253,0.45);box-shadow:0 0 0 0.1rem rgba(13,110,253,0.12);}
 .todo-common-highlight .item-content:focus{box-shadow:0 0 0 0.2rem rgba(13,110,253,0.18);}
+.item-content.todo-common-match{border-color:rgba(13,110,253,0.55);box-shadow:0 0 0 0.15rem rgba(13,110,253,0.18);transition:box-shadow 0.2s ease,border-color 0.2s ease;}
+.item-content.todo-common-match:focus{box-shadow:0 0 0 0.2rem rgba(13,110,253,0.24);}
+.todo-common-highlight .item-content.todo-common-match{border-color:rgba(13,110,253,0.6);}
+.todo-input-wrapper{position:relative;display:flex;align-items:stretch;flex:1 1 auto;border-radius:0.375rem;overflow:hidden;}
+.todo-input-wrapper .item-content{flex:1 1 auto;width:100%;background-color:transparent!important;position:relative;z-index:2;}
+.todo-highlight-layer{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;padding:0.375rem 0.75rem;font:inherit;line-height:inherit;white-space:pre;overflow:hidden;border-radius:inherit;background:var(--todo-input-bg,var(--bs-body-bg,#fff));color:transparent;z-index:1;}
+.todo-highlight-content{display:inline-block;min-width:100%;white-space:pre;font:inherit;line-height:inherit;transform-origin:left top;}
+.todo-highlight-layer mark{background:rgba(13,110,253,0.2);border-radius:0.25rem;box-shadow:0 0 0 1px rgba(13,110,253,0.12);padding:0 0.08em;color:transparent;}
+.todo-common-highlight .todo-input-wrapper{--todo-input-bg:rgba(13,110,253,0.08);}
 .common-items-manager .common-item-row{display:flex;align-items:center;gap:0.5rem;}
 .common-items-manager .common-item-index{width:1.5rem;text-align:center;font-size:0.8rem;color:#6c757d;flex-shrink:0;}
 .common-items-manager .common-item-input{flex:1 1 auto;}
@@ -280,6 +286,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   let statusTimer=null;
   let commonItems=Array.isArray(window.commonTodoItems)?window.commonTodoItems.map(item=>({id:item.id,content:item.content??''})):[];
   let commonContentSet=new Set();
+  let commonContentList=[];
   let suggestionBar=null;
   let suggestionList=null;
   let suggestionCurrentInput=null;
@@ -290,20 +297,155 @@ window.addEventListener('DOMContentLoaded',()=>{
   const addCommonBtn=document.getElementById('addCommonItem');
 
   function rebuildCommonContentSet(){
-    commonContentSet=new Set(commonItems.map(item=>String(item.content||'').trim()).filter(text=>text.length>0));
+    const uniqueMap=new Map();
+    commonItems.forEach(item=>{
+      const text=String(item.content||'').trim();
+      if(!text) return;
+      const lower=text.toLocaleLowerCase();
+      if(!uniqueMap.has(lower)){
+        uniqueMap.set(lower,{text,lower});
+      }
+    });
+    commonContentList=Array.from(uniqueMap.values());
+    commonContentSet=new Set(commonContentList.map(entry=>entry.lower));
   }
   rebuildCommonContentSet();
 
+  const htmlEscapeMap={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g,ch=>htmlEscapeMap[ch]||ch);
+  }
+
+  function prepareInlineHighlight(input){
+    if(!input || input.dataset.inlineHighlight==='1') return;
+    const parent=input.parentElement;
+    if(!parent) return;
+    const wrapper=document.createElement('div');
+    wrapper.className='todo-input-wrapper';
+    if(input.classList.contains('flex-grow-1')){
+      wrapper.classList.add('flex-grow-1');
+      input.classList.remove('flex-grow-1');
+    }
+    if(input.classList.contains('me-2')){
+      wrapper.classList.add('me-2');
+      input.classList.remove('me-2');
+    }
+    const highlightLayer=document.createElement('div');
+    highlightLayer.className='todo-highlight-layer';
+    highlightLayer.setAttribute('aria-hidden','true');
+    const highlightContent=document.createElement('span');
+    highlightContent.className='todo-highlight-content';
+    highlightLayer.appendChild(highlightContent);
+    parent.insertBefore(wrapper,input);
+    wrapper.appendChild(highlightLayer);
+    wrapper.appendChild(input);
+    input.dataset.inlineHighlight='1';
+    input._highlightContent=highlightContent;
+    const sync=()=>syncHighlightScroll(input);
+    ['scroll','focus','click','keyup'].forEach(evt=>input.addEventListener(evt,sync));
+    sync();
+  }
+
+  function syncHighlightScroll(input){
+    if(!input) return;
+    const highlightContent=input._highlightContent;
+    if(highlightContent){
+      const offset=Number(input.scrollLeft)||0;
+      highlightContent.style.transform=`translateX(${-offset}px)`;
+    }
+  }
+
+  function buildHighlightRanges(value,matches){
+    if(!value || !matches || !matches.length) return [];
+    const lower=value.toLocaleLowerCase();
+    const ranges=[];
+    matches.forEach(entry=>{
+      const target=entry?.lower;
+      if(!target) return;
+      let startIndex=0;
+      while(startIndex<=lower.length){
+        const found=lower.indexOf(target,startIndex);
+        if(found===-1) break;
+        ranges.push({start:found,end:found+target.length});
+        startIndex=found+target.length;
+      }
+    });
+    if(!ranges.length) return [];
+    ranges.sort((a,b)=>a.start-b.start || b.end-a.end);
+    const merged=[];
+    ranges.forEach(range=>{
+      if(!merged.length){
+        merged.push({...range});
+        return;
+      }
+      const last=merged[merged.length-1];
+      if(range.start<=last.end){
+        last.end=Math.max(last.end,range.end);
+      }else{
+        merged.push({...range});
+      }
+    });
+    return merged;
+  }
+
+  function updateInlineHighlight(input,matches){
+    if(!input) return;
+    const highlightContent=input._highlightContent;
+    if(!highlightContent) return;
+    const value=String(input.value||'');
+    let html='';
+    const ranges=buildHighlightRanges(value,matches);
+    if(ranges.length){
+      let cursor=0;
+      ranges.forEach(range=>{
+        if(range.start>cursor){
+          html+=escapeHtml(value.slice(cursor,range.start));
+        }
+        html+=`<mark>${escapeHtml(value.slice(range.start,range.end))}</mark>`;
+        cursor=range.end;
+      });
+      if(cursor<value.length){
+        html+=escapeHtml(value.slice(cursor));
+      }
+    }
+    if(!html){
+      html=escapeHtml(value);
+    }
+    highlightContent.innerHTML=html || '&#8203;';
+    syncHighlightScroll(input);
+  }
+
   function highlightItem(input){
     if(!input) return;
+    prepareInlineHighlight(input);
     const li=input.closest('li');
     if(!li) return;
-    const value=String(input.value||'').trim();
-    if(value && commonContentSet.has(value)){
+    const rawValue=String(input.value||'');
+    const trimmedValue=rawValue.trim();
+    const lowerValue=rawValue.toLocaleLowerCase();
+    const matches=commonContentList.filter(entry=>lowerValue.includes(entry.lower));
+    if(matches.length){
+      input.classList.add('todo-common-match');
+      const lang=document.documentElement.lang||'zh';
+      const joiner=lang && lang.toLowerCase().startsWith('en') ? ', ' : '、';
+      const uniqueLabels=Array.from(new Map(matches.map(entry=>[entry.lower,entry.text])).values());
+      const joinedLabel=uniqueLabels.join(joiner);
+      const hintKey=uniqueLabels.length>1 ? 'todolist.common.match_hint_plural' : 'todolist.common.match_hint_single';
+      const fallback=uniqueLabels.length>1 ? `Matches common items: ${joinedLabel}` : `Matches common item: ${joinedLabel}`;
+      const hint=getLocalizedText(hintKey,fallback,{items:joinedLabel,item:joinedLabel});
+      if(hint){
+        input.setAttribute('title',hint);
+      }
+    }else{
+      input.classList.remove('todo-common-match');
+      input.removeAttribute('title');
+    }
+    if(trimmedValue && commonContentSet.has(trimmedValue.toLocaleLowerCase())){
       li.classList.add('todo-common-highlight');
     }else{
       li.classList.remove('todo-common-highlight');
     }
+    updateInlineHighlight(input,matches);
   }
 
   function refreshCommonHighlights(){
@@ -373,7 +515,9 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(!suggestionBar || !suggestionCurrentInput || suggestionBar.style.display==='none') return;
     const rect=suggestionCurrentInput.getBoundingClientRect();
     const gap=8;
-    const availableWidth=Math.min(rect.width,window.innerWidth-gap*2);
+    const minWidth=240;
+    const maxWidth=Math.min(520,window.innerWidth-gap*2);
+    const availableWidth=Math.min(Math.max(rect.width,minWidth),maxWidth);
     const maxLeft=window.innerWidth-availableWidth-gap;
     const desiredLeft=Math.max(gap,Math.min(rect.left,maxLeft));
     suggestionBar.style.width=`${availableWidth}px`;
@@ -559,14 +703,25 @@ window.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('scroll',updateSuggestionPosition,true);
   renderCommonManagerList();
   renderCommonSuggestions();
+  function getLocalizedText(key,fallback='',params){
+    const lang=document.documentElement.lang||'zh';
+    let template='';
+    if(typeof translations!=='undefined'){
+      template=translations[lang]?.[key] ?? translations.zh?.[key] ?? '';
+    }
+    if(!template) template=fallback||'';
+    if(params && template){
+      Object.keys(params).forEach(paramKey=>{
+        const value=params[paramKey];
+        template=template.replace(new RegExp(`\\{${paramKey}\\}`,'g'), value);
+      });
+    }
+    return template;
+  }
+
   function getStatusMessage(state){
     const key='todolist.status.'+state;
-    const lang=document.documentElement.lang||'zh';
-    if(typeof translations!=='undefined'){
-      if(translations[lang] && translations[lang][key]) return translations[lang][key];
-      if(translations.zh && translations.zh[key]) return translations.zh[key];
-    }
-    return statusDefaults[state]||'';
+    return getLocalizedText(key,statusDefaults[state]||'');
   }
   function hideStatus(){
     if(!statusEl) return;
@@ -654,6 +809,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
   function attach(li){
     const content=li.querySelector('.item-content');
+    prepareInlineHighlight(content);
     if(enableEditing){
       content.addEventListener('input',()=>{
         saveItem(li);
