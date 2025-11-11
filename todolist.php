@@ -72,18 +72,18 @@ $today_key = strtolower(date('D'));
 .save-status[data-state='error'] .status-indicator{animation:none;}
 .save-status .status-text{white-space:nowrap;}
 .common-suggestion-bar{position:fixed;left:0;top:0;z-index:1090;display:none;padding:0.65rem 0.75rem;border-radius:0.85rem;background:var(--app-surface-bg,#fff);border:1px solid rgba(13,110,253,0.24);box-shadow:0 1rem 2.5rem rgba(13,110,253,0.18);max-width:90vw;min-width:14rem;}
-.common-suggestion-inner{max-height:8.5rem;display:flex;flex-direction:column;gap:0.35rem;}
+.common-suggestion-inner{display:flex;flex-direction:column;gap:0.35rem;}
 .common-suggestion-header{font-size:0.75rem;letter-spacing:0.04em;font-weight:600;color:#6c757d;text-transform:uppercase;display:flex;align-items:center;gap:0.35rem;}
 .common-suggestion-header::before{content:'';width:0.65rem;height:0.65rem;border-radius:50%;background:#0d6efd;opacity:0.45;}
-.common-suggestion-list{display:flex;gap:0.5rem;overflow-x:auto;padding-bottom:0.2rem;scrollbar-width:thin;}
-.common-suggestion-list::-webkit-scrollbar{height:6px;}
-.common-suggestion-list::-webkit-scrollbar-track{background:rgba(13,110,253,0.08);border-radius:999px;}
-.common-suggestion-list::-webkit-scrollbar-thumb{background:rgba(13,110,253,0.35);border-radius:999px;}
-.common-suggestion-pill{flex:0 0 auto;border-radius:999px;border:1px solid rgba(13,110,253,0.38);background:rgba(13,110,253,0.08);color:#0d6efd;padding:0.25rem 0.75rem;font-size:0.85rem;line-height:1.1;white-space:nowrap;transition:background-color 0.2s ease,color 0.2s ease,border-color 0.2s ease;}
+.common-suggestion-list{display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-start;padding-bottom:0.1rem;}
+.common-suggestion-pill{flex:0 1 auto;max-width:100%;border-radius:999px;border:1px solid rgba(13,110,253,0.38);background:rgba(13,110,253,0.08);color:#0d6efd;padding:0.25rem 0.75rem;font-size:0.85rem;line-height:1.2;white-space:normal;word-break:break-word;text-align:left;transition:background-color 0.2s ease,color 0.2s ease,border-color 0.2s ease;}
 .common-suggestion-pill:hover,.common-suggestion-pill:focus{background:rgba(13,110,253,0.2);border-color:rgba(13,110,253,0.55);color:#0a58ca;}
 .todo-common-highlight{background:linear-gradient(90deg,rgba(13,110,253,0.12),rgba(13,110,253,0.03));border-left:3px solid rgba(13,110,253,0.4);}
 .todo-common-highlight .item-content{background:rgba(13,110,253,0.08);border-color:rgba(13,110,253,0.38);box-shadow:none;}
 .todo-common-highlight .item-content:focus{box-shadow:0 0 0 0.2rem rgba(13,110,253,0.18);}
+.item-content.todo-common-match{background:linear-gradient(120deg,rgba(13,110,253,0.16),rgba(13,110,253,0.05));border-color:rgba(13,110,253,0.38);box-shadow:inset 0 0 0 1px rgba(13,110,253,0.06);transition:background-color 0.2s ease,border-color 0.2s ease,box-shadow 0.2s ease;}
+.item-content.todo-common-match:focus{box-shadow:0 0 0 0.2rem rgba(13,110,253,0.18);}
+.todo-common-highlight .item-content.todo-common-match{background:linear-gradient(120deg,rgba(13,110,253,0.22),rgba(13,110,253,0.08));border-color:rgba(13,110,253,0.45);}
 .common-items-manager .common-item-row{display:flex;align-items:center;gap:0.5rem;}
 .common-items-manager .common-item-index{width:1.5rem;text-align:center;font-size:0.8rem;color:#6c757d;flex-shrink:0;}
 .common-items-manager .common-item-input{flex:1 1 auto;}
@@ -280,6 +280,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   let statusTimer=null;
   let commonItems=Array.isArray(window.commonTodoItems)?window.commonTodoItems.map(item=>({id:item.id,content:item.content??''})):[];
   let commonContentSet=new Set();
+  let commonContentList=[];
   let suggestionBar=null;
   let suggestionList=null;
   let suggestionCurrentInput=null;
@@ -290,7 +291,17 @@ window.addEventListener('DOMContentLoaded',()=>{
   const addCommonBtn=document.getElementById('addCommonItem');
 
   function rebuildCommonContentSet(){
-    commonContentSet=new Set(commonItems.map(item=>String(item.content||'').trim()).filter(text=>text.length>0));
+    const uniqueMap=new Map();
+    commonItems.forEach(item=>{
+      const text=String(item.content||'').trim();
+      if(!text) return;
+      const lower=text.toLocaleLowerCase();
+      if(!uniqueMap.has(lower)){
+        uniqueMap.set(lower,{text,lower});
+      }
+    });
+    commonContentList=Array.from(uniqueMap.values());
+    commonContentSet=new Set(commonContentList.map(entry=>entry.lower));
   }
   rebuildCommonContentSet();
 
@@ -298,8 +309,27 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(!input) return;
     const li=input.closest('li');
     if(!li) return;
-    const value=String(input.value||'').trim();
-    if(value && commonContentSet.has(value)){
+    const rawValue=String(input.value||'');
+    const trimmedValue=rawValue.trim();
+    const lowerValue=rawValue.toLocaleLowerCase();
+    const matches=commonContentList.filter(entry=>lowerValue.includes(entry.lower));
+    if(matches.length){
+      input.classList.add('todo-common-match');
+      const lang=document.documentElement.lang||'zh';
+      const joiner=lang && lang.toLowerCase().startsWith('en') ? ', ' : '、';
+      const uniqueLabels=Array.from(new Map(matches.map(entry=>[entry.lower,entry.text])).values());
+      const joinedLabel=uniqueLabels.join(joiner);
+      const hintKey=uniqueLabels.length>1 ? 'todolist.common.match_hint_plural' : 'todolist.common.match_hint_single';
+      const fallback=uniqueLabels.length>1 ? `Matches common items: ${joinedLabel}` : `Matches common item: ${joinedLabel}`;
+      const hint=getLocalizedText(hintKey,fallback,{items:joinedLabel,item:joinedLabel});
+      if(hint){
+        input.setAttribute('title',hint);
+      }
+    }else{
+      input.classList.remove('todo-common-match');
+      input.removeAttribute('title');
+    }
+    if(trimmedValue && commonContentSet.has(trimmedValue.toLocaleLowerCase())){
       li.classList.add('todo-common-highlight');
     }else{
       li.classList.remove('todo-common-highlight');
@@ -559,14 +589,25 @@ window.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('scroll',updateSuggestionPosition,true);
   renderCommonManagerList();
   renderCommonSuggestions();
+  function getLocalizedText(key,fallback='',params){
+    const lang=document.documentElement.lang||'zh';
+    let template='';
+    if(typeof translations!=='undefined'){
+      template=translations[lang]?.[key] ?? translations.zh?.[key] ?? '';
+    }
+    if(!template) template=fallback||'';
+    if(params && template){
+      Object.keys(params).forEach(paramKey=>{
+        const value=params[paramKey];
+        template=template.replace(new RegExp(`\\{${paramKey}\\}`,'g'), value);
+      });
+    }
+    return template;
+  }
+
   function getStatusMessage(state){
     const key='todolist.status.'+state;
-    const lang=document.documentElement.lang||'zh';
-    if(typeof translations!=='undefined'){
-      if(translations[lang] && translations[lang][key]) return translations[lang][key];
-      if(translations.zh && translations.zh[key]) return translations.zh[key];
-    }
-    return statusDefaults[state]||'';
+    return getLocalizedText(key,statusDefaults[state]||'');
   }
   function hideStatus(){
     if(!statusEl) return;
