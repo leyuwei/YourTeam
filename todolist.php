@@ -79,11 +79,17 @@ $today_key = strtolower(date('D'));
 .common-suggestion-pill{flex:1 1 calc(50% - 0.5rem);min-width:8.5rem;max-width:100%;border-radius:999px;border:1px solid rgba(13,110,253,0.38);background:rgba(13,110,253,0.08);color:#0d6efd;padding:0.35rem 0.75rem;font-size:0.85rem;line-height:1.25;white-space:normal;word-break:break-word;text-align:left;transition:background-color 0.2s ease,color 0.2s ease,border-color 0.2s ease;}
 .common-suggestion-pill:hover,.common-suggestion-pill:focus{background:rgba(13,110,253,0.2);border-color:rgba(13,110,253,0.55);color:#0a58ca;}
 .todo-common-highlight{background:linear-gradient(90deg,rgba(13,110,253,0.12),rgba(13,110,253,0.03));border-left:3px solid rgba(13,110,253,0.4);}
-.todo-common-highlight .item-content{background:rgba(13,110,253,0.08);border-color:rgba(13,110,253,0.38);box-shadow:none;}
+.todo-common-highlight .item-content{border-color:rgba(13,110,253,0.45);box-shadow:0 0 0 0.1rem rgba(13,110,253,0.12);}
 .todo-common-highlight .item-content:focus{box-shadow:0 0 0 0.2rem rgba(13,110,253,0.18);}
-.item-content.todo-common-match{background:linear-gradient(120deg,rgba(13,110,253,0.16),rgba(13,110,253,0.05));border-color:rgba(13,110,253,0.38);box-shadow:inset 0 0 0 1px rgba(13,110,253,0.06);transition:background-color 0.2s ease,border-color 0.2s ease,box-shadow 0.2s ease;}
-.item-content.todo-common-match:focus{box-shadow:0 0 0 0.2rem rgba(13,110,253,0.18);}
-.todo-common-highlight .item-content.todo-common-match{background:linear-gradient(120deg,rgba(13,110,253,0.22),rgba(13,110,253,0.08));border-color:rgba(13,110,253,0.45);}
+.item-content.todo-common-match{border-color:rgba(13,110,253,0.55);box-shadow:0 0 0 0.15rem rgba(13,110,253,0.18);transition:box-shadow 0.2s ease,border-color 0.2s ease;}
+.item-content.todo-common-match:focus{box-shadow:0 0 0 0.2rem rgba(13,110,253,0.24);}
+.todo-common-highlight .item-content.todo-common-match{border-color:rgba(13,110,253,0.6);}
+.todo-input-wrapper{position:relative;display:flex;align-items:stretch;flex:1 1 auto;border-radius:0.375rem;overflow:hidden;}
+.todo-input-wrapper .item-content{flex:1 1 auto;width:100%;background-color:transparent!important;position:relative;z-index:2;}
+.todo-highlight-layer{position:absolute;inset:0;pointer-events:none;display:flex;align-items:center;padding:0.375rem 0.75rem;font:inherit;line-height:inherit;white-space:pre;overflow:hidden;border-radius:inherit;background:var(--todo-input-bg,var(--bs-body-bg,#fff));color:transparent;z-index:1;}
+.todo-highlight-content{display:inline-block;min-width:100%;white-space:pre;font:inherit;line-height:inherit;transform-origin:left top;}
+.todo-highlight-layer mark{background:rgba(13,110,253,0.2);border-radius:0.25rem;box-shadow:0 0 0 1px rgba(13,110,253,0.12);padding:0 0.08em;color:transparent;}
+.todo-common-highlight .todo-input-wrapper{--todo-input-bg:rgba(13,110,253,0.08);}
 .common-items-manager .common-item-row{display:flex;align-items:center;gap:0.5rem;}
 .common-items-manager .common-item-index{width:1.5rem;text-align:center;font-size:0.8rem;color:#6c757d;flex-shrink:0;}
 .common-items-manager .common-item-input{flex:1 1 auto;}
@@ -305,8 +311,113 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
   rebuildCommonContentSet();
 
+  const htmlEscapeMap={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g,ch=>htmlEscapeMap[ch]||ch);
+  }
+
+  function prepareInlineHighlight(input){
+    if(!input || input.dataset.inlineHighlight==='1') return;
+    const parent=input.parentElement;
+    if(!parent) return;
+    const wrapper=document.createElement('div');
+    wrapper.className='todo-input-wrapper';
+    if(input.classList.contains('flex-grow-1')){
+      wrapper.classList.add('flex-grow-1');
+      input.classList.remove('flex-grow-1');
+    }
+    if(input.classList.contains('me-2')){
+      wrapper.classList.add('me-2');
+      input.classList.remove('me-2');
+    }
+    const highlightLayer=document.createElement('div');
+    highlightLayer.className='todo-highlight-layer';
+    highlightLayer.setAttribute('aria-hidden','true');
+    const highlightContent=document.createElement('span');
+    highlightContent.className='todo-highlight-content';
+    highlightLayer.appendChild(highlightContent);
+    parent.insertBefore(wrapper,input);
+    wrapper.appendChild(highlightLayer);
+    wrapper.appendChild(input);
+    input.dataset.inlineHighlight='1';
+    input._highlightContent=highlightContent;
+    const sync=()=>syncHighlightScroll(input);
+    ['scroll','focus','click','keyup'].forEach(evt=>input.addEventListener(evt,sync));
+    sync();
+  }
+
+  function syncHighlightScroll(input){
+    if(!input) return;
+    const highlightContent=input._highlightContent;
+    if(highlightContent){
+      const offset=Number(input.scrollLeft)||0;
+      highlightContent.style.transform=`translateX(${-offset}px)`;
+    }
+  }
+
+  function buildHighlightRanges(value,matches){
+    if(!value || !matches || !matches.length) return [];
+    const lower=value.toLocaleLowerCase();
+    const ranges=[];
+    matches.forEach(entry=>{
+      const target=entry?.lower;
+      if(!target) return;
+      let startIndex=0;
+      while(startIndex<=lower.length){
+        const found=lower.indexOf(target,startIndex);
+        if(found===-1) break;
+        ranges.push({start:found,end:found+target.length});
+        startIndex=found+target.length;
+      }
+    });
+    if(!ranges.length) return [];
+    ranges.sort((a,b)=>a.start-b.start || b.end-a.end);
+    const merged=[];
+    ranges.forEach(range=>{
+      if(!merged.length){
+        merged.push({...range});
+        return;
+      }
+      const last=merged[merged.length-1];
+      if(range.start<=last.end){
+        last.end=Math.max(last.end,range.end);
+      }else{
+        merged.push({...range});
+      }
+    });
+    return merged;
+  }
+
+  function updateInlineHighlight(input,matches){
+    if(!input) return;
+    const highlightContent=input._highlightContent;
+    if(!highlightContent) return;
+    const value=String(input.value||'');
+    let html='';
+    const ranges=buildHighlightRanges(value,matches);
+    if(ranges.length){
+      let cursor=0;
+      ranges.forEach(range=>{
+        if(range.start>cursor){
+          html+=escapeHtml(value.slice(cursor,range.start));
+        }
+        html+=`<mark>${escapeHtml(value.slice(range.start,range.end))}</mark>`;
+        cursor=range.end;
+      });
+      if(cursor<value.length){
+        html+=escapeHtml(value.slice(cursor));
+      }
+    }
+    if(!html){
+      html=escapeHtml(value);
+    }
+    highlightContent.innerHTML=html || '&#8203;';
+    syncHighlightScroll(input);
+  }
+
   function highlightItem(input){
     if(!input) return;
+    prepareInlineHighlight(input);
     const li=input.closest('li');
     if(!li) return;
     const rawValue=String(input.value||'');
@@ -334,6 +445,7 @@ window.addEventListener('DOMContentLoaded',()=>{
     }else{
       li.classList.remove('todo-common-highlight');
     }
+    updateInlineHighlight(input,matches);
   }
 
   function refreshCommonHighlights(){
@@ -697,6 +809,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
   function attach(li){
     const content=li.querySelector('.item-content');
+    prepareInlineHighlight(content);
     if(enableEditing){
       content.addEventListener('input',()=>{
         saveItem(li);
