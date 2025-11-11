@@ -71,12 +71,12 @@ $today_key = strtolower(date('D'));
 .save-status[data-state='error']{color:#b02a37;border-color:rgba(220,53,69,0.28);}
 .save-status[data-state='error'] .status-indicator{animation:none;}
 .save-status .status-text{white-space:nowrap;}
-.common-suggestion-bar{position:fixed;left:0;top:0;z-index:1090;display:none;padding:0.65rem 0.75rem;border-radius:0.85rem;background:var(--app-surface-bg,#fff);border:1px solid rgba(13,110,253,0.24);box-shadow:0 1rem 2.5rem rgba(13,110,253,0.18);max-width:90vw;min-width:14rem;}
+.common-suggestion-bar{position:fixed;left:0;top:0;z-index:1090;display:none;padding:0.65rem 0.75rem;border-radius:0.85rem;background:var(--app-surface-bg,#fff);border:1px solid rgba(13,110,253,0.24);box-shadow:0 1rem 2.5rem rgba(13,110,253,0.18);max-width:90vw;min-width:14rem;overflow-x:hidden;}
 .common-suggestion-inner{display:flex;flex-direction:column;gap:0.35rem;}
 .common-suggestion-header{font-size:0.75rem;letter-spacing:0.04em;font-weight:600;color:#6c757d;text-transform:uppercase;display:flex;align-items:center;gap:0.35rem;}
 .common-suggestion-header::before{content:'';width:0.65rem;height:0.65rem;border-radius:50%;background:#0d6efd;opacity:0.45;}
-.common-suggestion-list{display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-start;padding-bottom:0.1rem;}
-.common-suggestion-pill{flex:0 1 auto;max-width:100%;border-radius:999px;border:1px solid rgba(13,110,253,0.38);background:rgba(13,110,253,0.08);color:#0d6efd;padding:0.25rem 0.75rem;font-size:0.85rem;line-height:1.2;white-space:normal;word-break:break-word;text-align:left;transition:background-color 0.2s ease,color 0.2s ease,border-color 0.2s ease;}
+.common-suggestion-list{display:flex;flex-wrap:wrap;gap:0.5rem;align-items:flex-start;padding-bottom:0.1rem;width:100%;}
+.common-suggestion-pill{flex:1 1 calc(50% - 0.5rem);min-width:8.5rem;max-width:100%;border-radius:999px;border:1px solid rgba(13,110,253,0.38);background:rgba(13,110,253,0.08);color:#0d6efd;padding:0.35rem 0.75rem;font-size:0.85rem;line-height:1.25;white-space:normal;word-break:break-word;text-align:left;transition:background-color 0.2s ease,color 0.2s ease,border-color 0.2s ease;}
 .common-suggestion-pill:hover,.common-suggestion-pill:focus{background:rgba(13,110,253,0.2);border-color:rgba(13,110,253,0.55);color:#0a58ca;}
 .todo-common-highlight{background:linear-gradient(90deg,rgba(13,110,253,0.12),rgba(13,110,253,0.03));border-left:3px solid rgba(13,110,253,0.4);}
 .todo-common-highlight .item-content{background:rgba(13,110,253,0.08);border-color:rgba(13,110,253,0.38);box-shadow:none;}
@@ -403,7 +403,9 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(!suggestionBar || !suggestionCurrentInput || suggestionBar.style.display==='none') return;
     const rect=suggestionCurrentInput.getBoundingClientRect();
     const gap=8;
-    const availableWidth=Math.min(rect.width,window.innerWidth-gap*2);
+    const minWidth=240;
+    const maxWidth=Math.min(520,window.innerWidth-gap*2);
+    const availableWidth=Math.min(Math.max(rect.width,minWidth),maxWidth);
     const maxLeft=window.innerWidth-availableWidth-gap;
     const desiredLeft=Math.max(gap,Math.min(rect.left,maxLeft));
     suggestionBar.style.width=`${availableWidth}px`;
