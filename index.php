@@ -56,44 +56,60 @@ if($_SESSION['role']==='member'){
 ?>
 
 <?php if($_SESSION['role']==='member'): ?>
-<div class="card shadow-sm border-0 mb-4" id="memberLoginPreferencesCard">
-  <div class="card-body">
-    <h3 class="h4 fw-semibold mb-2" data-i18n="member.login_settings.title">Login Preferences</h3>
-    <p class="text-muted mb-2" data-i18n="member.login_settings.description">Choose how you would like to sign in as a member.</p>
+<div class="alert alert-info d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4" id="memberLoginSettingsSummary">
+  <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+    <span class="fw-semibold" data-i18n="member.login_settings.current_label">Current login method:</span>
     <?php if($memberAuthSettings): ?>
-    <span class="badge rounded-pill bg-info text-dark mb-3" id="memberLoginCurrentBadge" data-i18n="member.login_settings.current.<?= htmlspecialchars($memberAuthSettings['login_method'] ?? 'identity'); ?>">Current method: Identity Number</span>
+    <span class="badge rounded-pill bg-primary" id="memberLoginCurrentBadge" data-i18n="member.login_settings.current.<?= htmlspecialchars($memberAuthSettings['login_method'] ?? 'identity'); ?>">Current method: Identity Number</span>
+    <?php else: ?>
+    <span class="badge rounded-pill bg-primary" id="memberLoginCurrentBadge" data-i18n="member.login_settings.current.identity">Current method: Identity Number</span>
     <?php endif; ?>
-    <?php if($memberLoginSettingsMessageKey): ?>
-    <div class="alert alert-<?= htmlspecialchars($memberLoginSettingsMessageType); ?> mb-3" data-i18n="<?= $memberLoginSettingsMessageKey; ?>"></div>
-    <?php endif; ?>
-    <form method="post" class="row g-3 align-items-end" id="memberLoginSettingsForm">
-      <input type="hidden" name="action" value="update_member_login">
-      <div class="col-12">
-        <label class="form-label fw-semibold" data-i18n="member.login_settings.method_label">Preferred login method</label>
-        <div class="btn-group" role="group" aria-label="Member login preference">
-          <input type="radio" class="btn-check" name="member_login_method" id="memberSettingLoginIdentity" value="identity" <?= $memberLoginFormMethod === 'password' ? '' : 'checked'; ?>>
-          <label class="btn btn-outline-primary" for="memberSettingLoginIdentity" data-i18n="member.login_settings.method.identity">Identity Number</label>
-          <input type="radio" class="btn-check" name="member_login_method" id="memberSettingLoginPassword" value="password" <?= $memberLoginFormMethod === 'password' ? 'checked' : ''; ?>>
-          <label class="btn btn-outline-primary" for="memberSettingLoginPassword" data-i18n="member.login_settings.method.password">Password</label>
-        </div>
-        <div class="form-text" id="memberLoginPreferenceHint" data-i18n="<?= $memberLoginFormMethod === 'password' ? 'member.login_settings.method.password_hint' : 'member.login_settings.method.identity_hint'; ?>"></div>
+  </div>
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#memberLoginSettingsModal" data-i18n="member.login_settings.manage_button">Manage Login Method</button>
+</div>
+<?php if($memberLoginSettingsMessageKey): ?>
+<div class="alert alert-<?= htmlspecialchars($memberLoginSettingsMessageType); ?> mb-4" id="memberLoginSettingsFeedback" data-i18n="<?= $memberLoginSettingsMessageKey; ?>"></div>
+<?php endif; ?>
+
+<div class="modal fade" id="memberLoginSettingsModal" tabindex="-1" aria-labelledby="memberLoginSettingsTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="memberLoginSettingsTitle" data-i18n="member.login_settings.title">Login Preferences</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div id="memberPasswordPreferenceFields" class="col-12 <?= $memberLoginFormMethod === 'password' ? '' : 'd-none'; ?>">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label" data-i18n="member.login_settings.password.label">New Password</label>
-            <input type="password" name="new_password" class="form-control" data-i18n-placeholder="member.login_settings.password.placeholder" placeholder="Enter new password">
+      <div class="modal-body">
+        <p class="text-muted mb-3" data-i18n="member.login_settings.description">Choose how you would like to sign in as a member.</p>
+        <form method="post" id="memberLoginSettingsForm" class="row g-3">
+          <input type="hidden" name="action" value="update_member_login">
+          <div class="col-12">
+            <label class="form-label fw-semibold" data-i18n="member.login_settings.method_label">Preferred login method</label>
+            <div class="btn-group" role="group" aria-label="Member login preference">
+              <input type="radio" class="btn-check" name="member_login_method" id="memberSettingLoginIdentity" value="identity" <?= $memberLoginFormMethod === 'password' ? '' : 'checked'; ?>>
+              <label class="btn btn-outline-primary" for="memberSettingLoginIdentity" data-i18n="member.login_settings.method.identity">Identity Number</label>
+              <input type="radio" class="btn-check" name="member_login_method" id="memberSettingLoginPassword" value="password" <?= $memberLoginFormMethod === 'password' ? 'checked' : ''; ?>>
+              <label class="btn btn-outline-primary" for="memberSettingLoginPassword" data-i18n="member.login_settings.method.password">Password</label>
+            </div>
+            <div class="form-text" id="memberLoginPreferenceHint" data-i18n="<?= $memberLoginFormMethod === 'password' ? 'member.login_settings.method.password_hint' : 'member.login_settings.method.identity_hint'; ?>"></div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label" data-i18n="member.login_settings.password.confirm">Confirm Password</label>
-            <input type="password" name="confirm_password" class="form-control" data-i18n-placeholder="member.login_settings.password.confirm_placeholder" placeholder="Confirm password">
+          <div id="memberPasswordPreferenceFields" class="col-12 <?= $memberLoginFormMethod === 'password' ? '' : 'd-none'; ?>">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="member.login_settings.password.label">New Password</label>
+                <input type="password" name="new_password" class="form-control" data-i18n-placeholder="member.login_settings.password.placeholder" placeholder="Enter new password">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="member.login_settings.password.confirm">Confirm Password</label>
+                <input type="password" name="confirm_password" class="form-control" data-i18n-placeholder="member.login_settings.password.confirm_placeholder" placeholder="Confirm password">
+              </div>
+            </div>
           </div>
-        </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary" data-i18n="member.login_settings.submit">Save Preference</button>
+          </div>
+        </form>
       </div>
-      <div class="col-12">
-        <button type="submit" class="btn btn-primary" data-i18n="member.login_settings.submit">Save Preference</button>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
 <style>
@@ -183,6 +199,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const preferenceRadios=document.querySelectorAll('input[name="member_login_method"]');
   const passwordFields=document.getElementById('memberPasswordPreferenceFields');
   const hint=document.getElementById('memberLoginPreferenceHint');
+  const modalEl=document.getElementById('memberLoginSettingsModal');
   const updatePreferenceUI=()=>{
     const selected=document.querySelector('input[name="member_login_method"]:checked');
     const method=selected ? selected.value : 'identity';
@@ -204,6 +221,21 @@ document.addEventListener('DOMContentLoaded',()=>{
   };
   preferenceRadios.forEach(radio=>radio.addEventListener('change', updatePreferenceUI));
   updatePreferenceUI();
+
+  const settingsState=<?php echo json_encode([
+    'hasMessage'=>(bool)$memberLoginSettingsMessageKey,
+    'messageType'=>$memberLoginSettingsMessageType,
+    'formMethod'=>$memberLoginFormMethod
+  ]); ?>;
+  if(settingsState.hasMessage && settingsState.messageType==='danger' && modalEl){
+    const modalInstance=bootstrap.Modal.getOrCreateInstance(modalEl,{backdrop:'static'});
+    modalInstance.show();
+  }
+  if(passwordFields){
+    const inputs=passwordFields.querySelectorAll('input');
+    const isPassword=<?php echo json_encode($memberLoginFormMethod === 'password'); ?>;
+    inputs.forEach(input=>{ input.disabled=!isPassword; });
+  }
 });
 </script>
 <?php endif; ?>
