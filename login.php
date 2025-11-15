@@ -4,11 +4,28 @@ if(isset($_SESSION['role'])){
     header('Location: index.php');
     exit();
 }
-$error = '';
+$errorKey = '';
+$errorTarget = '';
+$activePanel = 'member';
+$errorFallbacks = [
+    'login.error.manager_invalid' => 'Invalid username or password.',
+    'login.error.member_name_required' => 'Please enter your name.',
+    'login.error.member_not_found' => 'Account not found. Please confirm your login method.',
+    'login.error.member_identity_required' => 'Please enter your identity number.',
+    'login.error.member_identity_invalid' => 'Identity number verification failed.',
+    'login.error.member_password_required' => 'Please enter your password.',
+    'login.error.member_password_invalid' => 'Password verification failed.',
+    'login.error.member_mode_mismatch' => 'This account uses a different login method. Please adjust your selection.'
+];
+$memberMode = $_POST['member_login_mode'] ?? 'identity';
+$submittedMemberName = $_POST['name'] ?? '';
+$submittedIdentity = $_POST['identity_number'] ?? '';
+$submittedMemberPassword = $_POST['member_password'] ?? '';
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
-    $type = $_POST['login_type'] ?? 'member';
+    $type = $_POST['login_type'] ?? '';
     if($type === 'manager'){
-        $username = $_POST['username'] ?? '';
+        $activePanel = 'manager';
+        $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
         $stmt = $pdo->prepare('SELECT * FROM managers WHERE username = ?');
         $stmt->execute([$username]);
@@ -20,24 +37,68 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             header('Location: index.php');
             exit();
         } else {
-            $error = 'Invalid username or password';
+            $errorKey = 'login.error.manager_invalid';
+            $errorTarget = 'manager';
         }
-    } else {
-        $name = $_POST['name'] ?? '';
-        $identity = $_POST['identity_number'] ?? '';
-        $stmt = $pdo->prepare('SELECT * FROM members WHERE name=? AND identity_number=?');
-        $stmt->execute([$name, $identity]);
-        $member = $stmt->fetch();
-        if($member){
-            $_SESSION['member_id'] = $member['id'];
-            $_SESSION['username'] = $member['name'];
-            $_SESSION['role'] = 'member';
-            header('Location: index.php');
-            exit();
+    } elseif($type === 'member'){
+        $activePanel = 'member';
+        $name = trim($_POST['name'] ?? '');
+        $memberMode = (($_POST['member_login_mode'] ?? '') === 'password') ? 'password' : 'identity';
+        if($name === ''){
+            $errorKey = 'login.error.member_name_required';
+            $errorTarget = 'member';
         } else {
-            $error = 'Invalid name or identity number';
+            $stmt = $pdo->prepare('SELECT * FROM members WHERE name = ?');
+            $stmt->execute([$name]);
+            $member = $stmt->fetch();
+            if(!$member){
+                $errorKey = 'login.error.member_not_found';
+                $errorTarget = 'member';
+            } elseif(($member['login_method'] ?? 'identity') !== $memberMode){
+                $errorKey = 'login.error.member_mode_mismatch';
+                $errorTarget = 'member';
+            } elseif($memberMode === 'identity'){
+                $identity = trim($_POST['identity_number'] ?? '');
+                if($identity === ''){
+                    $errorKey = 'login.error.member_identity_required';
+                    $errorTarget = 'member';
+                } elseif($member['identity_number'] !== null && hash_equals((string)$member['identity_number'], $identity)){
+                    $_SESSION['member_id'] = $member['id'];
+                    $_SESSION['username'] = $member['name'];
+                    $_SESSION['role'] = 'member';
+                    header('Location: index.php');
+                    exit();
+                } else {
+                    $errorKey = 'login.error.member_identity_invalid';
+                    $errorTarget = 'member';
+                }
+            } else {
+                $password = $_POST['member_password'] ?? '';
+                if($password === ''){
+                    $errorKey = 'login.error.member_password_required';
+                    $errorTarget = 'member';
+                } elseif(!empty($member['password_hash']) && password_verify($password, $member['password_hash'])){
+                    $_SESSION['member_id'] = $member['id'];
+                    $_SESSION['username'] = $member['name'];
+                    $_SESSION['role'] = 'member';
+                    header('Location: index.php');
+                    exit();
+                } else {
+                    $errorKey = 'login.error.member_password_invalid';
+                    $errorTarget = 'member';
+                }
+            }
         }
     }
+}
+if($errorTarget === 'manager'){
+    $activePanel = 'manager';
+}
+if($errorTarget !== 'member'){
+    $memberMode = 'identity';
+    $submittedMemberName = '';
+    $submittedIdentity = '';
+    $submittedMemberPassword = '';
 }
 ?>
 <!DOCTYPE html>
@@ -81,26 +142,117 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
   .container {
     max-width: 80%;
   }
+  .login-toggle-wrapper {
+    display: flex;
+    justify-content: center;
+  }
+  .login-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(6px);
+  }
+  body.theme-dark .login-toggle-group {
+    background: rgba(15, 23, 42, 0.45);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.4);
+  }
+  .login-toggle-group .btn {
+    border: none;
+    border-radius: 999px !important;
+    font-weight: 600;
+    color: var(--login-text-color);
+    padding: 0.5rem 1.25rem;
+    transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .login-toggle-group .btn-check:checked + .btn,
+  .login-toggle-group .btn:hover,
+  .login-toggle-group .btn:focus {
+    background-color: rgba(15, 23, 42, 0.15);
+    color: var(--login-text-color);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+  }
+  body.theme-dark .login-toggle-group .btn-check:checked + .btn,
+  body.theme-dark .login-toggle-group .btn:hover,
+  body.theme-dark .login-toggle-group .btn:focus {
+    background-color: rgba(148, 163, 184, 0.25);
+    color: #f8fafc;
+  }
   .card {
+    border: none;
+  }
+  .login-card {
+    position: relative;
     background-color: var(--login-card-bg);
+    border-radius: 1.25rem;
     border: 1px solid var(--login-card-border);
-    box-shadow: 0 0 25px rgba(15, 23, 42, 0.1);
-    transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+    box-shadow: 0 25px 45px rgba(15, 23, 42, 0.12);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.4s ease, border-color 0.4s ease;
   }
-  .card-header {
-    background: transparent;
-    color: var(--login-text-color);
-    border-bottom: 1px solid var(--login-card-border);
+  .login-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 30px 60px rgba(15, 23, 42, 0.18);
   }
-  .form-label,
-  .form-check-label {
+  .login-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    opacity: 0.6;
+  }
+  .login-card-manager::before {
+    background: linear-gradient(135deg, rgba(17, 94, 89, 0.9), rgba(12, 74, 110, 0.85));
+  }
+  .login-card-member::before {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(14, 116, 144, 0.85));
+  }
+  .login-card .card-body {
+    position: relative;
+    z-index: 1;
+  }
+  .login-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.9rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.25);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  }
+  .login-card-manager .login-card-badge { background: rgba(15, 118, 110, 0.6); }
+  .login-card-member .login-card-badge { background: rgba(59, 130, 246, 0.6); }
+  .login-card-description {
+    margin-top: 1.25rem;
+    font-size: 1.05rem;
+    color: rgba(255, 255, 255, 0.92);
+  }
+  .login-card-manager .login-card-description { color: rgba(224, 255, 255, 0.9); }
+  .login-card-member .login-card-description { color: rgba(240, 253, 250, 0.9); }
+  .login-card .form-label,
+  .login-card .form-check-label {
     color: var(--login-text-color);
+    font-weight: 600;
   }
   .form-control {
     background-color: var(--login-input-bg);
     color: var(--login-text-color);
     border-color: var(--login-input-border);
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  }
+  .login-card-manager .form-control,
+  .login-card-member .form-control {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.4);
   }
   .form-control:focus {
     border-color: rgba(255, 221, 87, 0.4);
@@ -133,46 +285,80 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     <button id="langToggle" class="btn btn-outline-secondary btn-sm">English</button>
     <button id="themeToggle" class="btn btn-outline-secondary btn-sm" data-i18n="theme.dark">Dark</button>
   </div>
-  <h2 class="text-center mb-4" data-i18n="header.title">Team Management Platform</h2>
-  <div class="row justify-content-center">
-    <div class="col-md-4">
-      <div class="card">
-        <div class="card-header" id="loginTitle" data-i18n="login.title.member">Login</div>
-        <div class="card-body">
-          <?php if($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
-          <form method="post" id="loginForm">
+  <h2 class="text-center mb-5" data-i18n="header.title">Team Management Platform</h2>
+  <div class="login-toggle-wrapper mb-4">
+    <div class="login-toggle-group" role="group" data-i18n-attr="aria-label:login.switch.label">
+      <input type="radio" class="btn-check" name="login_panel" id="loginPanelMember" value="member" data-login-panel-toggle="member" <?= $activePanel === 'member' ? 'checked' : ''; ?>>
+      <label class="btn" for="loginPanelMember" data-i18n="login.switch.member">Member</label>
+      <input type="radio" class="btn-check" name="login_panel" id="loginPanelManager" value="manager" data-login-panel-toggle="manager" <?= $activePanel === 'manager' ? 'checked' : ''; ?>>
+      <label class="btn" for="loginPanelManager" data-i18n="login.switch.manager">Administrator</label>
+    </div>
+  </div>
+  <div class="row g-4 justify-content-center align-items-stretch" data-login-panel-container data-active-panel="<?= htmlspecialchars($activePanel, ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="col-xl-4 col-lg-5 col-md-6 login-panel <?= $activePanel === 'manager' ? '' : 'd-none'; ?>" data-login-panel="manager">
+      <div class="card login-card login-card-manager h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="login-card-badge" data-i18n="login.section.manager.title">Administrator Access</div>
+          <p class="login-card-description" data-i18n="login.section.manager.description">Sign in to manage teams, projects and members.</p>
+          <?php if($errorKey && $errorTarget === 'manager'): ?>
+          <div class="alert alert-danger" data-i18n="<?= $errorKey; ?>"><?php echo htmlspecialchars($errorFallbacks[$errorKey] ?? ''); ?></div>
+          <?php endif; ?>
+          <form method="post" class="mt-4 mt-auto">
+            <input type="hidden" name="login_type" value="manager">
             <div class="mb-3">
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="login_type" id="loginManager" value="manager">
-                <label class="form-check-label" for="loginManager" data-i18n="login.radio.manager">Manager</label>
-              </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="login_type" id="loginMember" value="member" checked>
-                <label class="form-check-label" for="loginMember" data-i18n="login.radio.member">Member</label>
-              </div>
+              <label class="form-label" data-i18n="login.username">Username</label>
+              <input type="text" name="username" class="form-control" required data-i18n-placeholder="login.placeholder.username" placeholder="Username">
             </div>
-            <div id="identityWarning" class="alert alert-warning" data-i18n="login.warning.member"></div>
-            <div id="managerFields" style="display:none">
-              <div class="mb-3">
-                <label class="form-label" data-i18n="login.username">Username</label>
-                <input type="text" name="username" class="form-control">
-              </div>
-              <div class="mb-3">
-                <label class="form-label" data-i18n="login.password">Password</label>
-                <input type="password" name="password" class="form-control">
-              </div>
+            <div class="mb-3">
+              <label class="form-label" data-i18n="login.password">Password</label>
+              <input type="password" name="password" class="form-control" required data-i18n-placeholder="login.placeholder.password" placeholder="Password">
             </div>
-            <div id="memberFields">
-              <div class="mb-3">
-                <label class="form-label" data-i18n="login.name">Name</label>
-                <input type="text" name="name" class="form-control">
+            <div class="d-grid">
+              <button type="submit" class="btn btn-dark" data-i18n="login.button.manager">Manager Login</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-4 col-lg-5 col-md-6 login-panel <?= $activePanel === 'member' ? '' : 'd-none'; ?>" data-login-panel="member">
+      <div class="card login-card login-card-member h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="login-card-badge" data-i18n="login.section.member.title">Member Access</div>
+          <p class="login-card-description" data-i18n="login.section.member.description">Use the login method that you configured on the dashboard.</p>
+          <?php if($errorKey && $errorTarget === 'member'): ?>
+          <div class="alert alert-danger" data-i18n="<?= $errorKey; ?>"><?php echo htmlspecialchars($errorFallbacks[$errorKey] ?? ''); ?></div>
+          <?php endif; ?>
+          <form method="post" id="memberLoginForm" class="mt-3">
+            <input type="hidden" name="login_type" value="member">
+            <div class="mb-3">
+              <label class="form-label" data-i18n="login.name">Name</label>
+              <input type="text" name="name" class="form-control" value="<?= htmlspecialchars($submittedMemberName); ?>" required data-i18n-placeholder="login.placeholder.name" placeholder="Name">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" data-i18n="login.member.mode.title">Login Method</label>
+              <div class="btn-group w-100" role="group" aria-label="Member login method">
+                <input type="radio" class="btn-check" name="member_login_mode" id="memberLoginModeIdentity" value="identity" <?= $memberMode === 'identity' ? 'checked' : ''; ?>>
+                <label class="btn btn-outline-primary" for="memberLoginModeIdentity" data-i18n="login.member.mode.identity">Identity Number</label>
+                <input type="radio" class="btn-check" name="member_login_mode" id="memberLoginModePassword" value="password" <?= $memberMode === 'password' ? 'checked' : ''; ?>>
+                <label class="btn btn-outline-primary" for="memberLoginModePassword" data-i18n="login.member.mode.password">Password</label>
               </div>
+              <div class="form-text" id="memberModeHint" data-i18n="<?= $memberMode === 'password' ? 'login.member.mode.password_hint' : 'login.member.mode.identity_hint'; ?>"></div>
+            </div>
+            <div id="memberIdentityFields" class="<?= $memberMode === 'identity' ? '' : 'd-none'; ?>">
               <div class="mb-3">
                 <label class="form-label" data-i18n="login.identity">Identity Number</label>
-                <input type="text" name="identity_number" class="form-control">
+                <input type="text" name="identity_number" class="form-control" value="<?= htmlspecialchars($submittedIdentity); ?>" data-i18n-placeholder="login.placeholder.identity" placeholder="Identity Number">
               </div>
             </div>
-            <button type="submit" class="btn btn-primary w-100" data-i18n="login.button">Login</button>
+            <div id="memberPasswordFields" class="<?= $memberMode === 'password' ? '' : 'd-none'; ?>">
+              <div class="mb-3">
+                <label class="form-label" data-i18n="login.password">Password</label>
+                <input type="password" name="member_password" class="form-control" value="<?= htmlspecialchars($submittedMemberPassword); ?>" data-i18n-placeholder="login.placeholder.password" placeholder="Password">
+              </div>
+            </div>
+            <div class="d-grid mt-auto">
+              <button type="submit" class="btn btn-primary" data-i18n="login.button.member">Member Login</button>
+            </div>
           </form>
         </div>
       </div>
@@ -182,26 +368,48 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
 <script src="./style/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
-  const managerFields=document.getElementById('managerFields');
-  const memberFields=document.getElementById('memberFields');
-  const identityWarning=document.getElementById('identityWarning');
-  document.querySelectorAll('input[name="login_type"]').forEach(r=>{
-    r.addEventListener('change',function(){
-      const titleEl = document.getElementById('loginTitle');
-      if(this.value==='manager'){
-        managerFields.style.display='block';
-        memberFields.style.display='none';
-        titleEl.setAttribute('data-i18n','login.title.manager');
-        identityWarning.setAttribute('data-i18n','login.warning.manager');
-      }else{
-        managerFields.style.display='none';
-        memberFields.style.display='block';
-        titleEl.setAttribute('data-i18n','login.title.member');
-        identityWarning.setAttribute('data-i18n','login.warning.member');
-      }
-      applyTranslations();
+  const panelContainer=document.querySelector('[data-login-panel-container]');
+  const panelElements=document.querySelectorAll('[data-login-panel]');
+  const panelToggles=document.querySelectorAll('[data-login-panel-toggle]');
+  const setActivePanel=panel=>{
+    const target=panel==='manager'?'manager':'member';
+    if(panelContainer){
+      panelContainer.setAttribute('data-active-panel', target);
+    }
+    panelElements.forEach(el=>{
+      const name=el.getAttribute('data-login-panel');
+      el.classList.toggle('d-none', name !== target);
     });
+    panelToggles.forEach(input=>{
+      const value=input.getAttribute('data-login-panel-toggle')||input.value;
+      input.checked=value===target;
+    });
+  };
+  panelToggles.forEach(input=>{
+    const value=input.getAttribute('data-login-panel-toggle')||input.value;
+    input.addEventListener('change',()=>setActivePanel(value));
   });
+  setActivePanel(panelContainer ? panelContainer.getAttribute('data-active-panel') : 'member');
+
+  const modeRadios=document.querySelectorAll('input[name="member_login_mode"]');
+  const identityFields=document.getElementById('memberIdentityFields');
+  const passwordFields=document.getElementById('memberPasswordFields');
+  const modeHint=document.getElementById('memberModeHint');
+  const updateMemberModeUI=()=>{
+    const selected=document.querySelector('input[name="member_login_mode"]:checked');
+    const mode=selected ? selected.value : 'identity';
+    if(identityFields){ identityFields.classList.toggle('d-none', mode !== 'identity'); }
+    if(passwordFields){ passwordFields.classList.toggle('d-none', mode !== 'password'); }
+    if(modeHint){
+      const hintKey=mode === 'password' ? 'login.member.mode.password_hint' : 'login.member.mode.identity_hint';
+      modeHint.setAttribute('data-i18n', hintKey);
+    }
+    if(typeof applyTranslations === 'function'){
+      applyTranslations();
+    }
+  };
+  modeRadios.forEach(radio=>radio.addEventListener('change', updateMemberModeUI));
+  updateMemberModeUI();
 });
 </script>
 <script src="team_name.js"></script>

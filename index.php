@@ -1,6 +1,10 @@
 <?php
 include 'header.php';
 $regulations = $pdo->query('SELECT * FROM regulations ORDER BY sort_order')->fetchAll();
+$memberLoginSettingsMessageKey = '';
+$memberLoginSettingsMessageType = 'success';
+$memberLoginFormMethod = 'identity';
+$memberAuthSettings = null;
 foreach($regulations as &$r){
     $stmt = $pdo->prepare('SELECT id, original_filename FROM regulation_files WHERE regulation_id=?');
     $stmt->execute([$r['id']]);
@@ -9,6 +13,40 @@ foreach($regulations as &$r){
 unset($r);
 if($_SESSION['role']==='member'){
     $member_id = $_SESSION['member_id'];
+    if($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_member_login'){
+        $selectedMethod = (($_POST['member_login_method'] ?? '') === 'password') ? 'password' : 'identity';
+        $memberLoginFormMethod = $selectedMethod;
+        if($selectedMethod === 'identity'){
+            $stmt = $pdo->prepare('UPDATE members SET login_method = ?, password_hash = NULL WHERE id = ?');
+            $stmt->execute(['identity', $member_id]);
+            $memberLoginSettingsMessageKey = 'member.login_settings.success_identity';
+            $memberLoginSettingsMessageType = 'success';
+        } elseif($selectedMethod === 'password'){
+            $newPassword = $_POST['new_password'] ?? '';
+            $confirmPassword = $_POST['confirm_password'] ?? '';
+            if($newPassword === '' || $confirmPassword === ''){
+                $memberLoginSettingsMessageKey = 'member.login_settings.error_password_required';
+                $memberLoginSettingsMessageType = 'danger';
+            } elseif($newPassword !== $confirmPassword){
+                $memberLoginSettingsMessageKey = 'member.login_settings.error_password_mismatch';
+                $memberLoginSettingsMessageType = 'danger';
+            } else {
+                $stmt = $pdo->prepare('UPDATE members SET login_method = ?, password_hash = ? WHERE id = ?');
+                $stmt->execute(['password', password_hash($newPassword, PASSWORD_DEFAULT), $member_id]);
+                $memberLoginSettingsMessageKey = 'member.login_settings.success_password';
+                $memberLoginSettingsMessageType = 'success';
+            }
+        } else {
+            $memberLoginSettingsMessageKey = 'member.login_settings.error_invalid_method';
+            $memberLoginSettingsMessageType = 'danger';
+        }
+    }
+    $stmt = $pdo->prepare('SELECT login_method FROM members WHERE id=?');
+    $stmt->execute([$member_id]);
+    $memberAuthSettings = $stmt->fetch();
+    if($memberLoginSettingsMessageType === 'success'){
+        $memberLoginFormMethod = is_array($memberAuthSettings) ? ($memberAuthSettings['login_method'] ?? 'identity') : 'identity';
+    }
     $pdo->prepare('UPDATE notification_targets nt JOIN notifications n ON nt.notification_id=n.id SET nt.status="seen" WHERE nt.member_id=? AND nt.status="sent" AND n.is_revoked=0 AND CURDATE() BETWEEN n.valid_begin_date AND n.valid_end_date')->execute([$member_id]);
     $stmt = $pdo->prepare('SELECT n.id,n.content,n.valid_begin_date,n.valid_end_date,nt.status FROM notifications n JOIN notification_targets nt ON n.id=nt.notification_id WHERE nt.member_id=? AND n.is_revoked=0 AND CURDATE() BETWEEN n.valid_begin_date AND n.valid_end_date ORDER BY CASE nt.status WHEN \'checked\' THEN 1 ELSE 0 END, n.id DESC');
     $stmt->execute([$member_id]);
@@ -18,6 +56,62 @@ if($_SESSION['role']==='member'){
 ?>
 
 <?php if($_SESSION['role']==='member'): ?>
+<div class="alert alert-info d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4" id="memberLoginSettingsSummary">
+  <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+    <span class="fw-semibold" data-i18n="member.login_settings.current_label">Current login method:</span>
+    <?php if($memberAuthSettings): ?>
+    <span class="badge rounded-pill bg-primary" id="memberLoginCurrentBadge" data-i18n="member.login_settings.current.<?= htmlspecialchars($memberAuthSettings['login_method'] ?? 'identity'); ?>">Current method: Identity Number</span>
+    <?php else: ?>
+    <span class="badge rounded-pill bg-primary" id="memberLoginCurrentBadge" data-i18n="member.login_settings.current.identity">Current method: Identity Number</span>
+    <?php endif; ?>
+  </div>
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#memberLoginSettingsModal" data-i18n="member.login_settings.manage_button">Manage Login Method</button>
+</div>
+<?php if($memberLoginSettingsMessageKey): ?>
+<div class="alert alert-<?= htmlspecialchars($memberLoginSettingsMessageType); ?> mb-4" id="memberLoginSettingsFeedback" data-i18n="<?= $memberLoginSettingsMessageKey; ?>"></div>
+<?php endif; ?>
+
+<div class="modal fade" id="memberLoginSettingsModal" tabindex="-1" aria-labelledby="memberLoginSettingsTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="memberLoginSettingsTitle" data-i18n="member.login_settings.title">Login Preferences</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted mb-3" data-i18n="member.login_settings.description">Choose how you would like to sign in as a member.</p>
+        <form method="post" id="memberLoginSettingsForm" class="row g-3">
+          <input type="hidden" name="action" value="update_member_login">
+          <div class="col-12">
+            <label class="form-label fw-semibold" data-i18n="member.login_settings.method_label">Preferred login method</label>
+            <div class="btn-group" role="group" aria-label="Member login preference">
+              <input type="radio" class="btn-check" name="member_login_method" id="memberSettingLoginIdentity" value="identity" <?= $memberLoginFormMethod === 'password' ? '' : 'checked'; ?>>
+              <label class="btn btn-outline-primary" for="memberSettingLoginIdentity" data-i18n="member.login_settings.method.identity">Identity Number</label>
+              <input type="radio" class="btn-check" name="member_login_method" id="memberSettingLoginPassword" value="password" <?= $memberLoginFormMethod === 'password' ? 'checked' : ''; ?>>
+              <label class="btn btn-outline-primary" for="memberSettingLoginPassword" data-i18n="member.login_settings.method.password">Password</label>
+            </div>
+            <div class="form-text" id="memberLoginPreferenceHint" data-i18n="<?= $memberLoginFormMethod === 'password' ? 'member.login_settings.method.password_hint' : 'member.login_settings.method.identity_hint'; ?>"></div>
+          </div>
+          <div id="memberPasswordPreferenceFields" class="col-12 <?= $memberLoginFormMethod === 'password' ? '' : 'd-none'; ?>">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="member.login_settings.password.label">New Password</label>
+                <input type="password" name="new_password" class="form-control" data-i18n-placeholder="member.login_settings.password.placeholder" placeholder="Enter new password">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" data-i18n="member.login_settings.password.confirm">Confirm Password</label>
+                <input type="password" name="confirm_password" class="form-control" data-i18n-placeholder="member.login_settings.password.confirm_placeholder" placeholder="Confirm password">
+              </div>
+            </div>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary" data-i18n="member.login_settings.submit">Save Preference</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 <style>
   .notification-item.pending {
     border-left: 4px solid var(--app-highlight-border);
@@ -100,6 +194,50 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 <?php endif; ?>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const preferenceRadios=document.querySelectorAll('input[name="member_login_method"]');
+  const passwordFields=document.getElementById('memberPasswordPreferenceFields');
+  const hint=document.getElementById('memberLoginPreferenceHint');
+  const modalEl=document.getElementById('memberLoginSettingsModal');
+  const updatePreferenceUI=()=>{
+    const selected=document.querySelector('input[name="member_login_method"]:checked');
+    const method=selected ? selected.value : 'identity';
+    if(passwordFields){
+      const isPassword=method==='password';
+      passwordFields.classList.toggle('d-none', !isPassword);
+      passwordFields.querySelectorAll('input').forEach(input=>{
+        input.disabled=!isPassword;
+        if(!isPassword){ input.value=''; }
+      });
+    }
+    if(hint){
+      const hintKey=method==='password' ? 'member.login_settings.method.password_hint' : 'member.login_settings.method.identity_hint';
+      hint.setAttribute('data-i18n', hintKey);
+    }
+    if(typeof applyTranslations === 'function'){
+      applyTranslations();
+    }
+  };
+  preferenceRadios.forEach(radio=>radio.addEventListener('change', updatePreferenceUI));
+  updatePreferenceUI();
+
+  const settingsState=<?php echo json_encode([
+    'hasMessage'=>(bool)$memberLoginSettingsMessageKey,
+    'messageType'=>$memberLoginSettingsMessageType,
+    'formMethod'=>$memberLoginFormMethod
+  ]); ?>;
+  if(settingsState.hasMessage && settingsState.messageType==='danger' && modalEl){
+    const modalInstance=bootstrap.Modal.getOrCreateInstance(modalEl,{backdrop:'static'});
+    modalInstance.show();
+  }
+  if(passwordFields){
+    const inputs=passwordFields.querySelectorAll('input');
+    const isPassword=<?php echo json_encode($memberLoginFormMethod === 'password'); ?>;
+    inputs.forEach(input=>{ input.disabled=!isPassword; });
+  }
+});
+</script>
 <?php endif; ?>
 
 
