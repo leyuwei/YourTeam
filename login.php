@@ -6,6 +6,7 @@ if(isset($_SESSION['role'])){
 }
 $errorKey = '';
 $errorTarget = '';
+$activePanel = 'member';
 $errorFallbacks = [
     'login.error.manager_invalid' => 'Invalid username or password.',
     'login.error.member_name_required' => 'Please enter your name.',
@@ -23,6 +24,7 @@ $submittedMemberPassword = $_POST['member_password'] ?? '';
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $type = $_POST['login_type'] ?? '';
     if($type === 'manager'){
+        $activePanel = 'manager';
         $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
         $stmt = $pdo->prepare('SELECT * FROM managers WHERE username = ?');
@@ -39,6 +41,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
             $errorTarget = 'manager';
         }
     } elseif($type === 'member'){
+        $activePanel = 'member';
         $name = trim($_POST['name'] ?? '');
         $memberMode = (($_POST['member_login_mode'] ?? '') === 'password') ? 'password' : 'identity';
         if($name === ''){
@@ -88,6 +91,9 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
         }
     }
 }
+if($errorTarget === 'manager'){
+    $activePanel = 'manager';
+}
 if($errorTarget !== 'member'){
     $memberMode = 'identity';
     $submittedMemberName = '';
@@ -135,6 +141,45 @@ if($errorTarget !== 'member'){
   }
   .container {
     max-width: 80%;
+  }
+  .login-toggle-wrapper {
+    display: flex;
+    justify-content: center;
+  }
+  .login-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(6px);
+  }
+  body.theme-dark .login-toggle-group {
+    background: rgba(15, 23, 42, 0.45);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.4);
+  }
+  .login-toggle-group .btn {
+    border: none;
+    border-radius: 999px !important;
+    font-weight: 600;
+    color: var(--login-text-color);
+    padding: 0.5rem 1.25rem;
+    transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .login-toggle-group .btn-check:checked + .btn,
+  .login-toggle-group .btn:hover,
+  .login-toggle-group .btn:focus {
+    background-color: rgba(15, 23, 42, 0.15);
+    color: var(--login-text-color);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+  }
+  body.theme-dark .login-toggle-group .btn-check:checked + .btn,
+  body.theme-dark .login-toggle-group .btn:hover,
+  body.theme-dark .login-toggle-group .btn:focus {
+    background-color: rgba(148, 163, 184, 0.25);
+    color: #f8fafc;
   }
   .card {
     border: none;
@@ -241,8 +286,16 @@ if($errorTarget !== 'member'){
     <button id="themeToggle" class="btn btn-outline-secondary btn-sm" data-i18n="theme.dark">Dark</button>
   </div>
   <h2 class="text-center mb-5" data-i18n="header.title">Team Management Platform</h2>
-  <div class="row g-4 justify-content-center align-items-stretch">
-    <div class="col-xl-4 col-lg-5 col-md-6">
+  <div class="login-toggle-wrapper mb-4">
+    <div class="login-toggle-group" role="group" data-i18n-attr="aria-label:login.switch.label">
+      <input type="radio" class="btn-check" name="login_panel" id="loginPanelMember" value="member" data-login-panel-toggle="member" <?= $activePanel === 'member' ? 'checked' : ''; ?>>
+      <label class="btn" for="loginPanelMember" data-i18n="login.switch.member">Member</label>
+      <input type="radio" class="btn-check" name="login_panel" id="loginPanelManager" value="manager" data-login-panel-toggle="manager" <?= $activePanel === 'manager' ? 'checked' : ''; ?>>
+      <label class="btn" for="loginPanelManager" data-i18n="login.switch.manager">Administrator</label>
+    </div>
+  </div>
+  <div class="row g-4 justify-content-center align-items-stretch" data-login-panel-container data-active-panel="<?= htmlspecialchars($activePanel, ENT_QUOTES, 'UTF-8'); ?>">
+    <div class="col-xl-4 col-lg-5 col-md-6 login-panel <?= $activePanel === 'manager' ? '' : 'd-none'; ?>" data-login-panel="manager">
       <div class="card login-card login-card-manager h-100">
         <div class="card-body d-flex flex-column">
           <div class="login-card-badge" data-i18n="login.section.manager.title">Administrator Access</div>
@@ -263,11 +316,11 @@ if($errorTarget !== 'member'){
             <div class="d-grid">
               <button type="submit" class="btn btn-dark" data-i18n="login.button.manager">Manager Login</button>
             </div>
-        </form>
+          </form>
         </div>
       </div>
     </div>
-    <div class="col-xl-4 col-lg-5 col-md-6">
+    <div class="col-xl-4 col-lg-5 col-md-6 login-panel <?= $activePanel === 'member' ? '' : 'd-none'; ?>" data-login-panel="member">
       <div class="card login-card login-card-member h-100">
         <div class="card-body d-flex flex-column">
           <div class="login-card-badge" data-i18n="login.section.member.title">Member Access</div>
@@ -315,6 +368,29 @@ if($errorTarget !== 'member'){
 <script src="./style/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
+  const panelContainer=document.querySelector('[data-login-panel-container]');
+  const panelElements=document.querySelectorAll('[data-login-panel]');
+  const panelToggles=document.querySelectorAll('[data-login-panel-toggle]');
+  const setActivePanel=panel=>{
+    const target=panel==='manager'?'manager':'member';
+    if(panelContainer){
+      panelContainer.setAttribute('data-active-panel', target);
+    }
+    panelElements.forEach(el=>{
+      const name=el.getAttribute('data-login-panel');
+      el.classList.toggle('d-none', name !== target);
+    });
+    panelToggles.forEach(input=>{
+      const value=input.getAttribute('data-login-panel-toggle')||input.value;
+      input.checked=value===target;
+    });
+  };
+  panelToggles.forEach(input=>{
+    const value=input.getAttribute('data-login-panel-toggle')||input.value;
+    input.addEventListener('change',()=>setActivePanel(value));
+  });
+  setActivePanel(panelContainer ? panelContainer.getAttribute('data-active-panel') : 'member');
+
   const modeRadios=document.querySelectorAll('input[name="member_login_mode"]');
   const identityFields=document.getElementById('memberIdentityFields');
   const passwordFields=document.getElementById('memberPasswordFields');
