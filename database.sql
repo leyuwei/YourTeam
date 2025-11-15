@@ -26,7 +26,9 @@ CREATE TABLE members (
   department VARCHAR(100),
   workplace VARCHAR(100),
   homeplace VARCHAR(100),
-  status ENUM('in_work','exited') DEFAULT 'in_work'
+  status ENUM('in_work','exited') DEFAULT 'in_work',
+  login_method ENUM('identity','password') NOT NULL DEFAULT 'identity',
+  password_hash VARCHAR(255) DEFAULT NULL
 );
 
 CREATE TABLE member_extra_attributes (
