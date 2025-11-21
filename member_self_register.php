@@ -5,6 +5,7 @@ $error = '';
 $msg = '';
 $extraAttributes = getMemberExtraAttributes($pdo);
 $submittedExtraValues = [];
+$extraUploads = $_FILES['extra_attrs'] ?? null;
 if(isset($_POST['action']) && $_POST['action'] === 'register'){
     $campus_id = trim($_POST['campus_id']);
     $name = trim($_POST['name']);
@@ -37,7 +38,8 @@ if(isset($_POST['action']) && $_POST['action'] === 'register'){
         $stmt = $pdo->prepare('INSERT INTO members(campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
         $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,'in_work',$nextOrder]);
         $newMemberId = (int)$pdo->lastInsertId();
-        ensureMemberExtraValues($pdo, $newMemberId, $submittedExtraValues, $extraAttributes);
+        $preparedValues = prepareMemberExtraValues($newMemberId, $extraAttributes, $submittedExtraValues, $extraUploads, []);
+        ensureMemberExtraValues($pdo, $newMemberId, $preparedValues, $extraAttributes);
         $submittedExtraValues = [];
         $msg = '注册成功。';
     } catch (Exception $e) {
@@ -60,7 +62,7 @@ if(isset($_POST['action']) && $_POST['action'] === 'register'){
 <h2>新成员注册</h2>
 <?php if($msg): ?><div class="alert alert-success mt-3"><?= $msg; ?></div><?php endif; ?>
 <?php if($error): ?><div class="alert alert-danger mt-3"><?= $error; ?></div><?php endif; ?>
-<form method="post" class="mt-4">
+<form method="post" class="mt-4" enctype="multipart/form-data">
   <input type="hidden" name="action" value="register">
   <div class="mb-3">
     <label class="form-label">一卡通号（9位）</label>
@@ -120,14 +122,20 @@ if(isset($_POST['action']) && $_POST['action'] === 'register'){
       }
       $nameZh = (string)($attr['name_zh'] ?? '');
       $nameEn = (string)($attr['name_en'] ?? '');
+      $attrType = in_array($attr['attribute_type'] ?? '', ['text','media'], true) ? $attr['attribute_type'] : 'text';
       $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('属性' . $attrId));
       $value = array_key_exists($attrId, $submittedExtraValues)
         ? $submittedExtraValues[$attrId]
-        : (string)($attr['default_value'] ?? '');
+        : ($attrType === 'text' ? (string)($attr['default_value'] ?? '') : '');
     ?>
     <div class="mb-3">
       <label class="form-label" data-extra-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-extra-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($display); ?></label>
+      <?php if ($attrType === 'media'): ?>
+      <input type="file" name="extra_attrs[<?= $attrId; ?>]" class="form-control" accept="image/*,.zip,.rar,.7z,.tar,.gz,.7zip,.7Z">
+      <div class="form-text" data-i18n="members.extra.helper.media_input">可上传图片、压缩包等文件，默认值可留空。</div>
+      <?php else: ?>
       <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($value, ENT_QUOTES); ?>">
+      <?php endif; ?>
     </div>
     <?php endforeach; ?>
   <?php endif; ?>

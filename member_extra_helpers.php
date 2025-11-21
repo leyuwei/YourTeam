@@ -36,6 +36,82 @@ function getMemberExtraValues(PDO $pdo, array $memberIds): array
     return $map;
 }
 
+function normalizeMemberExtraUploads(?array $fileBag): array
+{
+    if (!is_array($fileBag) || !isset($fileBag['name'])) {
+        return [];
+    }
+
+    $normalized = [];
+    foreach ($fileBag['name'] as $key => $name) {
+        $normalized[$key] = [
+            'name' => $name,
+            'type' => $fileBag['type'][$key] ?? '',
+            'tmp_name' => $fileBag['tmp_name'][$key] ?? '',
+            'error' => $fileBag['error'][$key] ?? UPLOAD_ERR_NO_FILE,
+            'size' => $fileBag['size'][$key] ?? 0,
+        ];
+    }
+
+    return $normalized;
+}
+
+function prepareMemberExtraValues(int $memberId, array $attributes, array $postedValues, ?array $uploadedValues, array $existingValues = []): array
+{
+    $memberId = (int)$memberId;
+    $normalizedUploads = normalizeMemberExtraUploads($uploadedValues);
+    $result = [];
+
+    foreach ($attributes as $attribute) {
+        $attributeId = (int)($attribute['id'] ?? 0);
+        if ($attributeId <= 0) {
+            continue;
+        }
+
+        $attributeType = in_array($attribute['attribute_type'] ?? '', ['text', 'media'], true)
+            ? $attribute['attribute_type']
+            : 'text';
+        $defaultValue = $attributeType === 'text' ? (string)($attribute['default_value'] ?? '') : '';
+        $currentValue = $existingValues[$attributeId] ?? $defaultValue;
+        $value = $postedValues[$attributeId] ?? $currentValue;
+
+        if ($attributeType === 'media') {
+            $value = $currentValue;
+            $fileInfo = $normalizedUploads[$attributeId] ?? null;
+            if ($memberId > 0 && is_array($fileInfo) && ($fileInfo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                if (($fileInfo['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && is_uploaded_file((string)($fileInfo['tmp_name'] ?? ''))) {
+                    $baseDir = __DIR__ . '/asset_uploads/member_extra/' . $memberId;
+                    if (!is_dir($baseDir)) {
+                        mkdir($baseDir, 0777, true);
+                    }
+                    $ext = strtolower(pathinfo((string)($fileInfo['name'] ?? ''), PATHINFO_EXTENSION));
+                    $safeExt = $ext !== '' ? preg_replace('/[^a-z0-9._-]/i', '', $ext) : '';
+                    $filename = 'attr_' . $attributeId . '_' . uniqid();
+                    if ($safeExt !== '') {
+                        $filename .= '.' . $safeExt;
+                    }
+                    $targetPath = $baseDir . '/' . $filename;
+                    if (move_uploaded_file((string)$fileInfo['tmp_name'], $targetPath)) {
+                        if (!empty($currentValue)) {
+                            $oldPath = __DIR__ . '/' . ltrim((string)$currentValue, '/');
+                            if (is_file($oldPath)) {
+                                @unlink($oldPath);
+                            }
+                        }
+                        $value = 'asset_uploads/member_extra/' . $memberId . '/' . $filename;
+                    }
+                }
+            }
+        } elseif (is_array($value)) {
+            $value = '';
+        }
+
+        $result[$attributeId] = (string)$value;
+    }
+
+    return $result;
+}
+
 function ensureMemberExtraValues(PDO $pdo, int $memberId, array $submittedValues, array $attributes): void
 {
     $memberId = (int)$memberId;

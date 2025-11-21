@@ -47,10 +47,12 @@ if($member_id){
         $department = $_POST['department'];
         $workplace = $_POST['workplace'];
         $homeplace = $_POST['homeplace'];
+        $extraUploads = $_FILES['extra_attrs'] ?? null;
         $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=? WHERE id=?');
         $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$member_id]);
         $extraSubmitted = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
-        ensureMemberExtraValues($pdo, $member_id, $extraSubmitted, $extraAttributes);
+        $preparedValues = prepareMemberExtraValues((int)$member_id, $extraAttributes, $extraSubmitted, $extraUploads, $memberExtraValues);
+        ensureMemberExtraValues($pdo, $member_id, $preparedValues, $extraAttributes);
         $msg = 'Information updated successfully.';
         $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
         $stmt->execute([$member_id]);
@@ -96,7 +98,7 @@ if($member_id){
 </form>
 <?php else: ?>
 <?php if($msg): ?><div class="alert alert-success mt-3"><?= $msg; ?></div><?php endif; ?>
-<form method="post" class="mt-4">
+<form method="post" class="mt-4" enctype="multipart/form-data">
   <input type="hidden" name="action" value="update">
   <div class="mb-3">
     <label class="form-label">一卡通号（9位）</label>
@@ -153,12 +155,25 @@ if($member_id){
       $attrId = (int)($attr['id'] ?? 0);
       $nameZh = (string)($attr['name_zh'] ?? '');
       $nameEn = (string)($attr['name_en'] ?? '');
+      $attrType = in_array($attr['attribute_type'] ?? '', ['text','media'], true) ? $attr['attribute_type'] : 'text';
       $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('属性' . $attrId));
-      $value = $memberExtraValues[$attrId] ?? ($attr['default_value'] ?? '');
+      $value = $memberExtraValues[$attrId] ?? ($attrType === 'text' ? ($attr['default_value'] ?? '') : '');
     ?>
     <div class="mb-3">
       <label class="form-label"><?= htmlspecialchars($display); ?></label>
+      <?php if ($attrType === 'media'): ?>
+      <input type="file" name="extra_attrs[<?= $attrId; ?>]" class="form-control" accept="image/*,.zip,.rar,.7z,.tar,.gz,.7zip,.7Z">
+      <div class="form-text" data-i18n="members.extra.helper.media_input">可上传图片、压缩包等文件，默认值可留空。</div>
+      <?php if(!empty($value)): ?>
+      <div class="small mt-1" data-i18n="members.extra.current_file">
+        当前文件：<a href="<?= htmlspecialchars((string)$value, ENT_QUOTES); ?>" target="_blank" rel="noopener"><?= htmlspecialchars((string)$value, ENT_QUOTES); ?></a>
+      </div>
+      <?php else: ?>
+      <div class="small text-muted" data-i18n="members.extra.no_file">暂无上传的文件</div>
+      <?php endif; ?>
+      <?php else: ?>
       <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars((string)$value, ENT_QUOTES); ?>">
+      <?php endif; ?>
     </div>
     <?php endforeach; ?>
   <?php endif; ?>

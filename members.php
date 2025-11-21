@@ -28,7 +28,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
     $status = ($_POST['status'] ?? 'in_work') === 'exited' ? 'exited' : 'in_work';
 
     $extraAttributes = getMemberExtraAttributes($pdo);
+    $extraUploads = $_FILES['extra_attrs'] ?? null;
     $extraValues = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
+    $existingExtraValues = [];
+    if ($memberId) {
+        $existingExtraValues = getMemberExtraValues($pdo, [$memberId]);
+        $existingExtraValues = $existingExtraValues[$memberId] ?? [];
+    }
 
     if ($isManager) {
         if ($memberId) {
@@ -70,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
                 $nextOrder
             ]);
             $memberId = (int)$pdo->lastInsertId();
+            $existingExtraValues = [];
         }
     } elseif ($role === 'member' && $memberId && $memberId === $sessionMemberId) {
         $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=? WHERE id=?');
@@ -88,12 +95,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
             $homeplace,
             $memberId
         ]);
+        $existingExtraValues = getMemberExtraValues($pdo, [$memberId]);
+        $existingExtraValues = $existingExtraValues[$memberId] ?? [];
     } else {
         header('Location: members.php');
         exit();
     }
 
-    ensureMemberExtraValues($pdo, (int)$memberId, $extraValues, $extraAttributes);
+    $preparedValues = prepareMemberExtraValues((int)$memberId, $extraAttributes, $extraValues, $extraUploads, $existingExtraValues);
+    ensureMemberExtraValues($pdo, (int)$memberId, $preparedValues, $extraAttributes);
 
     header('Location: members.php');
     exit();
@@ -390,7 +400,7 @@ include 'header.php';
   <div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
-        <form id="memberForm" method="post">
+        <form id="memberForm" method="post" enctype="multipart/form-data">
           <input type="hidden" name="member_action" value="save">
           <input type="hidden" name="member_id" value="">
           <div class="modal-header">
@@ -460,9 +470,15 @@ include 'header.php';
                 $defaultValue = $attrType === 'text' ? (string)($attr['default_value'] ?? '') : '';
                 $displayName = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('Attr ' . $attrId));
               ?>
-              <div class="col-md-6">
+              <div class="col-md-6" data-extra-wrapper>
                 <label class="form-label" data-extra-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-extra-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($displayName); ?></label>
+                <?php if ($attrType === 'media'): ?>
+                <input type="file" name="extra_attrs[<?= $attrId; ?>]" class="form-control" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" accept="image/*,.zip,.rar,.7z,.tar,.gz,.7zip,.7Z">
+                <div class="form-text" data-i18n="members.extra.helper.media_input">可上传图片、压缩包等文件。</div>
+                <div class="small text-muted d-none" data-extra-current-file data-i18n="members.extra.no_file"></div>
+                <?php else: ?>
                 <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                <?php endif; ?>
               </div>
               <?php endforeach; ?>
               <?php endif; ?>
@@ -573,9 +589,35 @@ include 'header.php';
       const memberModal = new bootstrap.Modal(memberModalElement);
       const fieldNames = ['campus_id','name','email','identity_number','year_of_join','current_degree','degree_pursuing','phone','wechat','department','workplace','homeplace'];
       const extraInputs = Array.from(memberForm.querySelectorAll('[data-extra-field]'));
-      function translate(key){
+      function translateWithFallback(key, fallback){
         const lang = document.documentElement.lang || 'zh';
-        return (translations?.[lang] && translations[lang][key]) || key;
+        return (translations?.[lang] && translations[lang][key]) || fallback;
+      }
+      function translate(key){
+        return translateWithFallback(key, key);
+      }
+      function updateMediaInfo(input, value, isSelection){
+        const wrapper = input.closest('[data-extra-wrapper]');
+        const info = wrapper ? wrapper.querySelector('[data-extra-current-file]') : null;
+        if(!info){
+          return;
+        }
+        const currentLabel = translateWithFallback('members.extra.current_file', '当前文件');
+        const noneLabel = translateWithFallback('members.extra.no_file', '暂无上传的文件');
+        const selectedLabel = translateWithFallback('members.extra.selected_file', '已选择文件');
+        if(value){
+          const label = isSelection ? selectedLabel : currentLabel;
+          const safeValue = String(value);
+          if(isSelection){
+            info.textContent = `${label}: ${safeValue}`;
+          } else {
+            const link = encodeURI(safeValue);
+            info.innerHTML = `${label}: <a href="${link}" target="_blank" rel="noopener">${safeValue}</a>`;
+          }
+        } else {
+          info.textContent = noneLabel;
+        }
+        info.classList.remove('d-none');
       }
       function setModalTitle(key){
         if(!modalTitle){
@@ -586,8 +628,14 @@ include 'header.php';
       }
       function resetExtraFields(){
         extraInputs.forEach(function(input){
-          const defaultValue = input.dataset.defaultValue ?? '';
-          input.value = defaultValue;
+          const attrType = input.dataset.attributeType || 'text';
+          if(attrType === 'media'){
+            input.value = '';
+            updateMediaInfo(input, '', false);
+          } else {
+            const defaultValue = input.dataset.defaultValue ?? '';
+            input.value = defaultValue;
+          }
         });
       }
       function resetForm(){
@@ -627,10 +675,17 @@ include 'header.php';
           }
           extraInputs.forEach(function(input){
             const attrId = input.dataset.attributeId;
+            const attrType = input.dataset.attributeType || 'text';
+            const defaultValue = attrType === 'text' ? (input.dataset.defaultValue ?? '') : '';
+            let value = defaultValue;
             if (attrId && Object.prototype.hasOwnProperty.call(extraData, attrId)) {
-              input.value = extraData[attrId] ?? '';
+              value = extraData[attrId] ?? defaultValue;
+            }
+            if(attrType === 'media'){
+              input.value = '';
+              updateMediaInfo(input, value, false);
             } else {
-              input.value = input.dataset.defaultValue ?? '';
+              input.value = value;
             }
           });
           if(memberForm.elements['status']){
@@ -639,6 +694,16 @@ include 'header.php';
           setModalTitle(data.id ? 'member_edit.title_edit' : 'member_edit.title_add');
           memberModal.show();
         });
+      });
+      memberForm.addEventListener('change', function(event){
+        const target = event.target;
+        if(!(target instanceof HTMLInputElement)){
+          return;
+        }
+        if(target.dataset.attributeType === 'media'){
+          const name = target.files && target.files.length ? target.files[0].name : '';
+          updateMediaInfo(target, name, true);
+        }
       });
     }
     <?php if($isManager): ?>
