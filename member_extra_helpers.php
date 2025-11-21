@@ -4,13 +4,14 @@
  */
 function getMemberExtraAttributes(PDO $pdo): array
 {
-    $stmt = $pdo->query('SELECT id, sort_order, name_en, name_zh, default_value FROM member_extra_attributes ORDER BY sort_order, id');
+    $stmt = $pdo->query('SELECT id, sort_order, name_en, name_zh, attribute_type, default_value FROM member_extra_attributes ORDER BY sort_order, id');
     $attributes = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     foreach ($attributes as &$attr) {
         $attr['id'] = (int)($attr['id'] ?? 0);
         $attr['sort_order'] = (int)($attr['sort_order'] ?? 0);
         $attr['name_en'] = (string)($attr['name_en'] ?? '');
         $attr['name_zh'] = (string)($attr['name_zh'] ?? '');
+        $attr['attribute_type'] = in_array($attr['attribute_type'] ?? '', ['text', 'media'], true) ? $attr['attribute_type'] : 'text';
         $attr['default_value'] = (string)($attr['default_value'] ?? '');
     }
     unset($attr);
@@ -47,7 +48,8 @@ function ensureMemberExtraValues(PDO $pdo, int $memberId, array $submittedValues
         if ($attributeId <= 0) {
             continue;
         }
-        $defaultValue = (string)($attribute['default_value'] ?? '');
+        $attributeType = in_array($attribute['attribute_type'] ?? '', ['text', 'media'], true) ? $attribute['attribute_type'] : 'text';
+        $defaultValue = $attributeType === 'text' ? (string)($attribute['default_value'] ?? '') : '';
         $value = $submittedValues[$attributeId] ?? $defaultValue;
         if (is_array($value)) {
             $value = '';

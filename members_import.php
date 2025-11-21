@@ -345,9 +345,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 foreach ($extraAttributes as $attr) {
                                     $attrId = (int)$attr['id'];
                                     if ($attrId <= 0) continue;
+                                    $attrType = in_array($attr['attribute_type'] ?? '', ['text', 'media'], true) ? $attr['attribute_type'] : 'text';
+                                    $fallback = $attrType === 'text' ? (string)($attr['default_value'] ?? '') : '';
                                     $value = array_key_exists($attrId, $extraValues)
                                         ? (string)$extraValues[$attrId]
-                                        : (string)($attr['default_value'] ?? '');
+                                        : $fallback;
                                     $extraUpsertStmt->execute([$memberId, $attrId, $value]);
                                 }
                             } else {

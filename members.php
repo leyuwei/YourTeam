@@ -347,7 +347,9 @@ include 'header.php';
       $rowExtraValues = [];
       foreach ($extraAttributes as $attr) {
         $attrId = (int)($attr['id'] ?? 0);
-        $rowExtraValues[$attrId] = (string)($memberExtraValues[$memberId][$attrId] ?? ($attr['default_value'] ?? ''));
+        $attrType = $attr['attribute_type'] ?? 'text';
+        $fallback = $attrType === 'text' ? (string)($attr['default_value'] ?? '') : '';
+        $rowExtraValues[$attrId] = (string)($memberExtraValues[$memberId][$attrId] ?? $fallback);
       }
       $rowExtraJson = htmlspecialchars(json_encode($rowExtraValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
     ?>
@@ -454,12 +456,13 @@ include 'header.php';
                 $attrId = (int)($attr['id'] ?? 0);
                 $nameZh = (string)($attr['name_zh'] ?? '');
                 $nameEn = (string)($attr['name_en'] ?? '');
-                $defaultValue = (string)($attr['default_value'] ?? '');
+                $attrType = (string)($attr['attribute_type'] ?? 'text');
+                $defaultValue = $attrType === 'text' ? (string)($attr['default_value'] ?? '') : '';
                 $displayName = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('Attr ' . $attrId));
               ?>
               <div class="col-md-6">
                 <label class="form-label" data-extra-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-extra-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($displayName); ?></label>
-                <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>">
+                <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
               </div>
               <?php endforeach; ?>
               <?php endif; ?>
@@ -650,6 +653,7 @@ include 'header.php';
         id: attr.id ?? null,
         name_zh: attr.name_zh ?? '',
         name_en: attr.name_en ?? '',
+        attribute_type: attr.attribute_type ?? 'text',
         default_value: attr.default_value ?? ''
       })) : [];
       let workingAttributes = cloneAttributes(window.memberExtraAttributes || []);
@@ -693,18 +697,26 @@ include 'header.php';
           const wrapper=document.createElement('div');
           wrapper.className='border rounded p-3 mb-3';
           wrapper.dataset.index=String(index);
+          const isMedia = String(attr.attribute_type ?? 'text') === 'media';
           wrapper.innerHTML=`<div class="row g-3 align-items-end">
-  <div class="col-md-4">
+  <div class="col-md-3">
     <label class="form-label" data-i18n="members.extra.field.name_zh">中文名称</label>
     <input type="text" class="form-control" data-field="name_zh" value="${escapeHtml(attr.name_zh)}">
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
     <label class="form-label" data-i18n="members.extra.field.name_en">英文名称</label>
     <input type="text" class="form-control" data-field="name_en" value="${escapeHtml(attr.name_en)}">
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
+    <label class="form-label" data-i18n="members.extra.field.type">属性类型</label>
+    <select class="form-select" data-field="attribute_type">
+      <option value="text" ${isMedia ? '' : 'selected'} data-i18n="members.extra.type.text">文本</option>
+      <option value="media" ${isMedia ? 'selected' : ''} data-i18n="members.extra.type.media">多媒体</option>
+    </select>
+  </div>
+  <div data-default-wrapper class="col-md-3${isMedia ? ' d-none' : ''}">
     <label class="form-label" data-i18n="members.extra.field.default_value">默认值</label>
-    <input type="text" class="form-control" data-field="default_value" value="${escapeHtml(attr.default_value)}">
+    <input type="text" class="form-control" data-field="default_value" value="${escapeHtml(isMedia ? '' : attr.default_value)}">
   </div>
   <div class="col-12 d-flex justify-content-end mt-2">
     <button type="button" class="btn btn-sm btn-outline-danger extra-attr-delete" data-index="${index}" data-i18n="members.extra.delete">删除</button>
@@ -722,7 +734,7 @@ include 'header.php';
         extraModal.show();
       });
       addExtraAttributeBtn?.addEventListener('click', function(){
-        workingAttributes.push({id:null,name_zh:'',name_en:'',default_value:''});
+        workingAttributes.push({id:null,name_zh:'',name_en:'',attribute_type:'text',default_value:''});
         renderExtraAttributes();
       });
       extraAttributesList?.addEventListener('input', function(event){
@@ -744,6 +756,40 @@ include 'header.php';
         }
         workingAttributes[index][field] = target.value;
       });
+      extraAttributesList?.addEventListener('change', function(event){
+        const target = event.target;
+        if(!(target instanceof HTMLSelectElement)){
+          return;
+        }
+        const row = target.closest('[data-index]');
+        if(!row){
+          return;
+        }
+        const index = Number(row.dataset.index);
+        if(Number.isNaN(index) || !workingAttributes[index]){
+          return;
+        }
+        const field = target.getAttribute('data-field');
+        if(!field){
+          return;
+        }
+        workingAttributes[index][field] = target.value;
+        if(field === 'attribute_type'){
+          workingAttributes[index].default_value = target.value === 'media' ? '' : (workingAttributes[index].default_value ?? '');
+          const defaultWrapper = row.querySelector('[data-default-wrapper]');
+          if(defaultWrapper){
+            if(target.value === 'media'){
+              defaultWrapper.classList.add('d-none');
+            } else {
+              defaultWrapper.classList.remove('d-none');
+            }
+          }
+          const defaultInput = row.querySelector('[data-field="default_value"]');
+          if(defaultInput instanceof HTMLInputElement && target.value === 'media'){
+            defaultInput.value = '';
+          }
+        }
+      });
       extraAttributesList?.addEventListener('click', function(event){
         const deleteBtn = event.target.closest('.extra-attr-delete');
         if(!deleteBtn){
@@ -763,6 +809,7 @@ include 'header.php';
             id: attr.id ?? null,
             name_zh: String(attr.name_zh ?? '').trim(),
             name_en: String(attr.name_en ?? '').trim(),
+            attribute_type: attr.attribute_type ?? 'text',
             default_value: String(attr.default_value ?? '')
           };
         });

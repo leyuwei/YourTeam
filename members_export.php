@@ -60,7 +60,9 @@ foreach ($members as &$member) {
     foreach ($extraAttributes as $attr) {
         $attrId = (int)($attr['id'] ?? 0);
         $key = 'extra_' . $attrId;
-        $member[$key] = $extraValuesMap[$memberId][$attrId] ?? (string)($attr['default_value'] ?? '');
+        $attrType = in_array($attr['attribute_type'] ?? '', ['text', 'media'], true) ? $attr['attribute_type'] : 'text';
+        $fallback = $attrType === 'text' ? (string)($attr['default_value'] ?? '') : '';
+        $member[$key] = $extraValuesMap[$memberId][$attrId] ?? $fallback;
     }
 }
 unset($member);
