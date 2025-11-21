@@ -30,6 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
     $extraAttributes = getMemberExtraAttributes($pdo);
     $extraUploads = $_FILES['extra_attrs'] ?? null;
     $extraValues = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
+    $rawExtraClears = isset($_POST['extra_clear']) && is_array($_POST['extra_clear']) ? $_POST['extra_clear'] : [];
+    $extraClearFlags = [];
+    foreach ($rawExtraClears as $clearId => $flag) {
+        if ($flag === '1' || $flag === 1 || $flag === true || $flag === 'true') {
+            $extraClearFlags[(int)$clearId] = true;
+        }
+    }
     $existingExtraValues = [];
     if ($memberId) {
         $existingExtraValues = getMemberExtraValues($pdo, [$memberId]);
@@ -102,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
         exit();
     }
 
-    $preparedValues = prepareMemberExtraValues((int)$memberId, $extraAttributes, $extraValues, $extraUploads, $existingExtraValues);
+    $preparedValues = prepareMemberExtraValues((int)$memberId, $extraAttributes, $extraValues, $extraUploads, $existingExtraValues, $extraClearFlags);
     ensureMemberExtraValues($pdo, (int)$memberId, $preparedValues, $extraAttributes);
 
     header('Location: members.php');
@@ -524,6 +531,10 @@ include 'header.php';
                 <input type="file" name="extra_attrs[<?= $attrId; ?>]" class="form-control" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" accept="image/*,.zip,.rar,.7z,.tar,.gz,.7zip,.7Z">
                 <div class="form-text" data-i18n="members.extra.helper.media_input">可上传图片、压缩包等文件。</div>
                 <div class="small text-muted d-none" data-extra-current-file data-i18n="members.extra.no_file"></div>
+                <div class="d-flex gap-2 mt-1 align-items-center">
+                  <input type="hidden" name="extra_clear[<?= $attrId; ?>]" value="0" data-extra-clear-flag data-attribute-id="<?= $attrId; ?>">
+                  <button type="button" class="btn btn-sm btn-outline-danger" data-extra-clear-btn data-attribute-id="<?= $attrId; ?>" data-i18n="members.extra.clear_file">清除文件</button>
+                </div>
                 <?php else: ?>
                 <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
                 <?php endif; ?>
@@ -644,7 +655,13 @@ include 'header.php';
       function translate(key){
         return translateWithFallback(key, key);
       }
-      function updateMediaInfo(input, value, isSelection){
+      function setClearFlag(wrapper, enabled){
+        const clearField = wrapper ? wrapper.querySelector('[data-extra-clear-flag]') : null;
+        if (clearField) {
+          clearField.value = enabled ? '1' : '0';
+        }
+      }
+      function updateMediaInfo(input, value, isSelection, isClearing){
         const wrapper = input.closest('[data-extra-wrapper]');
         const info = wrapper ? wrapper.querySelector('[data-extra-current-file]') : null;
         if(!info){
@@ -653,7 +670,10 @@ include 'header.php';
         const currentLabel = translateWithFallback('members.extra.current_file', '当前文件');
         const noneLabel = translateWithFallback('members.extra.no_file', '暂无上传的文件');
         const selectedLabel = translateWithFallback('members.extra.selected_file', '已选择文件');
-        if(value){
+        const clearingLabel = translateWithFallback('members.extra.will_clear', '将删除当前文件');
+        if(isClearing){
+          info.textContent = clearingLabel;
+        } else if(value){
           const label = isSelection ? selectedLabel : currentLabel;
           const safeValue = String(value);
           if(isSelection){
@@ -677,9 +697,11 @@ include 'header.php';
       function resetExtraFields(){
         extraInputs.forEach(function(input){
           const attrType = input.dataset.attributeType || 'text';
+          const wrapper = input.closest('[data-extra-wrapper]');
           if(attrType === 'media'){
             input.value = '';
-            updateMediaInfo(input, '', false);
+            setClearFlag(wrapper, false);
+            updateMediaInfo(input, '', false, false);
           } else {
             const defaultValue = input.dataset.defaultValue ?? '';
             input.value = defaultValue;
@@ -731,7 +753,9 @@ include 'header.php';
             }
             if(attrType === 'media'){
               input.value = '';
-              updateMediaInfo(input, value, false);
+              const wrapper = input.closest('[data-extra-wrapper]');
+              setClearFlag(wrapper, false);
+              updateMediaInfo(input, value, false, false);
             } else {
               input.value = value;
             }
@@ -750,8 +774,23 @@ include 'header.php';
         }
         if(target.dataset.attributeType === 'media'){
           const name = target.files && target.files.length ? target.files[0].name : '';
-          updateMediaInfo(target, name, true);
+          const wrapper = target.closest('[data-extra-wrapper]');
+          setClearFlag(wrapper, false);
+          updateMediaInfo(target, name, true, false);
         }
+      });
+
+      document.querySelectorAll('[data-extra-clear-btn]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          const wrapper = btn.closest('[data-extra-wrapper]');
+          const input = wrapper ? wrapper.querySelector('input[type="file"][data-extra-field]') : null;
+          if(!input){
+            return;
+          }
+          input.value = '';
+          setClearFlag(wrapper, true);
+          updateMediaInfo(input, '', false, true);
+        });
       });
     }
     <?php if($isManager): ?>

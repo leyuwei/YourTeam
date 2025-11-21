@@ -51,7 +51,14 @@ if($member_id){
         $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=? WHERE id=?');
         $stmt->execute([$campus_id,$name,$email,$identity_number,$year_of_join,$current_degree,$degree_pursuing,$phone,$wechat,$department,$workplace,$homeplace,$member_id]);
         $extraSubmitted = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
-        $preparedValues = prepareMemberExtraValues((int)$member_id, $extraAttributes, $extraSubmitted, $extraUploads, $memberExtraValues);
+        $extraClearsRaw = isset($_POST['extra_clear']) && is_array($_POST['extra_clear']) ? $_POST['extra_clear'] : [];
+        $extraClears = [];
+        foreach ($extraClearsRaw as $id => $flag) {
+            if ($flag === '1' || $flag === 1 || $flag === true || $flag === 'true') {
+                $extraClears[(int)$id] = true;
+            }
+        }
+        $preparedValues = prepareMemberExtraValues((int)$member_id, $extraAttributes, $extraSubmitted, $extraUploads, $memberExtraValues, $extraClears);
         ensureMemberExtraValues($pdo, $member_id, $preparedValues, $extraAttributes);
         $msg = 'Information updated successfully.';
         $stmt = $pdo->prepare('SELECT * FROM members WHERE id=?');
@@ -171,6 +178,10 @@ if($member_id){
       <?php else: ?>
       <div class="small text-muted" data-i18n="members.extra.no_file">暂无上传的文件</div>
       <?php endif; ?>
+      <div class="form-check mt-1">
+        <input class="form-check-input" type="checkbox" name="extra_clear[<?= $attrId; ?>]" value="1" id="clear-extra-<?= $attrId; ?>">
+        <label class="form-check-label" for="clear-extra-<?= $attrId; ?>" data-i18n="members.extra.clear_file">清除文件</label>
+      </div>
       <?php else: ?>
       <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars((string)$value, ENT_QUOTES); ?>">
       <?php endif; ?>

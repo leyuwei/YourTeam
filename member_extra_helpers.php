@@ -56,7 +56,7 @@ function normalizeMemberExtraUploads(?array $fileBag): array
     return $normalized;
 }
 
-function prepareMemberExtraValues(int $memberId, array $attributes, array $postedValues, ?array $uploadedValues, array $existingValues = []): array
+function prepareMemberExtraValues(int $memberId, array $attributes, array $postedValues, ?array $uploadedValues, array $existingValues = [], array $clearFlags = []): array
 {
     $memberId = (int)$memberId;
     $normalizedUploads = normalizeMemberExtraUploads($uploadedValues);
@@ -78,29 +78,41 @@ function prepareMemberExtraValues(int $memberId, array $attributes, array $poste
         if ($attributeType === 'media') {
             $value = $currentValue;
             $fileInfo = $normalizedUploads[$attributeId] ?? null;
-            if ($memberId > 0 && is_array($fileInfo) && ($fileInfo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-                if (($fileInfo['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && is_uploaded_file((string)($fileInfo['tmp_name'] ?? ''))) {
-                    $baseDir = __DIR__ . '/asset_uploads/member_extra/' . $memberId;
-                    if (!is_dir($baseDir)) {
-                        mkdir($baseDir, 0777, true);
-                    }
-                    $ext = strtolower(pathinfo((string)($fileInfo['name'] ?? ''), PATHINFO_EXTENSION));
-                    $safeExt = $ext !== '' ? preg_replace('/[^a-z0-9._-]/i', '', $ext) : '';
-                    $filename = 'attr_' . $attributeId . '_' . uniqid();
-                    if ($safeExt !== '') {
-                        $filename .= '.' . $safeExt;
-                    }
-                    $targetPath = $baseDir . '/' . $filename;
-                    if (move_uploaded_file((string)$fileInfo['tmp_name'], $targetPath)) {
-                        if (!empty($currentValue)) {
-                            $oldPath = __DIR__ . '/' . ltrim((string)$currentValue, '/');
-                            if (is_file($oldPath)) {
-                                @unlink($oldPath);
-                            }
+            $isClearing = !empty($clearFlags[$attributeId]);
+            $uploadProvided = $memberId > 0 && is_array($fileInfo) && ($fileInfo['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+
+            if ($uploadProvided && ($fileInfo['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && is_uploaded_file((string)($fileInfo['tmp_name'] ?? ''))) {
+                $baseDir = __DIR__ . '/asset_uploads/member_extra/' . $memberId;
+                if (!is_dir($baseDir)) {
+                    mkdir($baseDir, 0777, true);
+                }
+                $ext = strtolower(pathinfo((string)($fileInfo['name'] ?? ''), PATHINFO_EXTENSION));
+                $safeExt = $ext !== '' ? preg_replace('/[^a-z0-9._-]/i', '', $ext) : '';
+                $filename = 'attr_' . $attributeId . '_' . uniqid();
+                if ($safeExt !== '') {
+                    $filename .= '.' . $safeExt;
+                }
+                $targetPath = $baseDir . '/' . $filename;
+                if (move_uploaded_file((string)$fileInfo['tmp_name'], $targetPath)) {
+                    if (!empty($currentValue)) {
+                        $oldPath = __DIR__ . '/' . ltrim((string)$currentValue, '/');
+                        if (is_file($oldPath)) {
+                            @unlink($oldPath);
                         }
-                        $value = 'asset_uploads/member_extra/' . $memberId . '/' . $filename;
+                    }
+                    $value = 'asset_uploads/member_extra/' . $memberId . '/' . $filename;
+                    $isClearing = false;
+                }
+            }
+
+            if ($isClearing) {
+                if (!empty($currentValue)) {
+                    $oldPath = __DIR__ . '/' . ltrim((string)$currentValue, '/');
+                    if (is_file($oldPath)) {
+                        @unlink($oldPath);
                     }
                 }
+                $value = '';
             }
         } elseif (is_array($value)) {
             $value = '';
