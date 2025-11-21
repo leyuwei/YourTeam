@@ -36,6 +36,7 @@ CREATE TABLE member_extra_attributes (
   sort_order INT DEFAULT 0,
   name_en VARCHAR(100) NOT NULL DEFAULT '',
   name_zh VARCHAR(100) NOT NULL DEFAULT '',
+  attribute_type ENUM('text','media') NOT NULL DEFAULT 'text',
   default_value TEXT
 );
 

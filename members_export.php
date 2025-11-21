@@ -46,9 +46,19 @@ $selectedHeaders = $headers[$lang] ?? $headers['zh'];
 $statusDisplay = $statusLabels[$lang] ?? $statusLabels['zh'];
 $selectedHeaders = array_merge($selectedHeaders, $lang === 'en' ? $extraHeadersEn : $extraHeadersZh);
 
-$columns = ['campus_id','name','email','identity_number','year_of_join','current_degree','degree_pursuing','phone','wechat','department','workplace','homeplace','status'];
+$columns = [];
+$columnMetas = [];
+$baseColumns = ['campus_id','name','email','identity_number','year_of_join','current_degree','degree_pursuing','phone','wechat','department','workplace','homeplace','status'];
+foreach ($baseColumns as $col) {
+    $columns[] = $col;
+    $columnMetas[] = ['type' => 'text'];
+}
 foreach ($extraAttributes as $attr) {
     $columns[] = 'extra_' . (int)($attr['id'] ?? 0);
+    $columnMetas[] = [
+        'type' => in_array($attr['attribute_type'] ?? '', ['text', 'media'], true) ? $attr['attribute_type'] : 'text',
+        'attrId' => (int)($attr['id'] ?? 0),
+    ];
 }
 
 $stmt = $pdo->query('SELECT id,campus_id,name,email,identity_number,year_of_join,current_degree,degree_pursuing,phone,wechat,department,workplace,homeplace,status FROM members');
@@ -60,16 +70,26 @@ foreach ($members as &$member) {
     foreach ($extraAttributes as $attr) {
         $attrId = (int)($attr['id'] ?? 0);
         $key = 'extra_' . $attrId;
-        $member[$key] = $extraValuesMap[$memberId][$attrId] ?? (string)($attr['default_value'] ?? '');
+        $attrType = in_array($attr['attribute_type'] ?? '', ['text', 'media'], true) ? $attr['attribute_type'] : 'text';
+        $fallback = $attrType === 'text' ? (string)($attr['default_value'] ?? '') : '';
+        $member[$key] = $extraValuesMap[$memberId][$attrId] ?? $fallback;
     }
 }
 unset($member);
+
+$mediaIndex = 1;
+$imageContentTypes = [];
+$activeImages = [];
+$exitedImages = [];
 
 $activeMembers = array_values(array_filter($members, fn($m) => ($m['status'] ?? '') === 'in_work'));
 $exitedMembers = array_values(array_filter($members, fn($m) => ($m['status'] ?? '') !== 'in_work'));
 
 sortMembersForExport($activeMembers);
 sortMembersForExport($exitedMembers);
+
+$activeImages = assignImageResources(collectSheetImages($activeMembers, $columns, $columnMetas, 2), $mediaIndex, $imageContentTypes);
+$exitedImages = assignImageResources(collectSheetImages($exitedMembers, $columns, $columnMetas, 2), $mediaIndex, $imageContentTypes);
 
 $palette = ['FFF9F2', 'F2FAFF', 'F6FFF2', 'FFF7F2', 'F2FFF8', 'F8F2FF', 'FFF5F7', 'F3F7FF'];
 $styleRegistry = createStyleRegistry();
@@ -81,9 +101,22 @@ $exitedSheetData = buildSheetData($exitedMembers, $columns, $statusDisplay);
 [$exitedRows, $exitedRowStyles] = prepareSheetRows($exitedSheetData, $selectedHeaders, $palette, $styleRegistry);
 
 $sheets = [
-    ['name' => '在岗人员', 'rows' => $activeRows, 'rowStyles' => $activeRowStyles],
-    ['name' => '已离退人员', 'rows' => $exitedRows, 'rowStyles' => $exitedRowStyles],
+    ['name' => '在岗人员', 'rows' => $activeRows, 'rowStyles' => $activeRowStyles, 'images' => $activeImages],
+    ['name' => '已离退人员', 'rows' => $exitedRows, 'rowStyles' => $exitedRowStyles, 'images' => $exitedImages],
 ];
+
+foreach ($sheets as $index => &$sheet) {
+    if (!empty($sheet['images'])) {
+        $sheet['drawingPath'] = 'xl/drawings/drawing' . ($index + 1) . '.xml';
+        $sheet['drawingRelsPath'] = 'xl/drawings/_rels/drawing' . ($index + 1) . '.xml.rels';
+        $sheet['sheetRelsPath'] = 'xl/worksheets/_rels/sheet' . ($index + 1) . '.xml.rels';
+        $sheet['drawingRelId'] = 'rId1';
+    }
+}
+unset($sheet);
+
+$drawingParts = array_values(array_map(fn($s) => $s['drawingPath'] ?? null, $sheets));
+$drawingParts = array_filter($drawingParts);
 
 $zip = new ZipArchive();
 $tmpFile = tempnam(sys_get_temp_dir(), 'members');
@@ -93,7 +126,7 @@ if ($tmpFile === false || $zip->open($tmpFile, ZipArchive::OVERWRITE) !== true) 
     exit;
 }
 
-$zip->addFromString('[Content_Types].xml', buildContentTypesXml(count($sheets)));
+$zip->addFromString('[Content_Types].xml', buildContentTypesXml(count($sheets), $drawingParts, $imageContentTypes));
 $zip->addFromString('_rels/.rels', buildRootRelsXml());
 $zip->addFromString('docProps/app.xml', buildAppXml(array_column($sheets, 'name')));
 $zip->addFromString('docProps/core.xml', buildCoreXml());
@@ -103,7 +136,20 @@ $zip->addFromString('xl/styles.xml', buildStylesXml($styleRegistry));
 
 foreach ($sheets as $index => $sheet) {
     $sheetPath = 'xl/worksheets/sheet' . ($index + 1) . '.xml';
-    $zip->addFromString($sheetPath, buildSheetXml($sheet['rows'], $sheet['rowStyles']));
+    $drawingRelId = $sheet['drawingRelId'] ?? null;
+    $zip->addFromString($sheetPath, buildSheetXml($sheet['rows'], $sheet['rowStyles'], $drawingRelId));
+
+    if (!empty($sheet['images'])) {
+        $zip->addFromString($sheet['sheetRelsPath'], buildSheetRelsXml('../drawings/drawing' . ($index + 1) . '.xml', $drawingRelId));
+        $zip->addFromString($sheet['drawingPath'], buildDrawingXml($sheet['images']));
+        $zip->addFromString($sheet['drawingRelsPath'], buildDrawingRelsXml($sheet['images']));
+        foreach ($sheet['images'] as $image) {
+            $content = @file_get_contents($image['path']);
+            if ($content !== false) {
+                $zip->addFromString($image['zipPath'], $content);
+            }
+        }
+    }
 }
 
 $zip->close();
@@ -254,7 +300,7 @@ function ensureStyleForColor(string $hexColor, array &$registry): int
     return $registry['colorStyleMap'][$argb];
 }
 
-function buildSheetXml(array $rows, array $rowStyles): string
+function buildSheetXml(array $rows, array $rowStyles, ?string $drawingRelId = null): string
 {
     $rowCount = count($rows);
     $colCount = $rowCount ? count($rows[0]) : 0;
@@ -285,9 +331,57 @@ function buildSheetXml(array $rows, array $rowStyles): string
     }
 
     $xml .= '</sheetData>';
+    if ($drawingRelId) {
+        $xml .= '<drawing r:id="' . htmlspecialchars($drawingRelId, ENT_XML1 | ENT_QUOTES, 'UTF-8') . '"/>';
+    }
     $xml .= '</worksheet>';
 
     return $xml;
+}
+
+function buildSheetRelsXml(string $drawingTarget, string $drawingRelId): string
+{
+    $drawingTarget = htmlspecialchars($drawingTarget, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    $drawingRelId = htmlspecialchars($drawingRelId, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="' . $drawingRelId . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="' . $drawingTarget . '"/></Relationships>';
+}
+
+function buildDrawingXml(array $images): string
+{
+    $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    $xml .= '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+
+    foreach ($images as $index => $image) {
+        $col = max(0, (int)($image['col'] ?? 1) - 1);
+        $row = max(0, (int)($image['row'] ?? 1) - 1);
+        $cx = (int)($image['cx'] ?? 190000);
+        $cy = (int)($image['cy'] ?? 190000);
+        $relId = 'rId' . ($index + 1);
+
+        $xml .= '<xdr:oneCellAnchor>';
+        $xml .= '<xdr:from><xdr:col>' . $col . '</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>' . $row . '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>';
+        $xml .= '<xdr:ext cx="' . $cx . '" cy="' . $cy . '"/>';
+        $xml .= '<xdr:pic>';
+        $xml .= '<xdr:nvPicPr><xdr:cNvPr id="' . ($index + 1) . '" name="Picture ' . ($index + 1) . '"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>';
+        $xml .= '<xdr:blipFill><a:blip r:embed="' . $relId . '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>';
+        $xml .= '<xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>';
+        $xml .= '</xdr:pic><xdr:clientData/>';
+        $xml .= '</xdr:oneCellAnchor>';
+    }
+
+    $xml .= '</xdr:wsDr>';
+    return $xml;
+}
+
+function buildDrawingRelsXml(array $images): string
+{
+    $rels = '';
+    foreach ($images as $index => $image) {
+        $target = '../media/' . basename((string)($image['zipPath'] ?? ''));
+        $rels .= '<Relationship Id="rId' . ($index + 1) . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="' . htmlspecialchars($target, ENT_XML1 | ENT_QUOTES, 'UTF-8') . '"/>';
+    }
+
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' . $rels . '</Relationships>';
 }
 
 function columnLetter(int $index): string
@@ -315,7 +409,7 @@ function buildStylesXml(array $registry): string
     return $xml;
 }
 
-function buildContentTypesXml(int $sheetCount): string
+function buildContentTypesXml(int $sheetCount, array $drawingParts = [], array $imageContentTypes = []): string
 {
     $overrides = [
         '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
@@ -328,10 +422,27 @@ function buildContentTypesXml(int $sheetCount): string
         $overrides[] = '<Override PartName="/xl/worksheets/sheet' . $i . '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
     }
 
+    foreach ($drawingParts as $drawing) {
+        $overrides[] = '<Override PartName="/' . ltrim($drawing, '/') . '" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>';
+    }
+
+    $defaultTypes = [
+        'rels' => 'application/vnd.openxmlformats-package.relationships+xml',
+        'xml' => 'application/xml',
+    ];
+
+    foreach ($imageContentTypes as $ext => $type) {
+        $ext = strtolower(trim((string)$ext));
+        if ($ext !== '' && $type) {
+            $defaultTypes[$ext] = $type;
+        }
+    }
+
     $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     $xml .= '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">';
-    $xml .= '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>';
-    $xml .= '<Default Extension="xml" ContentType="application/xml"/>';
+    foreach ($defaultTypes as $ext => $type) {
+        $xml .= '<Default Extension="' . htmlspecialchars($ext, ENT_XML1 | ENT_QUOTES, 'UTF-8') . '" ContentType="' . htmlspecialchars($type, ENT_XML1 | ENT_QUOTES, 'UTF-8') . '"/>';
+    }
     $xml .= implode('', $overrides);
     $xml .= '</Types>';
     return $xml;
@@ -392,4 +503,98 @@ function buildCoreXml(): string
 {
     $timestamp = gmdate('Y-m-d\TH:i:s\Z');
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>Team Management Platform</dc:creator><cp:lastModifiedBy>Team Management Platform</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">' . $timestamp . '</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">' . $timestamp . '</dcterms:modified></cp:coreProperties>';
+}
+
+function collectSheetImages(array $members, array $columns, array $columnMetas, int $startRow): array
+{
+    $images = [];
+    foreach ($members as $rowIndex => $member) {
+        foreach ($columns as $colIndex => $column) {
+            $meta = $columnMetas[$colIndex] ?? ['type' => 'text'];
+            if (($meta['type'] ?? 'text') !== 'media') {
+                continue;
+            }
+
+            $value = $member[$column] ?? '';
+            if ($value === '') {
+                continue;
+            }
+            $fullPath = __DIR__ . '/' . ltrim((string)$value, '/');
+            $info = normalizeImageInfo($fullPath);
+            if ($info === null) {
+                continue;
+            }
+
+            $heightEmu = 190000;
+            $ratio = ($info['height'] ?? 0) > 0 ? ($info['width'] / $info['height']) : 1;
+            $cx = (int)max(95000, round($heightEmu * $ratio));
+            $cy = $heightEmu;
+
+            $images[] = [
+                'row' => $startRow + $rowIndex,
+                'col' => $colIndex + 1,
+                'path' => $fullPath,
+                'mime' => $info['mime'],
+                'extension' => $info['extension'],
+                'cx' => $cx,
+                'cy' => $cy,
+            ];
+        }
+    }
+
+    return $images;
+}
+
+function assignImageResources(array $images, int &$counter, array &$contentTypes): array
+{
+    foreach ($images as &$image) {
+        $ext = strtolower(preg_replace('/[^a-z0-9]+/i', '', (string)($image['extension'] ?? 'png')));
+        $ext = $ext !== '' ? $ext : 'png';
+        $image['extension'] = $ext;
+        $contentTypes[$ext] = $image['mime'] ?? 'image/' . $ext;
+        $image['zipPath'] = 'xl/media/image' . $counter . '.' . $ext;
+        $counter++;
+    }
+    unset($image);
+    return $images;
+}
+
+function normalizeImageInfo(string $path): ?array
+{
+    if (!is_file($path)) {
+        return null;
+    }
+
+    $details = @getimagesize($path);
+    if ($details === false || empty($details['mime'])) {
+        return null;
+    }
+
+    $mime = (string)$details['mime'];
+    $extension = '';
+    if (!empty($details[2])) {
+        $extension = ltrim((string)image_type_to_extension((int)$details[2], false), '.');
+    }
+
+    if ($extension === '') {
+        $mimeMap = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/bmp' => 'bmp',
+            'image/webp' => 'webp',
+        ];
+        $extension = $mimeMap[$mime] ?? '';
+    }
+
+    if ($extension === '') {
+        $extension = strtolower((string)pathinfo($path, PATHINFO_EXTENSION));
+    }
+
+    return [
+        'mime' => $mime,
+        'extension' => $extension !== '' ? $extension : 'png',
+        'width' => (int)($details[0] ?? 0),
+        'height' => (int)($details[1] ?? 0),
+    ];
 }

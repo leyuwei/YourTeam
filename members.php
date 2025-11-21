@@ -28,7 +28,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
     $status = ($_POST['status'] ?? 'in_work') === 'exited' ? 'exited' : 'in_work';
 
     $extraAttributes = getMemberExtraAttributes($pdo);
+    $extraUploads = $_FILES['extra_attrs'] ?? null;
     $extraValues = isset($_POST['extra_attrs']) && is_array($_POST['extra_attrs']) ? $_POST['extra_attrs'] : [];
+    $rawExtraClears = isset($_POST['extra_clear']) && is_array($_POST['extra_clear']) ? $_POST['extra_clear'] : [];
+    $extraClearFlags = [];
+    foreach ($rawExtraClears as $clearId => $flag) {
+        if ($flag === '1' || $flag === 1 || $flag === true || $flag === 'true') {
+            $extraClearFlags[(int)$clearId] = true;
+        }
+    }
+    $existingExtraValues = [];
+    if ($memberId) {
+        $existingExtraValues = getMemberExtraValues($pdo, [$memberId]);
+        $existingExtraValues = $existingExtraValues[$memberId] ?? [];
+    }
 
     if ($isManager) {
         if ($memberId) {
@@ -70,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
                 $nextOrder
             ]);
             $memberId = (int)$pdo->lastInsertId();
+            $existingExtraValues = [];
         }
     } elseif ($role === 'member' && $memberId && $memberId === $sessionMemberId) {
         $stmt = $pdo->prepare('UPDATE members SET campus_id=?, name=?, email=?, identity_number=?, year_of_join=?, current_degree=?, degree_pursuing=?, phone=?, wechat=?, department=?, workplace=?, homeplace=? WHERE id=?');
@@ -88,12 +102,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['member_action'] ?? '') ===
             $homeplace,
             $memberId
         ]);
+        $existingExtraValues = getMemberExtraValues($pdo, [$memberId]);
+        $existingExtraValues = $existingExtraValues[$memberId] ?? [];
     } else {
         header('Location: members.php');
         exit();
     }
 
-    ensureMemberExtraValues($pdo, (int)$memberId, $extraValues, $extraAttributes);
+    $preparedValues = prepareMemberExtraValues((int)$memberId, $extraAttributes, $extraValues, $extraUploads, $existingExtraValues, $extraClearFlags);
+    ensureMemberExtraValues($pdo, (int)$memberId, $preparedValues, $extraAttributes);
 
     header('Location: members.php');
     exit();
@@ -295,6 +312,30 @@ include 'header.php';
   </div>
 </div>
 <?php endif; ?>
+<style>
+  .members-table .extra-media-thumb {
+    height: 1.5em;
+    width: auto;
+    object-fit: cover;
+    vertical-align: middle;
+  }
+
+  .members-table .extra-media-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 0.35rem;
+    background-color: #f0f2f5;
+    color: #6c757d;
+    font-size: 0.9em;
+  }
+
+  .members-table .extra-media-link {
+    max-width: 12rem;
+  }
+</style>
 <div class="table-responsive">
 <table class="table table-bordered table-striped table-hover members-table">
   <thead>
@@ -347,15 +388,41 @@ include 'header.php';
       $rowExtraValues = [];
       foreach ($extraAttributes as $attr) {
         $attrId = (int)($attr['id'] ?? 0);
-        $rowExtraValues[$attrId] = (string)($memberExtraValues[$memberId][$attrId] ?? ($attr['default_value'] ?? ''));
+        $attrType = $attr['attribute_type'] ?? 'text';
+        $fallback = $attrType === 'text' ? (string)($attr['default_value'] ?? '') : '';
+        $rowExtraValues[$attrId] = (string)($memberExtraValues[$memberId][$attrId] ?? $fallback);
       }
       $rowExtraJson = htmlspecialchars(json_encode($rowExtraValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
     ?>
     <?php foreach ($extraAttributes as $attr):
       $attrId = (int)($attr['id'] ?? 0);
-      $value = $rowExtraValues[$attrId] ?? '';
+      $attrType = (string)($attr['attribute_type'] ?? 'text');
+      $value = (string)($rowExtraValues[$attrId] ?? '');
+      $cleanPath = (string)parse_url($value, PHP_URL_PATH);
+      $extension = strtolower(pathinfo($cleanPath !== '' ? $cleanPath : $value, PATHINFO_EXTENSION));
+      $isImage = in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'], true);
+      $fileName = $cleanPath !== '' ? basename($cleanPath) : basename($value);
     ?>
-    <td><?= htmlspecialchars($value); ?></td>
+    <td>
+      <?php if ($attrType === 'media'): ?>
+        <?php if ($value === ''): ?>
+          <span class="text-muted" data-i18n="members.extra.no_file">暂无上传的文件</span>
+        <?php elseif ($isImage): ?>
+          <a href="<?= htmlspecialchars($value, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="d-inline-block">
+            <img src="<?= htmlspecialchars($value, ENT_QUOTES); ?>" class="extra-media-thumb" alt="<?= htmlspecialchars($fileName !== '' ? $fileName : 'media image', ENT_QUOTES); ?>">
+            <span class="visually-hidden" data-i18n="members.extra.media.preview_image">查看图片</span>
+          </a>
+        <?php else: ?>
+          <a href="<?= htmlspecialchars($value, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="d-inline-flex align-items-center gap-2 text-decoration-none extra-media-link" title="<?= htmlspecialchars($fileName !== '' ? $fileName : $value, ENT_QUOTES); ?>">
+            <span class="extra-media-icon" aria-hidden="true">📁</span>
+            <span class="text-truncate" style="max-width: 8rem;" title="<?= htmlspecialchars($fileName !== '' ? $fileName : $value, ENT_QUOTES); ?>"><?= htmlspecialchars($fileName !== '' ? $fileName : $value); ?></span>
+            <span class="visually-hidden" data-i18n="members.extra.media.download_file">下载文件</span>
+          </a>
+        <?php endif; ?>
+      <?php else: ?>
+        <?= htmlspecialchars($value); ?>
+      <?php endif; ?>
+    </td>
     <?php endforeach; ?>
     <td>
       <button type="button"
@@ -388,7 +455,7 @@ include 'header.php';
   <div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
       <div class="modal-content">
-        <form id="memberForm" method="post">
+        <form id="memberForm" method="post" enctype="multipart/form-data">
           <input type="hidden" name="member_action" value="save">
           <input type="hidden" name="member_id" value="">
           <div class="modal-header">
@@ -454,12 +521,23 @@ include 'header.php';
                 $attrId = (int)($attr['id'] ?? 0);
                 $nameZh = (string)($attr['name_zh'] ?? '');
                 $nameEn = (string)($attr['name_en'] ?? '');
-                $defaultValue = (string)($attr['default_value'] ?? '');
+                $attrType = (string)($attr['attribute_type'] ?? 'text');
+                $defaultValue = $attrType === 'text' ? (string)($attr['default_value'] ?? '') : '';
                 $displayName = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : ('Attr ' . $attrId));
               ?>
-              <div class="col-md-6">
+              <div class="col-md-6" data-extra-wrapper>
                 <label class="form-label" data-extra-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-extra-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($displayName); ?></label>
-                <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>">
+                <?php if ($attrType === 'media'): ?>
+                <input type="file" name="extra_attrs[<?= $attrId; ?>]" class="form-control" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" accept="image/*,.zip,.rar,.7z,.tar,.gz,.7zip,.7Z">
+                <div class="form-text" data-i18n="members.extra.helper.media_input">可上传图片、压缩包等文件。</div>
+                <div class="small text-muted d-none" data-extra-current-file data-i18n="members.extra.no_file"></div>
+                <div class="d-flex gap-2 mt-1 align-items-center">
+                  <input type="hidden" name="extra_clear[<?= $attrId; ?>]" value="0" data-extra-clear-flag data-attribute-id="<?= $attrId; ?>">
+                  <button type="button" class="btn btn-sm btn-outline-danger" data-extra-clear-btn data-attribute-id="<?= $attrId; ?>" data-i18n="members.extra.clear_file">清除文件</button>
+                </div>
+                <?php else: ?>
+                <input type="text" name="extra_attrs[<?= $attrId; ?>]" class="form-control" value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-extra-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                <?php endif; ?>
               </div>
               <?php endforeach; ?>
               <?php endif; ?>
@@ -570,9 +648,44 @@ include 'header.php';
       const memberModal = new bootstrap.Modal(memberModalElement);
       const fieldNames = ['campus_id','name','email','identity_number','year_of_join','current_degree','degree_pursuing','phone','wechat','department','workplace','homeplace'];
       const extraInputs = Array.from(memberForm.querySelectorAll('[data-extra-field]'));
-      function translate(key){
+      function translateWithFallback(key, fallback){
         const lang = document.documentElement.lang || 'zh';
-        return (translations?.[lang] && translations[lang][key]) || key;
+        return (translations?.[lang] && translations[lang][key]) || fallback;
+      }
+      function translate(key){
+        return translateWithFallback(key, key);
+      }
+      function setClearFlag(wrapper, enabled){
+        const clearField = wrapper ? wrapper.querySelector('[data-extra-clear-flag]') : null;
+        if (clearField) {
+          clearField.value = enabled ? '1' : '0';
+        }
+      }
+      function updateMediaInfo(input, value, isSelection, isClearing){
+        const wrapper = input.closest('[data-extra-wrapper]');
+        const info = wrapper ? wrapper.querySelector('[data-extra-current-file]') : null;
+        if(!info){
+          return;
+        }
+        const currentLabel = translateWithFallback('members.extra.current_file', '当前文件');
+        const noneLabel = translateWithFallback('members.extra.no_file', '暂无上传的文件');
+        const selectedLabel = translateWithFallback('members.extra.selected_file', '已选择文件');
+        const clearingLabel = translateWithFallback('members.extra.will_clear', '将删除当前文件');
+        if(isClearing){
+          info.textContent = clearingLabel;
+        } else if(value){
+          const label = isSelection ? selectedLabel : currentLabel;
+          const safeValue = String(value);
+          if(isSelection){
+            info.textContent = `${label}: ${safeValue}`;
+          } else {
+            const link = encodeURI(safeValue);
+            info.innerHTML = `${label}: <a href="${link}" target="_blank" rel="noopener">${safeValue}</a>`;
+          }
+        } else {
+          info.textContent = noneLabel;
+        }
+        info.classList.remove('d-none');
       }
       function setModalTitle(key){
         if(!modalTitle){
@@ -583,8 +696,16 @@ include 'header.php';
       }
       function resetExtraFields(){
         extraInputs.forEach(function(input){
-          const defaultValue = input.dataset.defaultValue ?? '';
-          input.value = defaultValue;
+          const attrType = input.dataset.attributeType || 'text';
+          const wrapper = input.closest('[data-extra-wrapper]');
+          if(attrType === 'media'){
+            input.value = '';
+            setClearFlag(wrapper, false);
+            updateMediaInfo(input, '', false, false);
+          } else {
+            const defaultValue = input.dataset.defaultValue ?? '';
+            input.value = defaultValue;
+          }
         });
       }
       function resetForm(){
@@ -624,10 +745,19 @@ include 'header.php';
           }
           extraInputs.forEach(function(input){
             const attrId = input.dataset.attributeId;
+            const attrType = input.dataset.attributeType || 'text';
+            const defaultValue = attrType === 'text' ? (input.dataset.defaultValue ?? '') : '';
+            let value = defaultValue;
             if (attrId && Object.prototype.hasOwnProperty.call(extraData, attrId)) {
-              input.value = extraData[attrId] ?? '';
+              value = extraData[attrId] ?? defaultValue;
+            }
+            if(attrType === 'media'){
+              input.value = '';
+              const wrapper = input.closest('[data-extra-wrapper]');
+              setClearFlag(wrapper, false);
+              updateMediaInfo(input, value, false, false);
             } else {
-              input.value = input.dataset.defaultValue ?? '';
+              input.value = value;
             }
           });
           if(memberForm.elements['status']){
@@ -635,6 +765,31 @@ include 'header.php';
           }
           setModalTitle(data.id ? 'member_edit.title_edit' : 'member_edit.title_add');
           memberModal.show();
+        });
+      });
+      memberForm.addEventListener('change', function(event){
+        const target = event.target;
+        if(!(target instanceof HTMLInputElement)){
+          return;
+        }
+        if(target.dataset.attributeType === 'media'){
+          const name = target.files && target.files.length ? target.files[0].name : '';
+          const wrapper = target.closest('[data-extra-wrapper]');
+          setClearFlag(wrapper, false);
+          updateMediaInfo(target, name, true, false);
+        }
+      });
+
+      document.querySelectorAll('[data-extra-clear-btn]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          const wrapper = btn.closest('[data-extra-wrapper]');
+          const input = wrapper ? wrapper.querySelector('input[type="file"][data-extra-field]') : null;
+          if(!input){
+            return;
+          }
+          input.value = '';
+          setClearFlag(wrapper, true);
+          updateMediaInfo(input, '', false, true);
         });
       });
     }
@@ -650,6 +805,7 @@ include 'header.php';
         id: attr.id ?? null,
         name_zh: attr.name_zh ?? '',
         name_en: attr.name_en ?? '',
+        attribute_type: attr.attribute_type ?? 'text',
         default_value: attr.default_value ?? ''
       })) : [];
       let workingAttributes = cloneAttributes(window.memberExtraAttributes || []);
@@ -693,18 +849,26 @@ include 'header.php';
           const wrapper=document.createElement('div');
           wrapper.className='border rounded p-3 mb-3';
           wrapper.dataset.index=String(index);
+          const isMedia = String(attr.attribute_type ?? 'text') === 'media';
           wrapper.innerHTML=`<div class="row g-3 align-items-end">
-  <div class="col-md-4">
+  <div class="col-md-3">
     <label class="form-label" data-i18n="members.extra.field.name_zh">中文名称</label>
     <input type="text" class="form-control" data-field="name_zh" value="${escapeHtml(attr.name_zh)}">
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
     <label class="form-label" data-i18n="members.extra.field.name_en">英文名称</label>
     <input type="text" class="form-control" data-field="name_en" value="${escapeHtml(attr.name_en)}">
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
+    <label class="form-label" data-i18n="members.extra.field.type">属性类型</label>
+    <select class="form-select" data-field="attribute_type">
+      <option value="text" ${isMedia ? '' : 'selected'} data-i18n="members.extra.type.text">文本</option>
+      <option value="media" ${isMedia ? 'selected' : ''} data-i18n="members.extra.type.media">多媒体</option>
+    </select>
+  </div>
+  <div data-default-wrapper class="col-md-3${isMedia ? ' d-none' : ''}">
     <label class="form-label" data-i18n="members.extra.field.default_value">默认值</label>
-    <input type="text" class="form-control" data-field="default_value" value="${escapeHtml(attr.default_value)}">
+    <input type="text" class="form-control" data-field="default_value" value="${escapeHtml(isMedia ? '' : attr.default_value)}">
   </div>
   <div class="col-12 d-flex justify-content-end mt-2">
     <button type="button" class="btn btn-sm btn-outline-danger extra-attr-delete" data-index="${index}" data-i18n="members.extra.delete">删除</button>
@@ -722,7 +886,7 @@ include 'header.php';
         extraModal.show();
       });
       addExtraAttributeBtn?.addEventListener('click', function(){
-        workingAttributes.push({id:null,name_zh:'',name_en:'',default_value:''});
+        workingAttributes.push({id:null,name_zh:'',name_en:'',attribute_type:'text',default_value:''});
         renderExtraAttributes();
       });
       extraAttributesList?.addEventListener('input', function(event){
@@ -744,6 +908,40 @@ include 'header.php';
         }
         workingAttributes[index][field] = target.value;
       });
+      extraAttributesList?.addEventListener('change', function(event){
+        const target = event.target;
+        if(!(target instanceof HTMLSelectElement)){
+          return;
+        }
+        const row = target.closest('[data-index]');
+        if(!row){
+          return;
+        }
+        const index = Number(row.dataset.index);
+        if(Number.isNaN(index) || !workingAttributes[index]){
+          return;
+        }
+        const field = target.getAttribute('data-field');
+        if(!field){
+          return;
+        }
+        workingAttributes[index][field] = target.value;
+        if(field === 'attribute_type'){
+          workingAttributes[index].default_value = target.value === 'media' ? '' : (workingAttributes[index].default_value ?? '');
+          const defaultWrapper = row.querySelector('[data-default-wrapper]');
+          if(defaultWrapper){
+            if(target.value === 'media'){
+              defaultWrapper.classList.add('d-none');
+            } else {
+              defaultWrapper.classList.remove('d-none');
+            }
+          }
+          const defaultInput = row.querySelector('[data-field="default_value"]');
+          if(defaultInput instanceof HTMLInputElement && target.value === 'media'){
+            defaultInput.value = '';
+          }
+        }
+      });
       extraAttributesList?.addEventListener('click', function(event){
         const deleteBtn = event.target.closest('.extra-attr-delete');
         if(!deleteBtn){
@@ -763,6 +961,7 @@ include 'header.php';
             id: attr.id ?? null,
             name_zh: String(attr.name_zh ?? '').trim(),
             name_en: String(attr.name_en ?? '').trim(),
+            attribute_type: attr.attribute_type ?? 'text',
             default_value: String(attr.default_value ?? '')
           };
         });

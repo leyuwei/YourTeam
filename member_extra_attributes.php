@@ -39,8 +39,8 @@ try {
     $seenIds = [];
     $position = 0;
 
-    $updateStmt = $pdo->prepare('UPDATE member_extra_attributes SET sort_order = ?, name_en = ?, name_zh = ?, default_value = ? WHERE id = ?');
-    $insertStmt = $pdo->prepare('INSERT INTO member_extra_attributes (sort_order, name_en, name_zh, default_value) VALUES (?, ?, ?, ?)');
+    $updateStmt = $pdo->prepare('UPDATE member_extra_attributes SET sort_order = ?, name_en = ?, name_zh = ?, attribute_type = ?, default_value = ? WHERE id = ?');
+    $insertStmt = $pdo->prepare('INSERT INTO member_extra_attributes (sort_order, name_en, name_zh, attribute_type, default_value) VALUES (?, ?, ?, ?, ?)');
 
     foreach ($attributes as $attribute) {
         if (!is_array($attribute)) {
@@ -49,17 +49,18 @@ try {
         $id = isset($attribute['id']) ? (int)$attribute['id'] : null;
         $nameEn = trim((string)($attribute['name_en'] ?? ''));
         $nameZh = trim((string)($attribute['name_zh'] ?? ''));
-        $defaultValue = (string)($attribute['default_value'] ?? '');
+        $attributeType = in_array($attribute['attribute_type'] ?? '', ['text', 'media'], true) ? $attribute['attribute_type'] : 'text';
+        $defaultValue = $attributeType === 'text' ? (string)($attribute['default_value'] ?? '') : '';
 
         if ($nameEn === '' && $nameZh === '') {
             throw new RuntimeException('Attribute name cannot be empty.');
         }
 
         if ($id) {
-            $updateStmt->execute([$position, $nameEn, $nameZh, $defaultValue, $id]);
+            $updateStmt->execute([$position, $nameEn, $nameZh, $attributeType, $defaultValue, $id]);
             $seenIds[] = $id;
         } else {
-            $insertStmt->execute([$position, $nameEn, $nameZh, $defaultValue]);
+            $insertStmt->execute([$position, $nameEn, $nameZh, $attributeType, $defaultValue]);
             $id = (int)$pdo->lastInsertId();
             $seenIds[] = $id;
             $assignStmt = $pdo->prepare('INSERT INTO member_extra_values (member_id, attribute_id, value) SELECT id, ?, ? FROM members');
