@@ -305,6 +305,30 @@ include 'header.php';
   </div>
 </div>
 <?php endif; ?>
+<style>
+  .members-table .extra-media-thumb {
+    height: 1.5em;
+    width: auto;
+    object-fit: cover;
+    vertical-align: middle;
+  }
+
+  .members-table .extra-media-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 0.35rem;
+    background-color: #f0f2f5;
+    color: #6c757d;
+    font-size: 0.9em;
+  }
+
+  .members-table .extra-media-link {
+    max-width: 12rem;
+  }
+</style>
 <div class="table-responsive">
 <table class="table table-bordered table-striped table-hover members-table">
   <thead>
@@ -365,9 +389,33 @@ include 'header.php';
     ?>
     <?php foreach ($extraAttributes as $attr):
       $attrId = (int)($attr['id'] ?? 0);
-      $value = $rowExtraValues[$attrId] ?? '';
+      $attrType = (string)($attr['attribute_type'] ?? 'text');
+      $value = (string)($rowExtraValues[$attrId] ?? '');
+      $cleanPath = (string)parse_url($value, PHP_URL_PATH);
+      $extension = strtolower(pathinfo($cleanPath !== '' ? $cleanPath : $value, PATHINFO_EXTENSION));
+      $isImage = in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'], true);
+      $fileName = $cleanPath !== '' ? basename($cleanPath) : basename($value);
     ?>
-    <td><?= htmlspecialchars($value); ?></td>
+    <td>
+      <?php if ($attrType === 'media'): ?>
+        <?php if ($value === ''): ?>
+          <span class="text-muted" data-i18n="members.extra.no_file">暂无上传的文件</span>
+        <?php elseif ($isImage): ?>
+          <a href="<?= htmlspecialchars($value, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="d-inline-block">
+            <img src="<?= htmlspecialchars($value, ENT_QUOTES); ?>" class="extra-media-thumb" alt="<?= htmlspecialchars($fileName !== '' ? $fileName : 'media image', ENT_QUOTES); ?>">
+            <span class="visually-hidden" data-i18n="members.extra.media.preview_image">查看图片</span>
+          </a>
+        <?php else: ?>
+          <a href="<?= htmlspecialchars($value, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="d-inline-flex align-items-center gap-2 text-decoration-none extra-media-link" title="<?= htmlspecialchars($fileName !== '' ? $fileName : $value, ENT_QUOTES); ?>">
+            <span class="extra-media-icon" aria-hidden="true">📁</span>
+            <span class="text-truncate" style="max-width: 8rem;" title="<?= htmlspecialchars($fileName !== '' ? $fileName : $value, ENT_QUOTES); ?>"><?= htmlspecialchars($fileName !== '' ? $fileName : $value); ?></span>
+            <span class="visually-hidden" data-i18n="members.extra.media.download_file">下载文件</span>
+          </a>
+        <?php endif; ?>
+      <?php else: ?>
+        <?= htmlspecialchars($value); ?>
+      <?php endif; ?>
+    </td>
     <?php endforeach; ?>
     <td>
       <button type="button"
