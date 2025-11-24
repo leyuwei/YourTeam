@@ -278,7 +278,7 @@ $today_key = strtolower(date('D'));
   <span class="status-indicator" aria-hidden="true"></span>
   <span class="status-text">保存中…</span>
 </div>
-<div id="undoDeleteBanner" class="undo-delete-banner alert alert-warning d-flex align-items-center" role="status" aria-live="polite" aria-hidden="true">
+<div id="undoDeleteBanner" class="undo-delete-banner alert alert-warning align-items-center" role="status" aria-live="polite" aria-hidden="true">
   <span class="undo-text" data-i18n="todolist.delete.undo_hint">待办事项已删除</span>
   <button type="button" class="btn btn-sm btn-outline-secondary undo-button" data-i18n="todolist.delete.undo_button">撤销</button>
   <span class="countdown text-muted small" aria-hidden="true"></span>
