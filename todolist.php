@@ -53,7 +53,10 @@ $today_key = strtolower(date('D'));
 ?>
 <style>
 .todolist li{flex-wrap:nowrap;}
-.todolist li .item-content{flex:1 1 auto;min-width:0;margin-right:0.5rem;}
+.todolist li .item-content{flex:1 1 auto;min-width:0;margin-right:0.5rem;resize:none;overflow:hidden;white-space:pre-wrap;}
+.todolist li .item-content.is-multiline{line-height:1.4;}
+.todo-input-wrapper.is-multiline .todo-highlight-layer{align-items:flex-start;}
+.todo-input-wrapper.is-multiline .todo-highlight-content{white-space:pre-wrap;word-break:break-word;}
 .todolist li .copy-item{margin-left:auto;}
 .todolist li .copy-item,
 .todolist li .next-week-item{white-space:nowrap;}
@@ -97,6 +100,8 @@ $today_key = strtolower(date('D'));
 .common-items-manager .common-item-input.is-invalid{border-color:#dc3545;box-shadow:0 0 0 0.15rem rgba(220,53,69,0.25);}
 .common-items-manager-empty{display:none;}
 .common-items-manager-empty[data-visible="true"]{display:block;}
+.undo-delete-banner{position:fixed;left:50%;bottom:4.5rem;transform:translateX(-50%);display:none;align-items:center;gap:0.75rem;padding:0.85rem 1rem;border-radius:0.75rem;box-shadow:0 1rem 2.5rem rgba(0,0,0,0.12);z-index:1080;}
+.undo-delete-banner .countdown{font-variant-numeric:tabular-nums;}
 @keyframes status-pulse{0%{box-shadow:0 0 0 0 rgba(13,110,253,0.45);}70%{box-shadow:0 0 0 10px rgba(13,110,253,0);}100%{box-shadow:0 0 0 0 rgba(13,110,253,0);}}
 @media (max-width:575.98px){.save-status{left:1rem;right:1rem;transform:none;justify-content:center;padding:0.65rem 1rem;border-radius:0.85rem;}.save-status .status-text{white-space:normal;text-align:center;}}
 @media (max-width:575.98px){.common-suggestion-bar{left:0.75rem!important;right:0.75rem!important;width:auto!important;}}
@@ -141,7 +146,7 @@ $today_key = strtolower(date('D'));
       <?php if(!empty($items['work'][$k])): foreach($items['work'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
-        <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
+        <textarea class="form-control item-content flex-grow-1 me-2" rows="1" data-multiline="0"><?= htmlspecialchars($it['content']); ?></textarea>
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
           <span class="visually-hidden" data-i18n="todolist.copy_item">复制</span>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -184,7 +189,7 @@ $today_key = strtolower(date('D'));
       <?php if(!empty($items['personal'][$k])): foreach($items['personal'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
-        <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
+        <textarea class="form-control item-content flex-grow-1 me-2" rows="1" data-multiline="0"><?= htmlspecialchars($it['content']); ?></textarea>
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
           <span class="visually-hidden" data-i18n="todolist.copy_item">复制</span>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -222,7 +227,7 @@ $today_key = strtolower(date('D'));
       <?php if(!empty($items['longterm'][''])): foreach($items['longterm'][''] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
-        <input type="text" class="form-control item-content flex-grow-1 me-2" value="<?= htmlspecialchars($it['content']); ?>">
+        <textarea class="form-control item-content flex-grow-1 me-2" rows="1" data-multiline="0"><?= htmlspecialchars($it['content']); ?></textarea>
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
           <span class="visually-hidden" data-i18n="todolist.copy_item">复制</span>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -273,6 +278,11 @@ $today_key = strtolower(date('D'));
   <span class="status-indicator" aria-hidden="true"></span>
   <span class="status-text">保存中…</span>
 </div>
+<div id="undoDeleteBanner" class="undo-delete-banner alert alert-warning d-flex align-items-center" role="status" aria-live="polite" aria-hidden="true">
+  <span class="undo-text" data-i18n="todolist.delete.undo_hint">待办事项已删除</span>
+  <button type="button" class="btn btn-sm btn-outline-secondary undo-button" data-i18n="todolist.delete.undo_button">撤销</button>
+  <span class="countdown text-muted small" aria-hidden="true"></span>
+</div>
 <script>
 window.commonTodoItems = <?= json_encode($common_items, JSON_UNESCAPED_UNICODE); ?>;
 </script>
@@ -295,6 +305,13 @@ window.addEventListener('DOMContentLoaded',()=>{
   const commonListEl=document.getElementById('commonItemsList');
   const commonEmptyEl=document.getElementById('commonItemsEmpty');
   const addCommonBtn=document.getElementById('addCommonItem');
+  const undoBanner=document.getElementById('undoDeleteBanner');
+  const undoButton=undoBanner?.querySelector('.undo-button');
+  const undoCountdown=undoBanner?.querySelector('.countdown');
+  const undoDuration=6000;
+  let pendingDeletion=null;
+  let undoTimer=null;
+  let countdownTimer=null;
 
   function rebuildCommonContentSet(){
     const uniqueMap=new Map();
@@ -699,6 +716,14 @@ window.addEventListener('DOMContentLoaded',()=>{
     addCommonBtn.addEventListener('click',appendDraftCommonItem);
   }
 
+  if(undoButton){
+    undoButton.addEventListener('click',()=>{
+      if(pendingDeletion){
+        restoreDeletedItem(pendingDeletion);
+      }
+    });
+  }
+
   window.addEventListener('resize',updateSuggestionPosition);
   window.addEventListener('scroll',updateSuggestionPosition,true);
   renderCommonManagerList();
@@ -774,6 +799,117 @@ window.addEventListener('DOMContentLoaded',()=>{
       if(span) span.textContent=`(${done}/${total})`;
     });
   }
+  function updateUndoCountdownDisplay(remainingMs){
+    if(!undoCountdown) return;
+    const seconds=Math.max(1,Math.ceil(remainingMs/1000));
+    undoCountdown.textContent=getLocalizedText('todolist.delete.undo_countdown','Undo in {seconds}s',{seconds});
+  }
+  function hideUndoBanner(){
+    if(!undoBanner) return;
+    undoBanner.style.display='none';
+    undoBanner.setAttribute('aria-hidden','true');
+    if(undoCountdown) undoCountdown.textContent='';
+  }
+  function finalizeDeletion(entry){
+    clearTimeout(undoTimer);
+    clearInterval(countdownTimer);
+    if(entry && entry.id){
+      postData({action:'delete',id:entry.id}).then(()=>updateStats());
+    }
+    pendingDeletion=null;
+    hideUndoBanner();
+  }
+  function restoreDeletedItem(entry){
+    clearTimeout(undoTimer);
+    clearInterval(countdownTimer);
+    if(!entry || !entry.list || !entry.element) return;
+    const children=Array.from(entry.list.children);
+    const anchor=entry.position < children.length ? children[entry.position] : null;
+    entry.list.insertBefore(entry.element,anchor);
+    saveItem(entry.element);
+    updateStats();
+    pendingDeletion=null;
+    hideUndoBanner();
+  }
+  function showUndoBanner(){
+    if(!undoBanner) return;
+    undoBanner.style.display='flex';
+    undoBanner.setAttribute('aria-hidden','false');
+    if(typeof applyTranslations==='function'){
+      applyTranslations();
+    }
+    updateUndoCountdownDisplay(undoDuration);
+    const start=Date.now();
+    clearInterval(countdownTimer);
+    countdownTimer=setInterval(()=>{
+      const elapsed=Date.now()-start;
+      const remaining=Math.max(0,undoDuration-elapsed);
+      updateUndoCountdownDisplay(remaining);
+      if(remaining<=0){
+        clearInterval(countdownTimer);
+      }
+    },200);
+  }
+  function startPendingDeletion(li){
+    if(!li) return;
+    const list=li.parentElement;
+    const id=li.dataset.id;
+    if(pendingDeletion){
+      finalizeDeletion(pendingDeletion);
+    }
+    const position=Array.from(list.children).indexOf(li);
+    list.removeChild(li);
+    pendingDeletion={id,list,position,element:li};
+    updateStats();
+    if(!id){
+      pendingDeletion=null;
+      hideUndoBanner();
+      return;
+    }
+    showUndoBanner();
+    undoTimer=setTimeout(()=>{
+      finalizeDeletion({id});
+    },undoDuration);
+  }
+  const multilineThreshold=48;
+  function shouldExpandMultiline(input){
+    if(!input) return false;
+    const value=String(input.value||'');
+    return value.length>multilineThreshold || value.includes('\n');
+  }
+  function expandMultiline(input){
+    if(!input) return;
+    input.dataset.multiline='1';
+    input.classList.add('is-multiline');
+    input.rows=Math.min(8,Math.max(2,(input.value.split('\n').length||1)));
+    input.style.height='auto';
+    input.style.height=Math.min(320,input.scrollHeight+4)+'px';
+    const wrapper=input.closest('.todo-input-wrapper');
+    if(wrapper){
+      wrapper.classList.add('is-multiline');
+    }
+  }
+  function collapseMultiline(input){
+    if(!input) return;
+    input.dataset.multiline='0';
+    input.classList.remove('is-multiline');
+    input.rows=1;
+    input.style.height='';
+    const wrapper=input.closest('.todo-input-wrapper');
+    if(wrapper){
+      wrapper.classList.remove('is-multiline');
+    }
+  }
+  function adjustMultiline(input){
+    if(!input) return;
+    if(shouldExpandMultiline(input)){
+      expandMultiline(input);
+    }
+    if(input.dataset.multiline==='1'){
+      input.style.height='auto';
+      input.style.height=Math.min(320,input.scrollHeight+4)+'px';
+    }
+  }
   function saveItem(li){
     const id=li.dataset.id;
     const content=li.querySelector('.item-content').value;
@@ -810,16 +946,18 @@ window.addEventListener('DOMContentLoaded',()=>{
   function attach(li){
     const content=li.querySelector('.item-content');
     prepareInlineHighlight(content);
+    collapseMultiline(content);
     if(enableEditing){
       content.addEventListener('input',()=>{
         saveItem(li);
         highlightItem(content);
+        adjustMultiline(content);
         if(document.activeElement===content){
           showCommonSuggestionBar(content);
         }
       });
-      content.addEventListener('focus',()=>{showCommonSuggestionBar(content);highlightItem(content);});
-      content.addEventListener('blur',scheduleHideSuggestionBar);
+      content.addEventListener('focus',()=>{showCommonSuggestionBar(content);highlightItem(content);adjustMultiline(content);});
+      content.addEventListener('blur',()=>{scheduleHideSuggestionBar();collapseMultiline(content);});
     }else{
       content.setAttribute('readonly',true);
     }
@@ -846,7 +984,7 @@ window.addEventListener('DOMContentLoaded',()=>{
           updateStats();
         }
       });
-      li.querySelector('.delete-item').addEventListener('click',()=>{postData({action:'delete',id:li.dataset.id}).then(()=>{li.remove();updateStats();});});
+      li.querySelector('.delete-item').addEventListener('click',()=>startPendingDeletion(li));
     }else{
       li.querySelectorAll('.copy-item,.next-week-item,.tomorrow-item,.delete-item').forEach(btn=>btn.style.display='none');
     }
@@ -914,7 +1052,7 @@ window.addEventListener('DOMContentLoaded',()=>{
           </button>` : '';
         li.innerHTML = `
           <input type="checkbox" class="form-check-input me-2 item-done">
-          <input type="text" class="form-control item-content flex-grow-1 me-2">
+          <textarea class="form-control item-content flex-grow-1 me-2" rows="1" data-multiline="0"></textarea>
           ${copyBtnHtml}
           ${nextWeekBtnHtml}
           ${tomorrowBtnHtml}
