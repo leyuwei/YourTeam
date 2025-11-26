@@ -57,7 +57,10 @@ $today_key = strtolower(date('D'));
 .todolist li .item-content.is-multiline{line-height:1.4;}
 .todo-input-wrapper.is-multiline .todo-highlight-layer{align-items:flex-start;}
 .todo-input-wrapper.is-multiline .todo-highlight-content{white-space:pre-wrap;word-break:break-word;}
+.todolist li .drag-handle{cursor:grab;}
+.todolist li .drag-handle:active{cursor:grabbing;}
 .todolist li .copy-item{margin-left:auto;}
+.todolist li .drag-handle,
 .todolist li .copy-item,
 .todolist li .next-week-item{white-space:nowrap;}
 .todolist li .icon-btn{width:2rem;height:2rem;padding:0;display:inline-flex;align-items:center;justify-content:center;}
@@ -145,6 +148,12 @@ $today_key = strtolower(date('D'));
     <ul class="list-group mb-3 todolist<?= $is_today ? ' today' : '' ?>" data-category="work" data-day="<?= $k; ?>">
       <?php if(!empty($items['work'][$k])): foreach($items['work'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
+        <button type="button" class="btn btn-sm btn-outline-secondary me-2 drag-handle icon-btn" title="拖动排序" data-i18n-title="todolist.drag_handle" aria-label="拖动排序">
+          <span class="visually-hidden" data-i18n="todolist.drag_handle">拖动排序</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M3 5h10M3 8h10M3 11h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>
+          </svg>
+        </button>
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <textarea class="form-control item-content flex-grow-1 me-2" rows="1" data-multiline="0"><?= htmlspecialchars($it['content']); ?></textarea>
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
@@ -188,6 +197,12 @@ $today_key = strtolower(date('D'));
     <ul class="list-group mb-3 todolist<?= $is_today ? ' today' : '' ?>" data-category="personal" data-day="<?= $k; ?>">
       <?php if(!empty($items['personal'][$k])): foreach($items['personal'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
+        <button type="button" class="btn btn-sm btn-outline-secondary me-2 drag-handle icon-btn" title="拖动排序" data-i18n-title="todolist.drag_handle" aria-label="拖动排序">
+          <span class="visually-hidden" data-i18n="todolist.drag_handle">拖动排序</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M3 5h10M3 8h10M3 11h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>
+          </svg>
+        </button>
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <textarea class="form-control item-content flex-grow-1 me-2" rows="1" data-multiline="0"><?= htmlspecialchars($it['content']); ?></textarea>
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
@@ -226,6 +241,12 @@ $today_key = strtolower(date('D'));
     <ul class="list-group mb-3 todolist" data-category="longterm" data-day="">
       <?php if(!empty($items['longterm'][''])): foreach($items['longterm'][''] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
+        <button type="button" class="btn btn-sm btn-outline-secondary me-2 drag-handle icon-btn" title="拖动排序" data-i18n-title="todolist.drag_handle" aria-label="拖动排序">
+          <span class="visually-hidden" data-i18n="todolist.drag_handle">拖动排序</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M3 5h10M3 8h10M3 11h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>
+          </svg>
+        </button>
         <input type="checkbox" class="form-check-input me-2 item-done" <?= $it['is_done']?'checked':''; ?>>
         <textarea class="form-control item-content flex-grow-1 me-2" rows="1" data-multiline="0"><?= htmlspecialchars($it['content']); ?></textarea>
         <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
@@ -986,7 +1007,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       });
       li.querySelector('.delete-item').addEventListener('click',()=>startPendingDeletion(li));
     }else{
-      li.querySelectorAll('.copy-item,.next-week-item,.tomorrow-item,.delete-item').forEach(btn=>btn.style.display='none');
+      li.querySelectorAll('.drag-handle,.copy-item,.next-week-item,.tomorrow-item,.delete-item').forEach(btn=>btn.style.display='none');
     }
     highlightItem(content);
   }
@@ -995,6 +1016,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       Sortable.create(list,{
         group:'todolist',
         animation:150,
+        handle:'.drag-handle',
         onChoose:function(){
           hideCommonSuggestionBar();
         },
@@ -1020,6 +1042,13 @@ window.addEventListener('DOMContentLoaded',()=>{
         const list=document.querySelector(`.todolist[data-category='${btn.dataset.category}'][data-day='${btn.dataset.day}']`);
         const li=document.createElement('li');
         li.className='list-group-item d-flex align-items-center flex-nowrap';
+        const dragHandleHtml = `
+          <button type="button" class="btn btn-sm btn-outline-secondary me-2 drag-handle icon-btn" title="拖动排序" data-i18n-title="todolist.drag_handle" aria-label="拖动排序">
+            <span class="visually-hidden" data-i18n="todolist.drag_handle">拖动排序</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M3 5h10M3 8h10M3 11h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>
+            </svg>
+          </button>`;
         const copyBtnHtml = `
           <button class="btn btn-sm btn-outline-secondary ms-auto copy-item icon-btn" title="复制" data-i18n-title="todolist.copy_item" aria-label="复制">
             <span class="visually-hidden" data-i18n="todolist.copy_item">复制</span>
@@ -1051,6 +1080,7 @@ window.addEventListener('DOMContentLoaded',()=>{
             </svg>
           </button>` : '';
         li.innerHTML = `
+          ${dragHandleHtml}
           <input type="checkbox" class="form-check-input me-2 item-done">
           <textarea class="form-control item-content flex-grow-1 me-2" rows="1" data-multiline="0"></textarea>
           ${copyBtnHtml}
