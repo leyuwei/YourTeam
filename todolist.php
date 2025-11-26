@@ -63,8 +63,10 @@ $today_key = strtolower(date('D'));
 .todolist li .drag-handle,
 .todolist li .copy-item,
 .todolist li .next-week-item{white-space:nowrap;}
-.todolist li .icon-btn{width:2rem;height:2rem;padding:0;display:inline-flex;align-items:center;justify-content:center;}
-.todolist li .icon-btn svg{width:1.1rem;height:1.1rem;}
+.todolist li .icon-btn{width:1.75rem;height:1.75rem;padding:0;display:inline-flex;align-items:center;justify-content:center;}
+.todolist li .drag-handle.icon-btn{border:none;background:transparent;color:inherit;}
+.todolist li .drag-handle.icon-btn:focus{box-shadow:0 0 0 0.15rem rgba(13,110,253,0.25);}
+.todolist li .icon-btn svg{width:1rem;height:1rem;}
 .today-heading{background:var(--app-highlight-bg);color:var(--app-highlight-text);padding:2px 4px;border-radius:4px;}
 .today-heading .btn{color:inherit;border-color:var(--app-highlight-border);}
 .today-heading .btn:hover,.today-heading .btn:focus{background-color:var(--app-highlight-button-hover);color:var(--app-text-color);}
