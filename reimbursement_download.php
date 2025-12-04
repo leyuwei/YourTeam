@@ -12,7 +12,7 @@ $is_manager = ($_SESSION['role'] === 'manager');
 if(!($is_manager || $batch['in_charge_member_id']==$member_id)){
     exit('No permission');
 }
-$receipts = $pdo->prepare("SELECT r.*, mb.name AS member_name FROM reimbursement_receipts r JOIN members mb ON r.member_id=mb.id WHERE r.batch_id=? AND r.status!='refused'");
+$receipts = $pdo->prepare("SELECT r.*, mb.name AS member_name, mb.campus_id FROM reimbursement_receipts r JOIN members mb ON r.member_id=mb.id WHERE r.batch_id=? AND r.status!='refused'");
 $receipts->execute([$id]);
 $items = $receipts->fetchAll();
 $zip = new ZipArchive();
@@ -20,13 +20,13 @@ $tmp = tempnam(sys_get_temp_dir(),'zip');
 $zip->open($tmp, ZipArchive::CREATE);
 $fp = fopen('php://temp', 'r+');
 fputs($fp, "\xEF\xBB\xBF");
-fputcsv($fp, ['id','member','original_filename','category','description','price','status','uploaded_at']);
+fputcsv($fp, ['id','member','campus_id','original_filename','category','description','price','status','uploaded_at']);
 foreach($items as $r){
     $path = __DIR__."/reimburse_uploads/".$id."/".$r['stored_filename'];
     if(is_file($path)){
         $zip->addFile($path, $r['original_filename']);
     }
-    fputcsv($fp, [$r['id'],$r['member_name'],$r['original_filename'],$r['category'],$r['description'],$r['price'],$r['status'],$r['uploaded_at']]);
+    fputcsv($fp, [$r['id'],$r['member_name'],$r['campus_id'],$r['original_filename'],$r['category'],$r['description'],$r['price'],$r['status'],$r['uploaded_at']]);
 }
 rewind($fp);
 $csv = stream_get_contents($fp);

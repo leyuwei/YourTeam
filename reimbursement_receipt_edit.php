@@ -66,7 +66,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                     $tmpPath = $_FILES['receipt']['tmp_name'];
                     $orig_base = pathinfo($orig, PATHINFO_FILENAME);
                     $suffix = mt_rand(1000,9999) . '-' . time();
-                    $orig = $orig_base . '-' . $suffix . '.' . $ext;
+                    $orig = $orig_base . '-' . $mi['name'] . '-' . $suffix . '.' . $ext;
                     if($ext==='pdf'){
                         $keywords=$pdo->query("SELECT keyword FROM reimbursement_prohibited_keywords")->fetchAll(PDO::FETCH_COLUMN);
                         $content=@shell_exec('pdftotext '.escapeshellarg($tmpPath).' -');

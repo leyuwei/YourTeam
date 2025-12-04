@@ -14,11 +14,20 @@ if(!$batch){
 $allowedTypes = $batch['allowed_types'] ? explode(',', $batch['allowed_types']) : ['office','electronic','membership','book','trip'];
 $is_manager = ($_SESSION['role'] === 'manager');
 $member_id = $_SESSION['member_id'] ?? null;
+$can_edit_notice = ($is_manager || $batch['in_charge_member_id']==$member_id);
 $deadline_passed = (strtotime($batch['deadline']) < strtotime(date('Y-m-d')));
 $batch_locked = ($batch['status'] !== 'open');
 $error = '';
 
 if($_SERVER['REQUEST_METHOD']==='POST'){
+    if(isset($_POST['update_notice']) && $can_edit_notice){
+        $notice_en = trim($_POST['notice_en'] ?? '');
+        $notice_zh = trim($_POST['notice_zh'] ?? '');
+        $pdo->prepare("UPDATE reimbursement_batches SET notice_en=?, notice_zh=? WHERE id=?")->execute([$notice_en, $notice_zh, $id]);
+        $batch['notice_en'] = $notice_en;
+        $batch['notice_zh'] = $notice_zh;
+        add_batch_log($pdo,$id,$_SESSION['username'],'Batch notice updated');
+    }
     if(isset($_POST['lock']) && ($is_manager || $batch['in_charge_member_id']==$member_id)){
         $pdo->prepare("UPDATE reimbursement_batches SET status='locked' WHERE id=?")->execute([$id]);
         $pdo->prepare("UPDATE reimbursement_receipts SET status='locked' WHERE batch_id=? AND status<>'refused'")->execute([$id]);
@@ -64,7 +73,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                     $tmpPath = $_FILES['receipt']['tmp_name'];
                     $orig_base = pathinfo($orig, PATHINFO_FILENAME);
                     $suffix = mt_rand(1000,9999) . '-' . time();
-                    $orig = $orig_base . '-' . $suffix . '.' . $ext;
+                    $memberInfo = $pdo->prepare("SELECT name,campus_id FROM members WHERE id=?");
+                    $memberInfo->execute([$member_id]);
+                    $mi = $memberInfo->fetch();
+                    $orig = $orig_base . '-' . $mi['name'] . '-' . $suffix . '.' . $ext;
                     if($ext === 'pdf'){
                         $keywords=$pdo->query("SELECT keyword FROM reimbursement_prohibited_keywords")->fetchAll(PDO::FETCH_COLUMN);
                         $content=@shell_exec('pdftotext '.escapeshellarg($tmpPath).' -');
@@ -77,9 +89,6 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                         }
                     }
                     if(!$error){
-                        $memberInfo = $pdo->prepare("SELECT name,campus_id FROM members WHERE id=?");
-                        $memberInfo->execute([$member_id]);
-                        $mi = $memberInfo->fetch();
                         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND status<>'refused'");
                         $countStmt->execute([$id,$member_id]);
                         $index = $countStmt->fetchColumn()+1;
@@ -144,6 +153,57 @@ if($is_manager){
 <p><strong data-i18n="reimburse.batch.incharge">In Charge:</strong> <?= htmlspecialchars($batch['in_charge_name']); ?> &nbsp; <strong data-i18n="reimburse.batch.deadline">Deadline:</strong> <?= htmlspecialchars($batch['deadline']); ?> &nbsp; <strong data-i18n="reimburse.batch.limit">Limit:</strong> <?= htmlspecialchars($batch['price_limit']); ?> &nbsp; <strong data-i18n="reimburse.batch.status">Status:</strong> <span data-i18n="reimburse.status.<?= $batch['status']; ?>"><?= htmlspecialchars($batch['status']); ?></span></p>
 <p><strong data-i18n="reimburse.batch.allowed_types">Allowed Types:</strong>
 <?php if($allowedTypes){ foreach($allowedTypes as $t){ echo '<span data-i18n="reimburse.category.'.$t.'">'.$t.'</span> '; } } else { echo '<span data-i18n="reimburse.batch.none">None</span>'; } ?></p>
+<div class="alert alert-info border border-primary border-3 bg-light-subtle" role="status">
+  <div class="d-flex justify-content-between align-items-start mb-2">
+    <div class="fw-bold" data-i18n="reimburse.batch.notice.title">Batch Notice</div>
+    <div class="d-flex gap-2">
+      <?php if($can_edit_notice): ?>
+      <span class="badge bg-primary align-self-center" data-i18n="reimburse.batch.notice.editable">Editable</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editNoticeModal" data-i18n="reimburse.batch.notice.edit_button">Edit Notice</button>
+      <?php endif; ?>
+    </div>
+  </div>
+  <?php $hasNotice = ($batch['notice_en'] ?? '') !== '' || ($batch['notice_zh'] ?? '') !== ''; ?>
+  <?php if($hasNotice): ?>
+  <div class="notice-text" data-lang="en"><?= nl2br(htmlspecialchars($batch['notice_en'] ?? '')); ?></div>
+  <div class="notice-text" data-lang="zh"><?= nl2br(htmlspecialchars($batch['notice_zh'] ?? '')); ?></div>
+  <?php else: ?>
+  <div class="text-muted" data-i18n="reimburse.batch.notice.empty">No notice yet.</div>
+  <?php endif; ?>
+</div>
+<style>
+.notice-text[data-lang]{display:none;}
+html[lang="en"] .notice-text[data-lang="en"], html:not([lang]) .notice-text[data-lang="zh"]{display:block;}
+html[lang="zh"] .notice-text[data-lang="zh"]{display:block;}
+</style>
+<?php if($can_edit_notice): ?>
+<div class="modal fade" id="editNoticeModal" tabindex="-1" aria-labelledby="editNoticeLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editNoticeLabel" data-i18n="reimburse.batch.notice.edit_title">Edit Batch Notice</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="update_notice" value="1">
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.notice.en">Notice (English)</label>
+          <textarea name="notice_en" class="form-control" rows="3" placeholder="" aria-describedby="noticeHelpEn"><?= htmlspecialchars($batch['notice_en'] ?? ''); ?></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.notice.zh">Notice (Chinese)</label>
+          <textarea name="notice_zh" class="form-control" rows="3" placeholder="" aria-describedby="noticeHelpZh"><?= htmlspecialchars($batch['notice_zh'] ?? ''); ?></textarea>
+        </div>
+        <div class="text-muted" id="noticeHelpEn" data-i18n="reimburse.batch.notice.hint">Visible to everyone; only managers and the person in charge can edit.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.notice.cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.notice.save">Save Notice</button>
+      </div>
+    </form>
+  </div>
+</div>
+<?php endif; ?>
 <?php if($is_manager || $batch['in_charge_member_id']==$member_id): ?>
 <div class="alert alert-danger fw-bold" data-i18n="reimburse.batch.check_warning">You should carefully check the content of each receipt and refuse those unqualified receipts before proceeding to the next step</div>
 <?php endif; ?>
