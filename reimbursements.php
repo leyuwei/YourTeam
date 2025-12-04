@@ -12,17 +12,20 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']
     $deadline = $_POST['deadline'];
     $limit = $_POST['price_limit'] !== '' ? $_POST['price_limit'] : null;
     $allowed = isset($_POST['allowed_types']) ? implode(',', $_POST['allowed_types']) : null;
+    $notice_en = trim($_POST['notice_en'] ?? '');
+    $notice_zh = trim($_POST['notice_zh'] ?? '');
     if($id){
-        $oldStmt = $pdo->prepare("SELECT title,in_charge_member_id,deadline,price_limit,allowed_types FROM reimbursement_batches WHERE id=?");
+        $oldStmt = $pdo->prepare("SELECT title,in_charge_member_id,deadline,price_limit,allowed_types,notice_en,notice_zh FROM reimbursement_batches WHERE id=?");
         $oldStmt->execute([$id]);
         $old = $oldStmt->fetch();
-        $stmt = $pdo->prepare("UPDATE reimbursement_batches SET title=?, in_charge_member_id=?, deadline=?, price_limit=?, allowed_types=? WHERE id=?");
-        $stmt->execute([$title, $incharge, $deadline, $limit, $allowed, $id]);
+        $stmt = $pdo->prepare("UPDATE reimbursement_batches SET title=?, in_charge_member_id=?, deadline=?, price_limit=?, allowed_types=?, notice_en=?, notice_zh=? WHERE id=?");
+        $stmt->execute([$title, $incharge, $deadline, $limit, $allowed, $notice_en, $notice_zh, $id]);
         if($old){
             if($old['title'] !== $title) add_batch_log($pdo,$id,$_SESSION['username'],'Title changed from '.$old['title'].' to '.$title);
             if($old['deadline'] !== $deadline) add_batch_log($pdo,$id,$_SESSION['username'],'Deadline changed from '.$old['deadline'].' to '.$deadline);
             if($old['price_limit'] != $limit) add_batch_log($pdo,$id,$_SESSION['username'],'Price limit changed from '.$old['price_limit'].' to '.$limit);
             if($old['allowed_types'] !== $allowed) add_batch_log($pdo,$id,$_SESSION['username'],'Allowed types changed');
+            if($old['notice_en'] !== $notice_en || $old['notice_zh'] !== $notice_zh) add_batch_log($pdo,$id,$_SESSION['username'],'Batch notice updated');
             if($old['in_charge_member_id'] != $incharge){
                 $oldName='None';
                 if($old['in_charge_member_id']){ $s=$pdo->prepare('SELECT name FROM members WHERE id=?'); $s->execute([$old['in_charge_member_id']]); $oldName=$s->fetchColumn()?:'None'; }
@@ -32,8 +35,8 @@ if($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['title']
             }
         }
     } else {
-        $stmt = $pdo->prepare("INSERT INTO reimbursement_batches (title, in_charge_member_id, deadline, price_limit, allowed_types) VALUES (?,?,?,?,?)");
-        $stmt->execute([$title, $incharge, $deadline, $limit, $allowed]);
+        $stmt = $pdo->prepare("INSERT INTO reimbursement_batches (title, in_charge_member_id, deadline, price_limit, allowed_types, notice_en, notice_zh) VALUES (?,?,?,?,?,?,?)");
+        $stmt->execute([$title, $incharge, $deadline, $limit, $allowed, $notice_en, $notice_zh]);
         $newId=$pdo->lastInsertId();
         add_batch_log($pdo,$newId,$_SESSION['username'],'Batch created');
     }
@@ -148,7 +151,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
     <a class="btn btn-sm btn-info" href="reimbursement_download.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_download">Download</a>
     <?php endif; ?>
     <?php if($is_manager): ?>
-    <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-types="<?= htmlspecialchars($b['allowed_types']); ?>" data-i18n="reimburse.action_edit">Edit</button>
+    <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-types="<?= htmlspecialchars($b['allowed_types']); ?>" data-notice-en="<?= htmlspecialchars($b['notice_en'] ?? '',ENT_QUOTES); ?>" data-notice-zh="<?= htmlspecialchars($b['notice_zh'] ?? '',ENT_QUOTES); ?>" data-i18n="reimburse.action_edit">Edit</button>
     <a class="btn btn-sm btn-danger" href="reimbursement_batch_delete.php?id=<?= $b['id']; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_delete_batch']);">Delete</a>
     <?php endif; ?>
   </td>
@@ -214,7 +217,7 @@ html[lang="zh"] .announcement[data-lang="zh"]{display:block;}
         <a class="btn btn-sm btn-info" href="reimbursement_download.php?id=<?= $b['id']; ?>" data-i18n="reimburse.action_download">Download</a>
         <?php endif; ?>
         <?php if($is_manager): ?>
-        <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-types="<?= htmlspecialchars($b['allowed_types']); ?>" data-i18n="reimburse.action_edit">Edit</button>
+        <button class="btn btn-sm btn-warning edit-batch" data-id="<?= $b['id']; ?>" data-title="<?= htmlspecialchars($b['title'],ENT_QUOTES); ?>" data-incharge="<?= $b['in_charge_member_id']; ?>" data-deadline="<?= $b['deadline']; ?>" data-limit="<?= $b['price_limit']; ?>" data-types="<?= htmlspecialchars($b['allowed_types']); ?>" data-notice-en="<?= htmlspecialchars($b['notice_en'] ?? '',ENT_QUOTES); ?>" data-notice-zh="<?= htmlspecialchars($b['notice_zh'] ?? '',ENT_QUOTES); ?>" data-i18n="reimburse.action_edit">Edit</button>
         <a class="btn btn-sm btn-danger" href="reimbursement_batch_delete.php?id=<?= $b['id']; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_delete_batch']);">Delete</a>
         <?php endif; ?>
       </td>
@@ -305,6 +308,14 @@ if(completedToggle && completedContainer){
           </div>
           <?php endforeach; ?>
         </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.notice.en">Notice (English)</label>
+          <textarea name="notice_en" class="form-control" id="batch-notice-en" rows="2"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.notice.zh">Notice (Chinese)</label>
+          <textarea name="notice_zh" class="form-control" id="batch-notice-zh" rows="2"></textarea>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.cancel">Cancel</button>
@@ -321,6 +332,8 @@ if(completedToggle && completedContainer){
       document.getElementById('batch-incharge').value=btn.dataset.incharge;
       document.getElementById('batch-deadline').value=btn.dataset.deadline;
       document.getElementById('batch-limit').value=btn.dataset.limit;
+      document.getElementById('batch-notice-en').value=btn.dataset.noticeEn || '';
+      document.getElementById('batch-notice-zh').value=btn.dataset.noticeZh || '';
       document.querySelectorAll('input[name="allowed_types[]"]').forEach(cb=>{cb.checked=false;});
       if(btn.dataset.types){
         btn.dataset.types.split(',').forEach(t=>{
@@ -336,6 +349,8 @@ if(completedToggle && completedContainer){
   document.getElementById('batchModal').addEventListener('hidden.bs.modal',()=>{
     document.getElementById('batch-id').value='';
     document.getElementById('batch-limit').value='';
+    document.getElementById('batch-notice-en').value='';
+    document.getElementById('batch-notice-zh').value='';
     document.querySelectorAll('input[name="allowed_types[]"]').forEach(cb=>{cb.checked=false;});
     document.getElementById('batchModalLabel').textContent=translations[document.documentElement.lang||'zh']['reimburse.add_batch'];
   });

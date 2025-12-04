@@ -158,6 +158,8 @@ CREATE TABLE reimbursement_batches (
   deadline DATE NOT NULL,
   price_limit DECIMAL(10,2) DEFAULT NULL,
   allowed_types VARCHAR(255) DEFAULT NULL,
+  notice_en TEXT DEFAULT NULL,
+  notice_zh TEXT DEFAULT NULL,
   status ENUM('open','locked','completed') DEFAULT 'open',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (in_charge_member_id) REFERENCES members(id) ON DELETE SET NULL
