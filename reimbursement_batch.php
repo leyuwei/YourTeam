@@ -156,9 +156,12 @@ if($is_manager){
 <div class="alert alert-info border border-primary border-3 bg-light-subtle" role="status">
   <div class="d-flex justify-content-between align-items-start mb-2">
     <div class="fw-bold" data-i18n="reimburse.batch.notice.title">Batch Notice</div>
-    <?php if($can_edit_notice): ?>
-    <span class="badge bg-primary" data-i18n="reimburse.batch.notice.editable">Editable</span>
-    <?php endif; ?>
+    <div class="d-flex gap-2">
+      <?php if($can_edit_notice): ?>
+      <span class="badge bg-primary align-self-center" data-i18n="reimburse.batch.notice.editable">Editable</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editNoticeModal" data-i18n="reimburse.batch.notice.edit_button">Edit Notice</button>
+      <?php endif; ?>
+    </div>
   </div>
   <?php $hasNotice = ($batch['notice_en'] ?? '') !== '' || ($batch['notice_zh'] ?? '') !== ''; ?>
   <?php if($hasNotice): ?>
@@ -174,24 +177,32 @@ html[lang="en"] .notice-text[data-lang="en"], html:not([lang]) .notice-text[data
 html[lang="zh"] .notice-text[data-lang="zh"]{display:block;}
 </style>
 <?php if($can_edit_notice): ?>
-<form method="post" class="card border-primary mb-4">
-  <div class="card-header bg-primary text-white fw-bold" data-i18n="reimburse.batch.notice.edit_title">Edit Batch Notice</div>
-  <div class="card-body">
-    <input type="hidden" name="update_notice" value="1">
-    <div class="mb-3">
-      <label class="form-label" data-i18n="reimburse.batch.notice.en">Notice (English)</label>
-      <textarea name="notice_en" class="form-control" rows="3" placeholder="" aria-describedby="noticeHelpEn"><?= htmlspecialchars($batch['notice_en'] ?? ''); ?></textarea>
-    </div>
-    <div class="mb-3">
-      <label class="form-label" data-i18n="reimburse.batch.notice.zh">Notice (Chinese)</label>
-      <textarea name="notice_zh" class="form-control" rows="3" placeholder="" aria-describedby="noticeHelpZh"><?= htmlspecialchars($batch['notice_zh'] ?? ''); ?></textarea>
-    </div>
-    <div class="text-muted" id="noticeHelpEn" data-i18n="reimburse.batch.notice.hint">Visible to everyone; only managers and the person in charge can edit.</div>
+<div class="modal fade" id="editNoticeModal" tabindex="-1" aria-labelledby="editNoticeLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="post" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editNoticeLabel" data-i18n="reimburse.batch.notice.edit_title">Edit Batch Notice</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="update_notice" value="1">
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.notice.en">Notice (English)</label>
+          <textarea name="notice_en" class="form-control" rows="3" placeholder="" aria-describedby="noticeHelpEn"><?= htmlspecialchars($batch['notice_en'] ?? ''); ?></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.notice.zh">Notice (Chinese)</label>
+          <textarea name="notice_zh" class="form-control" rows="3" placeholder="" aria-describedby="noticeHelpZh"><?= htmlspecialchars($batch['notice_zh'] ?? ''); ?></textarea>
+        </div>
+        <div class="text-muted" id="noticeHelpEn" data-i18n="reimburse.batch.notice.hint">Visible to everyone; only managers and the person in charge can edit.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.notice.cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.notice.save">Save Notice</button>
+      </div>
+    </form>
   </div>
-  <div class="card-footer text-end">
-    <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.notice.save">Save Notice</button>
-  </div>
-</form>
+</div>
 <?php endif; ?>
 <?php if($is_manager || $batch['in_charge_member_id']==$member_id): ?>
 <div class="alert alert-danger fw-bold" data-i18n="reimburse.batch.check_warning">You should carefully check the content of each receipt and refuse those unqualified receipts before proceeding to the next step</div>
