@@ -102,11 +102,18 @@ $results = [
 if ($searchQuery !== '') {
     try {
         $like = '%' . implode('%', array_filter(preg_split('/\s+/', $searchQuery))) . '%';
-        $knowledgeStmt = $pdo->prepare("SELECT DISTINCT e.id, e.content_zh, e.content_en FROM askme_entries e LEFT JOIN askme_keywords k ON e.id = k.entry_id WHERE ((:lang = 'en' AND e.content_en LIKE :pattern_en) OR (:lang != 'en' AND e.content_zh LIKE :pattern_zh) OR k.keyword LIKE :pattern_kw) ORDER BY e.updated_at DESC, e.id DESC LIMIT 50");
+        $knowledgeStmt = $pdo->prepare(
+            "SELECT DISTINCT e.id, e.content_zh, e.content_en
+             FROM askme_entries e
+             LEFT JOIN askme_keywords k ON e.id = k.entry_id
+             WHERE e.content_zh LIKE :pattern_text
+                OR e.content_en LIKE :pattern_text
+                OR k.keyword LIKE :pattern_kw
+             ORDER BY e.updated_at DESC, e.id DESC
+             LIMIT 50"
+        );
         $knowledgeStmt->execute([
-            ':lang' => $lang,
-            ':pattern_en' => $like,
-            ':pattern_zh' => $like,
+            ':pattern_text' => $like,
             ':pattern_kw' => $like,
         ]);
         $results['knowledge'] = $knowledgeStmt->fetchAll();
