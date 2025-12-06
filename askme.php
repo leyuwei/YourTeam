@@ -159,10 +159,38 @@ function renderResults(items) {
 
     body.appendChild(header);
     body.appendChild(snippet);
+
+    if (item.source === 'askme_entries' && item.content) {
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'btn btn-link ps-0 mt-2';
+      toggle.dataset.i18n = 'askme.show_detail';
+      toggle.textContent = getTranslation('askme.show_detail');
+
+      const detail = document.createElement('div');
+      detail.className = 'mt-2 p-3 bg-light border rounded d-none';
+      const detailText = document.createElement('p');
+      detailText.className = 'mb-0';
+      detailText.textContent = item.content;
+      detail.appendChild(detailText);
+
+      toggle.addEventListener('click', () => {
+        const isHidden = detail.classList.contains('d-none');
+        detail.classList.toggle('d-none');
+        const key = isHidden ? 'askme.hide_detail' : 'askme.show_detail';
+        toggle.dataset.i18n = key;
+        toggle.textContent = getTranslation(key);
+      });
+
+      body.appendChild(toggle);
+      body.appendChild(detail);
+    }
+
     card.appendChild(body);
     col.appendChild(card);
     resultsContainer.appendChild(col);
   });
+  applyI18n();
 }
 
 function getTranslation(key) {

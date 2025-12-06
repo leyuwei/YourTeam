@@ -80,7 +80,8 @@ foreach ($stmt->fetchAll() as $row) {
         'source' => 'askme_entries',
         'source_label' => 'AskMe 知识库',
         'title' => $row['keywords'],
-        'snippet' => make_snippet($text, $q)
+        'snippet' => make_snippet($text, $q),
+        'content' => $text,
     ];
 }
 
