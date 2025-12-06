@@ -306,3 +306,21 @@ INSERT INTO asset_settings (id, code_prefix, link_prefix, sync_api_prefix, sync_
 VALUES (1, 'ASSET-', '', '', NULL)
 ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix, sync_api_prefix = sync_api_prefix, sync_mapping = sync_mapping;
 
+CREATE TABLE askme_entries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  content_zh LONGTEXT NOT NULL,
+  content_en LONGTEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE askme_keywords (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  entry_id INT NOT NULL,
+  keyword VARCHAR(255) NOT NULL,
+  locale ENUM('zh','en') NOT NULL DEFAULT 'zh',
+  INDEX idx_askme_keyword_lookup (keyword(120)),
+  INDEX idx_askme_keyword_locale (locale),
+  FOREIGN KEY (entry_id) REFERENCES askme_entries(id) ON DELETE CASCADE
+);
+
