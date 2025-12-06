@@ -111,12 +111,22 @@ if ($searchQuery !== '') {
         ]);
         $results['knowledge'] = $knowledgeStmt->fetchAll();
 
-        $officeStmt = $pdo->prepare("SELECT id, name, region, location_description FROM offices WHERE name LIKE :pattern OR region LIKE :pattern OR location_description LIKE :pattern ORDER BY sort_order, name LIMIT 20");
-        $officeStmt->execute([':pattern' => $like]);
+        $officeStmt = $pdo->prepare("SELECT id, name, region, location_description FROM offices WHERE name LIKE :pattern_name OR region LIKE :pattern_region OR location_description LIKE :pattern_loc ORDER BY sort_order, name LIMIT 20");
+        $officeStmt->execute([
+            ':pattern_name' => $like,
+            ':pattern_region' => $like,
+            ':pattern_loc' => $like,
+        ]);
         $results['offices'] = $officeStmt->fetchAll();
 
-        $assetStmt = $pdo->prepare("SELECT id, asset_code, category, model, organization, remarks FROM assets WHERE asset_code LIKE :pattern OR category LIKE :pattern OR model LIKE :pattern OR organization LIKE :pattern OR remarks LIKE :pattern ORDER BY updated_at DESC LIMIT 20");
-        $assetStmt->execute([':pattern' => $like]);
+        $assetStmt = $pdo->prepare("SELECT id, asset_code, category, model, organization, remarks FROM assets WHERE asset_code LIKE :pattern_code OR category LIKE :pattern_category OR model LIKE :pattern_model OR organization LIKE :pattern_org OR remarks LIKE :pattern_remarks ORDER BY updated_at DESC LIMIT 20");
+        $assetStmt->execute([
+            ':pattern_code' => $like,
+            ':pattern_category' => $like,
+            ':pattern_model' => $like,
+            ':pattern_org' => $like,
+            ':pattern_remarks' => $like,
+        ]);
         $results['assets'] = $assetStmt->fetchAll();
     } catch (\PDOException $e) {
         $searchError = '搜索时出错，请联系管理员或运行 update_db.sql。/ Search failed. Please contact admin or run update_db.sql.';
