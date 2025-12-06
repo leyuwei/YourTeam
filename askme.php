@@ -200,33 +200,6 @@ const knowledgeId = document.getElementById('knowledgeId');
 const knowledgeContent = document.getElementById('knowledgeContent');
 const knowledgeKeywords = document.getElementById('knowledgeKeywords');
 
-knowledgeModal = new bootstrap.Modal(document.getElementById('knowledgeModal'));
-
-document.getElementById('manageKnowledge').addEventListener('click', () => {
-  knowledgeModal.show();
-  loadKnowledge();
-});
-
-knowledgeForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const payload = {
-    action: 'save',
-    id: knowledgeId.value || null,
-    content: knowledgeContent.value.trim(),
-    keywords: knowledgeKeywords.value.trim(),
-  };
-  if (!payload.content) return;
-  await fetch('askme_knowledge.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-  knowledgeId.value = '';
-  knowledgeContent.value = '';
-  knowledgeKeywords.value = '';
-  await loadKnowledge();
-});
-
 async function loadKnowledge() {
   const res = await fetch('askme_knowledge.php');
   const data = await res.json();
@@ -282,6 +255,39 @@ async function loadKnowledge() {
   });
   applyI18n();
 }
+
+window.addEventListener('load', () => {
+  if (!window.bootstrap || !bootstrap.Modal) {
+    console.error('Bootstrap is not available');
+    return;
+  }
+  knowledgeModal = new bootstrap.Modal(document.getElementById('knowledgeModal'));
+
+  document.getElementById('manageKnowledge').addEventListener('click', () => {
+    knowledgeModal.show();
+    loadKnowledge();
+  });
+
+  knowledgeForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      action: 'save',
+      id: knowledgeId.value || null,
+      content: knowledgeContent.value.trim(),
+      keywords: knowledgeKeywords.value.trim(),
+    };
+    if (!payload.content) return;
+    await fetch('askme_knowledge.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    knowledgeId.value = '';
+    knowledgeContent.value = '';
+    knowledgeKeywords.value = '';
+    await loadKnowledge();
+  });
+});
 <?php endif; ?>
 </script>
 <?php include 'footer.php'; ?>
