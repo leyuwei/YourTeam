@@ -4,6 +4,7 @@ include 'header.php';
 $isManager = ($_SESSION['role'] ?? '') === 'manager';
 $saveMessage = '';
 $saveError = '';
+$searchError = '';
 
 function normalizeKeywords(array $rawKeywords): array {
     $keywords = [];
@@ -65,24 +66,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isManager) {
     if ($contentZh === '' && $contentEn === '') {
         $saveError = '请至少填写中文或英文的知识内容。/ Please provide knowledge content in Chinese or English.';
     } else {
-        if ($entryId > 0) {
-            $updateStmt = $pdo->prepare('UPDATE askme_entries SET content_zh = ?, content_en = ?, updated_at = NOW() WHERE id = ?');
-            $updateStmt->execute([$contentZh, $contentEn, $entryId]);
-            $pdo->prepare('DELETE FROM askme_keywords WHERE entry_id = ?')->execute([$entryId]);
-        } else {
-            $insertStmt = $pdo->prepare('INSERT INTO askme_entries (content_zh, content_en, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
-            $insertStmt->execute([$contentZh, $contentEn]);
-            $entryId = (int)$pdo->lastInsertId();
-        }
+        try {
+            if ($entryId > 0) {
+                $updateStmt = $pdo->prepare('UPDATE askme_entries SET content_zh = ?, content_en = ?, updated_at = NOW() WHERE id = ?');
+                $updateStmt->execute([$contentZh, $contentEn, $entryId]);
+                $pdo->prepare('DELETE FROM askme_keywords WHERE entry_id = ?')->execute([$entryId]);
+            } else {
+                $insertStmt = $pdo->prepare('INSERT INTO askme_entries (content_zh, content_en, created_at, updated_at) VALUES (?, ?, NOW(), NOW())');
+                $insertStmt->execute([$contentZh, $contentEn]);
+                $entryId = (int)$pdo->lastInsertId();
+            }
 
-        $keywordInsert = $pdo->prepare('INSERT INTO askme_keywords (entry_id, keyword, locale) VALUES (?, ?, ?)');
-        foreach ($keywordsZh as $keyword) {
-            $keywordInsert->execute([$entryId, $keyword, 'zh']);
+            $keywordInsert = $pdo->prepare('INSERT INTO askme_keywords (entry_id, keyword, locale) VALUES (?, ?, ?)');
+            foreach ($keywordsZh as $keyword) {
+                $keywordInsert->execute([$entryId, $keyword, 'zh']);
+            }
+            foreach ($keywordsEn as $keyword) {
+                $keywordInsert->execute([$entryId, $keyword, 'en']);
+            }
+            $saveMessage = '知识库已更新。/ Knowledge base updated.';
+        } catch (\PDOException $e) {
+            $saveError = '保存知识库时出错，请联系管理员或运行 update_db.sql。/ Failed to save knowledge base. Please contact admin or run update_db.sql.';
         }
-        foreach ($keywordsEn as $keyword) {
-            $keywordInsert->execute([$entryId, $keyword, 'en']);
-        }
-        $saveMessage = '知识库已更新。/ Knowledge base updated.';
     }
 }
 
@@ -95,29 +100,40 @@ $results = [
 ];
 
 if ($searchQuery !== '') {
-    $like = '%' . implode('%', array_filter(preg_split('/\s+/', $searchQuery))) . '%';
-    $knowledgeStmt = $pdo->prepare("SELECT DISTINCT e.id, e.content_zh, e.content_en FROM askme_entries e LEFT JOIN askme_keywords k ON e.id = k.entry_id WHERE ((:lang = 'en' AND e.content_en LIKE :pattern_en) OR (:lang != 'en' AND e.content_zh LIKE :pattern_zh) OR k.keyword LIKE :pattern_kw) ORDER BY e.updated_at DESC, e.id DESC LIMIT 50");
-    $knowledgeStmt->execute([
-        ':lang' => $lang,
-        ':pattern_en' => $like,
-        ':pattern_zh' => $like,
-        ':pattern_kw' => $like,
-    ]);
-    $results['knowledge'] = $knowledgeStmt->fetchAll();
+    try {
+        $like = '%' . implode('%', array_filter(preg_split('/\s+/', $searchQuery))) . '%';
+        $knowledgeStmt = $pdo->prepare("SELECT DISTINCT e.id, e.content_zh, e.content_en FROM askme_entries e LEFT JOIN askme_keywords k ON e.id = k.entry_id WHERE ((:lang = 'en' AND e.content_en LIKE :pattern_en) OR (:lang != 'en' AND e.content_zh LIKE :pattern_zh) OR k.keyword LIKE :pattern_kw) ORDER BY e.updated_at DESC, e.id DESC LIMIT 50");
+        $knowledgeStmt->execute([
+            ':lang' => $lang,
+            ':pattern_en' => $like,
+            ':pattern_zh' => $like,
+            ':pattern_kw' => $like,
+        ]);
+        $results['knowledge'] = $knowledgeStmt->fetchAll();
 
-    $officeStmt = $pdo->prepare("SELECT id, name, region, location_description FROM offices WHERE name LIKE :pattern OR region LIKE :pattern OR location_description LIKE :pattern ORDER BY sort_order, name LIMIT 20");
-    $officeStmt->execute([':pattern' => $like]);
-    $results['offices'] = $officeStmt->fetchAll();
+        $officeStmt = $pdo->prepare("SELECT id, name, region, location_description FROM offices WHERE name LIKE :pattern OR region LIKE :pattern OR location_description LIKE :pattern ORDER BY sort_order, name LIMIT 20");
+        $officeStmt->execute([':pattern' => $like]);
+        $results['offices'] = $officeStmt->fetchAll();
 
-    $assetStmt = $pdo->prepare("SELECT id, asset_code, category, model, organization, remarks FROM assets WHERE asset_code LIKE :pattern OR category LIKE :pattern OR model LIKE :pattern OR organization LIKE :pattern OR remarks LIKE :pattern ORDER BY updated_at DESC LIMIT 20");
-    $assetStmt->execute([':pattern' => $like]);
-    $results['assets'] = $assetStmt->fetchAll();
+        $assetStmt = $pdo->prepare("SELECT id, asset_code, category, model, organization, remarks FROM assets WHERE asset_code LIKE :pattern OR category LIKE :pattern OR model LIKE :pattern OR organization LIKE :pattern OR remarks LIKE :pattern ORDER BY updated_at DESC LIMIT 20");
+        $assetStmt->execute([':pattern' => $like]);
+        $results['assets'] = $assetStmt->fetchAll();
+    } catch (\PDOException $e) {
+        $searchError = '搜索时出错，请联系管理员或运行 update_db.sql。/ Search failed. Please contact admin or run update_db.sql.';
+    }
 }
 
 $askmeEntries = [];
 if ($isManager) {
-    $entriesStmt = $pdo->query("SELECT e.*, GROUP_CONCAT(CASE WHEN k.locale = 'zh' THEN k.keyword END SEPARATOR ', ') AS keywords_zh, GROUP_CONCAT(CASE WHEN k.locale = 'en' THEN k.keyword END SEPARATOR ', ') AS keywords_en FROM askme_entries e LEFT JOIN askme_keywords k ON e.id = k.entry_id GROUP BY e.id ORDER BY e.updated_at DESC, e.id DESC");
-    $askmeEntries = $entriesStmt->fetchAll();
+    try {
+        $entriesStmt = $pdo->query("SELECT e.*, GROUP_CONCAT(CASE WHEN k.locale = 'zh' THEN k.keyword END SEPARATOR ', ') AS keywords_zh, GROUP_CONCAT(CASE WHEN k.locale = 'en' THEN k.keyword END SEPARATOR ', ') AS keywords_en FROM askme_entries e LEFT JOIN askme_keywords k ON e.id = k.entry_id GROUP BY e.id ORDER BY e.updated_at DESC, e.id DESC");
+        $askmeEntries = $entriesStmt->fetchAll();
+    } catch (\PDOException $e) {
+        $askmeEntries = [];
+        if ($saveError === '') {
+            $saveError = '无法读取知识库，请联系管理员或运行 update_db.sql。/ Unable to load knowledge base. Please contact admin or run update_db.sql.';
+        }
+    }
 }
 ?>
 <style>
@@ -155,8 +171,12 @@ if ($isManager) {
 </div>
 <?php if ($saveMessage): ?>
   <div class="alert alert-success" role="alert"><?= htmlspecialchars($saveMessage, ENT_QUOTES); ?></div>
-<?php elseif ($saveError): ?>
+<?php endif; ?>
+<?php if ($saveError): ?>
   <div class="alert alert-danger" role="alert"><?= htmlspecialchars($saveError, ENT_QUOTES); ?></div>
+<?php endif; ?>
+<?php if ($searchError): ?>
+  <div class="alert alert-danger" role="alert"><?= htmlspecialchars($searchError, ENT_QUOTES); ?></div>
 <?php endif; ?>
 <?php if ($searchQuery === ''): ?>
   <div class="alert alert-info" data-i18n="askme.empty_state">输入关键词开始搜索，支持模糊匹配。</div>
