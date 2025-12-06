@@ -306,3 +306,11 @@ INSERT INTO asset_settings (id, code_prefix, link_prefix, sync_api_prefix, sync_
 VALUES (1, 'ASSET-', '', '', NULL)
 ON DUPLICATE KEY UPDATE code_prefix = code_prefix, link_prefix = link_prefix, sync_api_prefix = sync_api_prefix, sync_mapping = sync_mapping;
 
+
+CREATE TABLE IF NOT EXISTS askme_entries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  content LONGTEXT NOT NULL,
+  keywords TEXT NOT NULL DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
