@@ -115,6 +115,12 @@ const resultsContainer = document.getElementById('askmeResults');
 const queryInput = document.getElementById('askmeQuery');
 let knowledgeModal;
 
+function applyI18n() {
+  if (typeof applyTranslations === 'function') {
+    applyTranslations();
+  }
+}
+
 function renderResults(items) {
   resultsContainer.innerHTML = '';
   if (!items.length) {

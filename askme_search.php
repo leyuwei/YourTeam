@@ -32,16 +32,16 @@ function make_snippet(string $text, string $keyword, int $radius = 40): string {
 $like = '%' . $q . '%';
 $results = [];
 
-// Regulations
-$stmt = $pdo->prepare("SELECT description, category FROM regulations WHERE description LIKE ? OR category LIKE ? ORDER BY updated_at DESC LIMIT 10");
-$stmt->execute([$like, $like]);
+// Regulations (regulation_files)
+$stmt = $pdo->prepare("SELECT rf.original_filename, r.category, r.description FROM regulation_files rf JOIN regulations r ON rf.regulation_id = r.id WHERE rf.original_filename LIKE ? OR r.category LIKE ? OR r.description LIKE ? ORDER BY r.updated_at DESC LIMIT 15");
+$stmt->execute([$like, $like, $like]);
 foreach ($stmt->fetchAll() as $row) {
-    $base = $row['description'] ?: $row['category'];
+    $text = implode(' ', array_filter([$row['original_filename'], $row['category'], $row['description']], fn($v) => $v !== null && $v !== ''));
     $results[] = [
-        'source' => 'regulation',
+        'source' => 'regulation_files',
         'source_label' => '政策与流程 / Regulations',
-        'title' => $row['category'],
-        'snippet' => make_snippet($base, $q)
+        'title' => $row['original_filename'],
+        'snippet' => make_snippet($text, $q)
     ];
 }
 
@@ -51,7 +51,7 @@ $stmt->execute([$like, $like, $like]);
 foreach ($stmt->fetchAll() as $row) {
     $text = ($row['location_description'] ?: '') . ' ' . ($row['region'] ?: '');
     $results[] = [
-        'source' => 'office',
+        'source' => 'offices',
         'source_label' => '办公地点 / Offices',
         'title' => $row['name'],
         'snippet' => make_snippet($text !== ' ' ? $text : $row['name'], $q)
@@ -64,7 +64,7 @@ $stmt->execute([$like, $like, $like, $like, $like]);
 foreach ($stmt->fetchAll() as $row) {
     $text = implode(' ', array_filter([$row['asset_code'], $row['category'], $row['model'], $row['organization'], $row['remarks']], fn($v) => $v !== null && $v !== ''));
     $results[] = [
-        'source' => 'asset',
+        'source' => 'assets',
         'source_label' => '固定资产 / Assets',
         'title' => $row['asset_code'],
         'snippet' => make_snippet($text, $q)
@@ -77,7 +77,7 @@ $stmt->execute([$like, $like]);
 foreach ($stmt->fetchAll() as $row) {
     $text = $row['content'];
     $results[] = [
-        'source' => 'askme',
+        'source' => 'askme_entries',
         'source_label' => 'AskMe 知识库',
         'title' => $row['keywords'],
         'snippet' => make_snippet($text, $q)
