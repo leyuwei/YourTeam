@@ -3,12 +3,26 @@ include 'auth.php';
 header('Content-Type: application/json');
 
 $q = trim($_GET['q'] ?? '');
+$viewportWidth = (int)($_GET['width'] ?? 0);
 if ($q === '') {
     echo json_encode(['results' => []]);
     exit;
 }
 
-function make_snippet(string $text, string $keyword, int $radius = 40): string {
+function calculate_radius(int $viewportWidth): int {
+    $minRadius = 40;
+    $maxRadius = 200;
+    if ($viewportWidth <= 0) {
+        return $minRadius;
+    }
+    $estimatedChars = (int)round($viewportWidth / 6);
+    $radius = (int)floor($estimatedChars / 2);
+    return max($minRadius, min($maxRadius, $radius));
+}
+
+$snippetRadius = calculate_radius($viewportWidth);
+
+function make_snippet(string $text, string $keyword, int $radius): string {
     $plain = strip_tags($text);
     $pos = mb_stripos($plain, $keyword);
     if ($pos === false) {
@@ -33,7 +47,7 @@ $like = '%' . $q . '%';
 $results = [];
 
 // Regulations (regulation_files)
-$stmt = $pdo->prepare("SELECT rf.original_filename, r.category, r.description FROM regulation_files rf JOIN regulations r ON rf.regulation_id = r.id WHERE rf.original_filename LIKE ? OR r.category LIKE ? OR r.description LIKE ? ORDER BY r.updated_at DESC LIMIT 15");
+$stmt = $pdo->prepare("SELECT rf.id, rf.original_filename, r.category, r.description FROM regulation_files rf JOIN regulations r ON rf.regulation_id = r.id WHERE rf.original_filename LIKE ? OR r.category LIKE ? OR r.description LIKE ? ORDER BY r.updated_at DESC LIMIT 15");
 $stmt->execute([$like, $like, $like]);
 foreach ($stmt->fetchAll() as $row) {
     $text = implode(' ', array_filter([$row['original_filename'], $row['category'], $row['description']], fn($v) => $v !== null && $v !== ''));
@@ -41,20 +55,54 @@ foreach ($stmt->fetchAll() as $row) {
         'source' => 'regulation_files',
         'source_label' => '政策与流程 / Regulations',
         'title' => $row['original_filename'],
-        'snippet' => make_snippet($text, $q)
+        'snippet' => make_snippet($text, $q, $snippetRadius),
+        'download_url' => 'regulation_file.php?id=' . $row['id'],
     ];
 }
 
-// Offices
-$stmt = $pdo->prepare("SELECT name, location_description, region FROM offices WHERE name LIKE ? OR location_description LIKE ? OR region LIKE ? ORDER BY sort_order");
-$stmt->execute([$like, $like, $like]);
-foreach ($stmt->fetchAll() as $row) {
-    $text = ($row['location_description'] ?: '') . ' ' . ($row['region'] ?: '');
+// Offices and occupants (support searching by office or member name)
+$stmt = $pdo->prepare(
+    "SELECT DISTINCT o.id, o.name, o.location_description, o.region, o.sort_order
+     FROM offices o
+     LEFT JOIN office_seats s ON s.office_id = o.id
+     LEFT JOIN members m ON m.id = s.member_id
+     WHERE o.name LIKE ? OR o.location_description LIKE ? OR o.region LIKE ? OR m.name LIKE ?
+     ORDER BY o.sort_order"
+);
+$stmt->execute([$like, $like, $like, $like]);
+$officeRows = $stmt->fetchAll();
+
+$memberStmt = $pdo->prepare(
+    "SELECT m.name, s.label AS seat_label
+     FROM office_seats s
+     LEFT JOIN members m ON m.id = s.member_id
+     WHERE s.office_id = ? AND s.member_id IS NOT NULL
+     ORDER BY m.name"
+);
+
+foreach ($officeRows as $row) {
+    $memberStmt->execute([(int)$row['id']]);
+    $members = array_map(function ($memberRow) {
+        return [
+            'name' => $memberRow['name'],
+            'seat' => $memberRow['seat_label']
+        ];
+    }, $memberStmt->fetchAll());
+
+    $peopleNames = implode(' ', array_column($members, 'name'));
+    $text = trim(implode(' ', array_filter([
+        $row['name'] ?? '',
+        $row['location_description'] ?? '',
+        $row['region'] ?? '',
+        $peopleNames
+    ], fn($v) => $v !== null && $v !== '')));
+
     $results[] = [
         'source' => 'offices',
         'source_label' => '办公地点 / Offices',
         'title' => $row['name'],
-        'snippet' => make_snippet($text !== ' ' ? $text : $row['name'], $q)
+        'snippet' => make_snippet($text !== '' ? $text : $row['name'], $q, $snippetRadius),
+        'members' => $members,
     ];
 }
 
@@ -67,7 +115,7 @@ foreach ($stmt->fetchAll() as $row) {
         'source' => 'assets',
         'source_label' => '固定资产 / Assets',
         'title' => $row['asset_code'],
-        'snippet' => make_snippet($text, $q)
+        'snippet' => make_snippet($text, $q, $snippetRadius)
     ];
 }
 
@@ -80,7 +128,7 @@ foreach ($stmt->fetchAll() as $row) {
         'source' => 'askme_entries',
         'source_label' => 'AskMe 知识库',
         'title' => $row['keywords'],
-        'snippet' => make_snippet($text, $q),
+        'snippet' => make_snippet($text, $q, $snippetRadius),
         'content' => $text,
     ];
 }

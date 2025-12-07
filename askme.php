@@ -114,6 +114,24 @@ const askmeForm = document.getElementById('askmeForm');
 const resultsContainer = document.getElementById('askmeResults');
 const queryInput = document.getElementById('askmeQuery');
 let knowledgeModal;
+let lastQuery = '';
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightText(text, keyword) {
+  if (!keyword) return escapeHtml(text).replace(/\n/g, '<br>');
+  const escaped = escapeHtml(text).replace(/\n/g, '<br>');
+  const pattern = new RegExp(`(${escapeRegex(keyword)})`, 'gi');
+  return escaped.replace(pattern, '<mark>$1</mark>');
+}
 
 function applyI18n() {
   if (typeof applyTranslations === 'function') {
@@ -171,7 +189,7 @@ function renderResults(items) {
       detail.className = 'mt-2 p-3 bg-light border rounded d-none';
       const detailText = document.createElement('p');
       detailText.className = 'mb-0';
-      detailText.textContent = item.content;
+      detailText.innerHTML = highlightText(item.content, lastQuery);
       detail.appendChild(detailText);
 
       toggle.addEventListener('click', () => {
@@ -184,6 +202,46 @@ function renderResults(items) {
 
       body.appendChild(toggle);
       body.appendChild(detail);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'd-flex flex-wrap gap-2 mt-3';
+
+    if (Array.isArray(item.members) && item.members.length) {
+      const memberWrap = document.createElement('div');
+      memberWrap.className = 'mt-3';
+
+      const memberLabel = document.createElement('div');
+      memberLabel.className = 'text-muted small mb-2';
+      memberLabel.dataset.i18n = 'askme.office_members';
+      memberLabel.textContent = getTranslation('askme.office_members');
+      memberWrap.appendChild(memberLabel);
+
+      const memberList = document.createElement('div');
+      memberList.className = 'd-flex flex-wrap gap-2';
+      item.members.forEach(member => {
+        const pill = document.createElement('span');
+        pill.className = 'badge bg-light text-dark border';
+        const seatText = member.seat ? ` <span class="text-muted">(${escapeHtml(member.seat)})</span>` : '';
+        pill.innerHTML = highlightText(member.name || '', lastQuery) + seatText;
+        memberList.appendChild(pill);
+      });
+      memberWrap.appendChild(memberList);
+      body.appendChild(memberWrap);
+    }
+
+    if (item.source === 'regulation_files' && item.download_url) {
+      const download = document.createElement('a');
+      download.className = 'btn btn-outline-primary btn-sm';
+      download.href = item.download_url;
+      download.setAttribute('download', '');
+      download.dataset.i18n = 'askme.download';
+      download.textContent = getTranslation('askme.download');
+      actions.appendChild(download);
+    }
+
+    if (actions.children.length) {
+      body.appendChild(actions);
     }
 
     card.appendChild(body);
@@ -202,12 +260,14 @@ askmeForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const q = queryInput.value.trim();
   if (!q) return;
+  lastQuery = q;
   const btn = document.getElementById('askmeSearch');
   btn.disabled = true;
   btn.classList.add('disabled');
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' + getTranslation('askme.searching');
   try {
-    const res = await fetch('askme_search.php?q=' + encodeURIComponent(q));
+    const width = Math.round(resultsContainer.clientWidth || document.documentElement.clientWidth || window.innerWidth || 0);
+    const res = await fetch('askme_search.php?q=' + encodeURIComponent(q) + '&width=' + width);
     const data = await res.json();
     renderResults(data.results || []);
   } catch (err) {
