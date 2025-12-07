@@ -62,7 +62,7 @@ foreach ($stmt->fetchAll() as $row) {
 
 // Offices and occupants (support searching by office or member name)
 $stmt = $pdo->prepare(
-    "SELECT DISTINCT o.id, o.name, o.location_description, o.region
+    "SELECT DISTINCT o.id, o.name, o.location_description, o.region, o.sort_order
      FROM offices o
      LEFT JOIN office_seats s ON s.office_id = o.id
      LEFT JOIN members m ON m.id = s.member_id
