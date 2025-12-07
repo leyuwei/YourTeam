@@ -207,6 +207,29 @@ function renderResults(items) {
     const actions = document.createElement('div');
     actions.className = 'd-flex flex-wrap gap-2 mt-3';
 
+    if (Array.isArray(item.members) && item.members.length) {
+      const memberWrap = document.createElement('div');
+      memberWrap.className = 'mt-3';
+
+      const memberLabel = document.createElement('div');
+      memberLabel.className = 'text-muted small mb-2';
+      memberLabel.dataset.i18n = 'askme.office_members';
+      memberLabel.textContent = getTranslation('askme.office_members');
+      memberWrap.appendChild(memberLabel);
+
+      const memberList = document.createElement('div');
+      memberList.className = 'd-flex flex-wrap gap-2';
+      item.members.forEach(member => {
+        const pill = document.createElement('span');
+        pill.className = 'badge bg-light text-dark border';
+        const seatText = member.seat ? ` <span class="text-muted">(${escapeHtml(member.seat)})</span>` : '';
+        pill.innerHTML = highlightText(member.name || '', lastQuery) + seatText;
+        memberList.appendChild(pill);
+      });
+      memberWrap.appendChild(memberList);
+      body.appendChild(memberWrap);
+    }
+
     if (item.source === 'regulation_files' && item.download_url) {
       const download = document.createElement('a');
       download.className = 'btn btn-outline-primary btn-sm';

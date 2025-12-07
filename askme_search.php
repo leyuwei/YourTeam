@@ -60,16 +60,49 @@ foreach ($stmt->fetchAll() as $row) {
     ];
 }
 
-// Offices
-$stmt = $pdo->prepare("SELECT name, location_description, region FROM offices WHERE name LIKE ? OR location_description LIKE ? OR region LIKE ? ORDER BY sort_order");
-$stmt->execute([$like, $like, $like]);
-foreach ($stmt->fetchAll() as $row) {
-    $text = ($row['location_description'] ?: '') . ' ' . ($row['region'] ?: '');
+// Offices and occupants (support searching by office or member name)
+$stmt = $pdo->prepare(
+    "SELECT DISTINCT o.id, o.name, o.location_description, o.region
+     FROM offices o
+     LEFT JOIN office_seats s ON s.office_id = o.id
+     LEFT JOIN members m ON m.id = s.member_id
+     WHERE o.name LIKE ? OR o.location_description LIKE ? OR o.region LIKE ? OR m.name LIKE ?
+     ORDER BY o.sort_order"
+);
+$stmt->execute([$like, $like, $like, $like]);
+$officeRows = $stmt->fetchAll();
+
+$memberStmt = $pdo->prepare(
+    "SELECT m.name, s.label AS seat_label
+     FROM office_seats s
+     LEFT JOIN members m ON m.id = s.member_id
+     WHERE s.office_id = ? AND s.member_id IS NOT NULL
+     ORDER BY m.name"
+);
+
+foreach ($officeRows as $row) {
+    $memberStmt->execute([(int)$row['id']]);
+    $members = array_map(function ($memberRow) {
+        return [
+            'name' => $memberRow['name'],
+            'seat' => $memberRow['seat_label']
+        ];
+    }, $memberStmt->fetchAll());
+
+    $peopleNames = implode(' ', array_column($members, 'name'));
+    $text = trim(implode(' ', array_filter([
+        $row['name'] ?? '',
+        $row['location_description'] ?? '',
+        $row['region'] ?? '',
+        $peopleNames
+    ], fn($v) => $v !== null && $v !== '')));
+
     $results[] = [
         'source' => 'offices',
         'source_label' => '办公地点 / Offices',
         'title' => $row['name'],
-        'snippet' => make_snippet($text !== ' ' ? $text : $row['name'], $q, $snippetRadius)
+        'snippet' => make_snippet($text !== '' ? $text : $row['name'], $q, $snippetRadius),
+        'members' => $members,
     ];
 }
 
