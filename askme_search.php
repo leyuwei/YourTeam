@@ -3,12 +3,26 @@ include 'auth.php';
 header('Content-Type: application/json');
 
 $q = trim($_GET['q'] ?? '');
+$viewportWidth = (int)($_GET['width'] ?? 0);
 if ($q === '') {
     echo json_encode(['results' => []]);
     exit;
 }
 
-function make_snippet(string $text, string $keyword, int $radius = 40): string {
+function calculate_radius(int $viewportWidth): int {
+    $minRadius = 40;
+    $maxRadius = 200;
+    if ($viewportWidth <= 0) {
+        return $minRadius;
+    }
+    $estimatedChars = (int)round($viewportWidth / 6);
+    $radius = (int)floor($estimatedChars / 2);
+    return max($minRadius, min($maxRadius, $radius));
+}
+
+$snippetRadius = calculate_radius($viewportWidth);
+
+function make_snippet(string $text, string $keyword, int $radius): string {
     $plain = strip_tags($text);
     $pos = mb_stripos($plain, $keyword);
     if ($pos === false) {
@@ -33,7 +47,7 @@ $like = '%' . $q . '%';
 $results = [];
 
 // Regulations (regulation_files)
-$stmt = $pdo->prepare("SELECT rf.original_filename, r.category, r.description FROM regulation_files rf JOIN regulations r ON rf.regulation_id = r.id WHERE rf.original_filename LIKE ? OR r.category LIKE ? OR r.description LIKE ? ORDER BY r.updated_at DESC LIMIT 15");
+$stmt = $pdo->prepare("SELECT rf.id, rf.original_filename, r.category, r.description FROM regulation_files rf JOIN regulations r ON rf.regulation_id = r.id WHERE rf.original_filename LIKE ? OR r.category LIKE ? OR r.description LIKE ? ORDER BY r.updated_at DESC LIMIT 15");
 $stmt->execute([$like, $like, $like]);
 foreach ($stmt->fetchAll() as $row) {
     $text = implode(' ', array_filter([$row['original_filename'], $row['category'], $row['description']], fn($v) => $v !== null && $v !== ''));
@@ -41,7 +55,8 @@ foreach ($stmt->fetchAll() as $row) {
         'source' => 'regulation_files',
         'source_label' => '政策与流程 / Regulations',
         'title' => $row['original_filename'],
-        'snippet' => make_snippet($text, $q)
+        'snippet' => make_snippet($text, $q, $snippetRadius),
+        'download_url' => 'regulation_file.php?id=' . $row['id'],
     ];
 }
 
@@ -54,7 +69,7 @@ foreach ($stmt->fetchAll() as $row) {
         'source' => 'offices',
         'source_label' => '办公地点 / Offices',
         'title' => $row['name'],
-        'snippet' => make_snippet($text !== ' ' ? $text : $row['name'], $q)
+        'snippet' => make_snippet($text !== ' ' ? $text : $row['name'], $q, $snippetRadius)
     ];
 }
 
@@ -67,7 +82,7 @@ foreach ($stmt->fetchAll() as $row) {
         'source' => 'assets',
         'source_label' => '固定资产 / Assets',
         'title' => $row['asset_code'],
-        'snippet' => make_snippet($text, $q)
+        'snippet' => make_snippet($text, $q, $snippetRadius)
     ];
 }
 
@@ -80,7 +95,7 @@ foreach ($stmt->fetchAll() as $row) {
         'source' => 'askme_entries',
         'source_label' => 'AskMe 知识库',
         'title' => $row['keywords'],
-        'snippet' => make_snippet($text, $q),
+        'snippet' => make_snippet($text, $q, $snippetRadius),
         'content' => $text,
     ];
 }
