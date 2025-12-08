@@ -31,24 +31,20 @@ unset($r);
   #regulationList .drag-handle:active {
     cursor: grabbing;
   }
-  #regulationList tr.drag-ghost,
-  #regulationList tr.drag-dragging {
+  #regulationList tr.reg-drag-ghost,
+  #regulationList tr.reg-drag-chosen {
     display: table;
     width: 100%;
     table-layout: fixed;
-    background-color: var(--app-surface-bg);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-    border-radius: 0.25rem;
+    background-color: #f8fbff;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 5;
   }
-  #regulationList tr.drag-ghost td,
-  #regulationList tr.drag-dragging td,
-  #regulationList tr.drag-active td {
+  #regulationList tr.reg-drag-ghost td,
+  #regulationList tr.reg-drag-chosen td {
     background-color: inherit !important;
     vertical-align: middle;
-  }
-  #regulationList tr.drag-ghost td:first-child,
-  #regulationList tr.drag-dragging td:first-child {
-    border-right: 1px solid var(--app-table-border);
   }
 </style>
 <div class="d-flex justify-content-between mb-3">
@@ -261,36 +257,40 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   const regulationList=document.getElementById('regulationList');
   if(regulationList && typeof Sortable !== 'undefined'){
-    const preserveRowLayout = (row)=>{
+    const freezeRow = (row)=>{
       if(!row) return;
-      const cells = row.querySelectorAll('td');
+      const tableWidth = regulationList.getBoundingClientRect().width;
+      const cells = Array.from(row.children || []);
       row.style.display = 'table';
       row.style.tableLayout = 'fixed';
-      row.style.width = '100%';
+      row.style.width = tableWidth + 'px';
       cells.forEach(cell=>{
         const width = cell.getBoundingClientRect().width;
         cell.style.width = width + 'px';
       });
     };
 
-    const clearRowLayout = (row)=>{
+    const releaseRow = (row)=>{
       if(!row) return;
       row.removeAttribute('style');
-      row.querySelectorAll('td').forEach(cell=>cell.removeAttribute('style'));
+      (row.children ? Array.from(row.children) : []).forEach(cell=>cell.removeAttribute('style'));
     };
 
     Sortable.create(regulationList, {
       handle: '.drag-handle',
-      animation: 150,
-      forceFallback: true,
-      fallbackOnBody: true,
-      chosenClass: 'drag-active',
-      ghostClass: 'drag-ghost',
-      dragClass: 'drag-dragging',
-      onChoose: (evt)=>preserveRowLayout(evt.item),
-      onUnchoose: (evt)=>clearRowLayout(evt.item),
+      animation: 160,
+      chosenClass: 'reg-drag-chosen',
+      ghostClass: 'reg-drag-ghost',
+      dragClass: 'reg-dragging',
+      setData: (dataTransfer)=>{ dataTransfer.setData('text/plain',''); },
+      onStart: (evt)=>{
+        freezeRow(evt.item);
+      },
+      onClone: (evt)=>{
+        freezeRow(evt.clone);
+      },
       onEnd: function(evt){
-        clearRowLayout(evt.item);
+        releaseRow(evt.item);
         const order = Array.from(regulationList.querySelectorAll('tr')).map((row,index)=>({id:row.dataset.id, position:index}));
         fetch('regulation_order.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:order})});
       }

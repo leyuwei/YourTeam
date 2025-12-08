@@ -130,8 +130,9 @@ include 'header.php';
     document.querySelectorAll('.regulation-file-delete').forEach(link => {
       link.addEventListener('click', function(e){
         e.preventDefault();
-        const confirmText = dict['regulation_edit.confirm_file_delete'] || 'Delete this attachment?';
-        if(typeof doubleConfirm === 'function' && !doubleConfirm(confirmText)){
+        const firstText = dict['regulation_edit.confirm_file_delete'] || 'Delete this attachment?';
+        const secondText = dict['regulation_edit.confirm_file_delete_second'] || 'Please confirm again to delete.';
+        if(!confirm(firstText) || !confirm(secondText)){
           return;
         }
         const payload = {id: this.dataset.fileId, reg_id: this.dataset.regId};
