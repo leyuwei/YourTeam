@@ -104,7 +104,7 @@ include 'header.php';
       <?php foreach($files as $f): ?>
       <li class="list-group-item d-flex justify-content-between align-items-center">
         <a href="regulation_file.php?id=<?= $f['id']; ?>" target="_blank"><?= htmlspecialchars($f['original_filename']); ?></a>
-        <a class="btn btn-sm btn-danger" href="regulation_file_delete.php?id=<?= $f['id']; ?>&reg_id=<?= $id; ?>" data-i18n="regulations.file_delete">Delete</a>
+        <a class="btn btn-sm btn-danger reg-file-delete" data-filename="<?= htmlspecialchars($f['original_filename']); ?>" href="regulation_file_delete.php?id=<?= $f['id']; ?>&reg_id=<?= $id; ?>" data-i18n="regulations.file_delete">Delete</a>
       </li>
       <?php endforeach; ?>
     </ul>
@@ -124,6 +124,21 @@ window.addEventListener('load', function(){
   const progress = document.getElementById('uploadProgress');
   const bar = progress.querySelector('.progress-bar');
   const errBox = document.getElementById('uploadError');
+  const fileDeleteLinks = document.querySelectorAll('.reg-file-delete');
+
+  fileDeleteLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+      const lang = document.documentElement.lang || 'zh';
+      const filename = link.dataset.filename ? ` (${link.dataset.filename})` : '';
+      const msg = (translations?.[lang]?.['regulations.confirm.file_delete'] || 'Delete this file?') + filename;
+      if (typeof doubleConfirm === 'function') {
+        if (!doubleConfirm(msg)) e.preventDefault();
+      } else if (!(confirm(msg) && confirm('Please confirm again to proceed.'))) {
+        e.preventDefault();
+      }
+    });
+  });
+
   form.addEventListener('submit', function(e){
     e.preventDefault();
     const xhr = new XMLHttpRequest();
