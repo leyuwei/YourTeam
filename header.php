@@ -510,6 +510,8 @@
     margin: 1rem auto;
   }
   body.mobile-view .navbar-collapse {
+    flex-basis: 100%;
+    flex-grow: 1;
     align-items: stretch;
   }
   body.mobile-view .navbar-nav {
@@ -532,6 +534,11 @@
   }
   body.mobile-view .navbar-toggler {
     display: block;
+    margin-left: auto;
+  }
+  body.mobile-view .navbar .container-fluid {
+    flex-wrap: wrap;
+    align-items: center;
   }
   body.mobile-view .navbar-collapse.collapse {
     display: none !important;
