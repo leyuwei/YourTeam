@@ -551,7 +551,7 @@
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'reimburse') === 0 ? 'active' : ''); ?>" href="reimbursements.php" data-i18n="nav.reimburse">Reimbursement</a></li>
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'assets.php' ? 'active' : ''); ?>" href="assets.php" data-i18n="nav.assets">Assets</a></li>
           <?php if($_SESSION['role']==='manager'): ?>
-          <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'notification') === 0 ? 'active' : ''); ?>" href="notifications.php" data-i18n="nav.notifications">Notifications</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo ((strpos($current_page, 'notification') === 0 || strpos($current_page, 'regulation') === 0) ? 'active' : ''); ?>" href="notifications.php" data-i18n="nav.notifications">Notifications</a></li>
           <?php endif; ?>
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'task') === 0 ? 'active' : ''); ?>" href="tasks.php" data-i18n="nav.tasks">Tasks</a></li>
           <?php if($_SESSION['role']==='manager'): ?>
