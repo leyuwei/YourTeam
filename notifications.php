@@ -31,6 +31,25 @@ unset($r);
   #regulationList .drag-handle:active {
     cursor: grabbing;
   }
+  #regulationList tr.drag-ghost,
+  #regulationList tr.drag-dragging {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    background-color: var(--app-surface-bg);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    border-radius: 0.25rem;
+  }
+  #regulationList tr.drag-ghost td,
+  #regulationList tr.drag-dragging td,
+  #regulationList tr.drag-active td {
+    background-color: inherit !important;
+    vertical-align: middle;
+  }
+  #regulationList tr.drag-ghost td:first-child,
+  #regulationList tr.drag-dragging td:first-child {
+    border-right: 1px solid var(--app-table-border);
+  }
 </style>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="notifications.title">Notifications</h2>
@@ -247,6 +266,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
       animation: 150,
       forceFallback: true,
       fallbackOnBody: true,
+      chosenClass: 'drag-active',
+      ghostClass: 'drag-ghost',
+      dragClass: 'drag-dragging',
       onEnd: function(){
         const order = Array.from(regulationList.querySelectorAll('tr')).map((row,index)=>({id:row.dataset.id, position:index}));
         fetch('regulation_order.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:order})});
