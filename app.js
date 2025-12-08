@@ -1790,9 +1790,25 @@ function debounce(fn, wait = 100) {
 function setupResponsiveNav(nav, onUpdate) {
   if (!nav) return () => {};
   const collapseElement = nav.closest('.navbar-collapse');
+  const navbarContainer = nav.closest('.container-fluid') || nav.closest('.navbar');
+  const navbarElement = nav.closest('.navbar');
+
+  const isOverflowing = (element) => {
+    if (!element) return false;
+    return Math.ceil(element.scrollWidth) > Math.floor(element.clientWidth);
+  };
 
   function adjustNav() {
     const isDesktop = window.matchMedia('(min-width: 992px)').matches;
+
+    if (collapseElement?.classList.contains('show') && isDesktop) {
+      if (!forceMobileNav) {
+        forceMobileNav = true;
+        updateMobileViewClass();
+      }
+      onUpdate?.();
+      return;
+    }
 
     if (!isDesktop) {
       if (forceMobileNav) {
@@ -1835,11 +1851,17 @@ function setupResponsiveNav(nav, onUpdate) {
       collapseElement.style.width = previousWidth;
     }
 
-    const isOverflowing = nav.scrollWidth > availableWidth;
-    if (isOverflowing !== forceMobileNav) {
-      forceMobileNav = isOverflowing;
+    const containerOverflowing = isOverflowing(navbarContainer);
+    const navbarOverflowing = navbarElement && navbarElement !== navbarContainer
+      ? isOverflowing(navbarElement)
+      : false;
+    const navOverflowing = Math.ceil(nav.scrollWidth) > Math.floor(availableWidth);
+    const shouldForceMobile = navOverflowing || containerOverflowing || navbarOverflowing;
+
+    if (shouldForceMobile !== forceMobileNav) {
+      forceMobileNav = shouldForceMobile;
       updateMobileViewClass();
-    } else if (isOverflowing && !wasForced) {
+    } else if (shouldForceMobile && !wasForced) {
       updateMobileViewClass();
     }
 
@@ -1848,6 +1870,23 @@ function setupResponsiveNav(nav, onUpdate) {
 
   const debouncedAdjustNav = debounce(adjustNav, 150);
   window.addEventListener('resize', debouncedAdjustNav);
+
+  const resizeObserver = typeof ResizeObserver !== 'undefined'
+    ? new ResizeObserver(() => debouncedAdjustNav())
+    : null;
+
+  resizeObserver?.observe(nav);
+  navbarContainer && resizeObserver?.observe(navbarContainer);
+  if (navbarElement && navbarElement !== navbarContainer) {
+    resizeObserver?.observe(navbarElement);
+  }
+
+  if (collapseElement) {
+    collapseElement.addEventListener('hidden.bs.collapse', () => {
+      debouncedAdjustNav();
+    });
+  }
+
   adjustNav();
   return adjustNav;
 }
