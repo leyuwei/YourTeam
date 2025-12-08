@@ -1,6 +1,6 @@
 [English](#english) | [中文](#中文)
 
-<img width="2706" height="1395" alt="mainpage" src="https://github.com/user-attachments/assets/f64c2de2-1b69-43ae-b723-7407f0b09940" />
+<img width="2487" height="1709" alt="ScreenShot_2025-12-08_114042_897" src="https://github.com/user-attachments/assets/c518a5db-4265-48f1-b43e-0526e64275ae" />
 
 # 中文
 
