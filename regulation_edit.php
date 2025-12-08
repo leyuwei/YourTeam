@@ -118,51 +118,85 @@ include 'header.php';
   <a class="btn btn-secondary" href="notifications.php" data-i18n="regulation_edit.cancel">Cancel</a>
 </form>
 <script>
-window.addEventListener('load', function(){
-  const form = document.getElementById('regForm');
-  if(!form) return;
-  const progress = document.getElementById('uploadProgress');
-  const bar = progress.querySelector('.progress-bar');
-  const errBox = document.getElementById('uploadError');
-  form.addEventListener('submit', function(e){
-    e.preventDefault();
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', form.action);
-    xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');
-    const lang = localStorage.getItem('lang') || 'zh';
-    const t = translations?.[lang] || {};
-    progress.classList.remove('d-none');
-    errBox.classList.add('d-none');
-    bar.style.width = '0%';
-    xhr.upload.onprogress = function(ev){
-      if(ev.lengthComputable){
-        bar.style.width = (ev.loaded / ev.total * 100) + '%';
-      }
-    };
-    xhr.onload = function(){
-      if(xhr.status === 200){
-        try{
-          const res = JSON.parse(xhr.responseText);
-          if(res.success){
-            window.location = 'notifications.php';
-          }else{
-            errBox.textContent = (t['regulation_edit.upload_error'] || 'Upload failed: ') + (res.error || '');
+  window.addEventListener('load', function(){
+    const form = document.getElementById('regForm');
+    if(!form) return;
+    const progress = document.getElementById('uploadProgress');
+    const bar = progress.querySelector('.progress-bar');
+    const errBox = document.getElementById('uploadError');
+    const lang = document.documentElement.lang || 'zh';
+    const dict = translations?.[lang] || {};
+
+    document.querySelectorAll('.regulation-file-delete').forEach(link => {
+      link.addEventListener('click', function(e){
+        e.preventDefault();
+        const confirmText = dict['regulation_edit.confirm_file_delete'] || 'Delete this attachment?';
+        if(typeof doubleConfirm === 'function' && !doubleConfirm(confirmText)){
+          return;
+        }
+        const payload = {id: this.dataset.fileId, reg_id: this.dataset.regId};
+        const fallback = () => { window.location = this.href; };
+
+        fetch(this.href, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify(payload)
+        })
+          .then(res => res.ok ? res.json() : Promise.reject())
+          .then(data => {
+            if(data?.success){
+              this.closest('li')?.remove();
+            } else {
+              errBox.textContent = dict['regulation_edit.upload_error'] || 'Upload failed';
+              errBox.classList.remove('d-none');
+            }
+          })
+          .catch(() => fallback());
+      });
+    });
+
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', form.action);
+      xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');
+      const lang = localStorage.getItem('lang') || 'zh';
+      const t = translations?.[lang] || {};
+      progress.classList.remove('d-none');
+      errBox.classList.add('d-none');
+      bar.style.width = '0%';
+      xhr.upload.onprogress = function(ev){
+        if(ev.lengthComputable){
+          bar.style.width = (ev.loaded / ev.total * 100) + '%';
+        }
+      };
+      xhr.onload = function(){
+        if(xhr.status === 200){
+          try{
+            const res = JSON.parse(xhr.responseText);
+            if(res.success){
+              window.location = 'notifications.php';
+            }else{
+              errBox.textContent = (t['regulation_edit.upload_error'] || 'Upload failed: ') + (res.error || '');
+              errBox.classList.remove('d-none');
+              progress.classList.add('d-none');
+            }
+          }catch(e){
+            errBox.textContent = t['regulation_edit.upload_error'] || 'Upload failed';
             errBox.classList.remove('d-none');
             progress.classList.add('d-none');
           }
-        }catch(e){
+        }else{
           errBox.textContent = t['regulation_edit.upload_error'] || 'Upload failed';
           errBox.classList.remove('d-none');
           progress.classList.add('d-none');
         }
-      }else{
-        errBox.textContent = t['regulation_edit.upload_error'] || 'Upload failed';
-        errBox.classList.remove('d-none');
-        progress.classList.add('d-none');
-      }
-    };
-    xhr.send(new FormData(form));
+      };
+      xhr.send(new FormData(form));
+    });
   });
-});
 </script>
 <?php include 'footer.php'; ?>
