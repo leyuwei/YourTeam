@@ -104,7 +104,7 @@ include 'header.php';
       <?php foreach($files as $f): ?>
       <li class="list-group-item d-flex justify-content-between align-items-center">
         <a href="regulation_file.php?id=<?= $f['id']; ?>" target="_blank"><?= htmlspecialchars($f['original_filename']); ?></a>
-        <a class="btn btn-sm btn-danger" href="regulation_file_delete.php?id=<?= $f['id']; ?>&reg_id=<?= $id; ?>" data-i18n="regulations.file_delete">Delete</a>
+        <a class="btn btn-sm btn-danger regulation-file-delete" href="regulation_file_delete.php?id=<?= $f['id']; ?>&reg_id=<?= $id; ?>" data-file-id="<?= $f['id']; ?>" data-reg-id="<?= $id; ?>" data-i18n="regulations.file_delete">Delete</a>
       </li>
       <?php endforeach; ?>
     </ul>

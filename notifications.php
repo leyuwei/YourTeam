@@ -261,6 +261,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   const regulationList=document.getElementById('regulationList');
   if(regulationList && typeof Sortable !== 'undefined'){
+    const preserveRowLayout = (row)=>{
+      if(!row) return;
+      const cells = row.querySelectorAll('td');
+      row.style.display = 'table';
+      row.style.tableLayout = 'fixed';
+      row.style.width = '100%';
+      cells.forEach(cell=>{
+        const width = cell.getBoundingClientRect().width;
+        cell.style.width = width + 'px';
+      });
+    };
+
+    const clearRowLayout = (row)=>{
+      if(!row) return;
+      row.removeAttribute('style');
+      row.querySelectorAll('td').forEach(cell=>cell.removeAttribute('style'));
+    };
+
     Sortable.create(regulationList, {
       handle: '.drag-handle',
       animation: 150,
@@ -269,7 +287,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
       chosenClass: 'drag-active',
       ghostClass: 'drag-ghost',
       dragClass: 'drag-dragging',
-      onEnd: function(){
+      onChoose: (evt)=>preserveRowLayout(evt.item),
+      onUnchoose: (evt)=>clearRowLayout(evt.item),
+      onEnd: function(evt){
+        clearRowLayout(evt.item);
         const order = Array.from(regulationList.querySelectorAll('tr')).map((row,index)=>({id:row.dataset.id, position:index}));
         fetch('regulation_order.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:order})});
       }
