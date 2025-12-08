@@ -104,6 +104,11 @@ unset($r);
 
 <hr class="my-5">
 
+<style>
+  .drag-handle { cursor: grab; }
+  .drag-handle:active { cursor: grabbing; }
+</style>
+
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="regulations.title">Regulations</h2>
   <a class="btn btn-success" href="regulation_edit.php" data-i18n="regulations.add">Add Regulation</a>
@@ -162,62 +167,91 @@ unset($r);
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
-document.querySelectorAll('.toggle-members').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    const ul=document.getElementById('members-'+btn.dataset.id);
-    ul.style.display=ul.style.display==='none'?'block':'none';
-  });
-});
-document.querySelectorAll('.delete-notification').forEach(link=>{
-  link.addEventListener('click',e=>{
-    const lang=document.documentElement.lang||'zh';
-    const msg=translations[lang]['notifications.confirm.revoke'];
-    if(!doubleConfirm(msg)) e.preventDefault();
-  });
-});
-document.querySelectorAll('.delete-regulation').forEach(link=>{
-  link.addEventListener('click',e=>{
-    const lang=document.documentElement.lang||'zh';
-    const msg=translations[lang]['regulations.confirm.delete'];
-    if(!doubleConfirm(msg)) e.preventDefault();
-  });
-});
-const expiredToggle=document.getElementById('toggleExpiredNotifications');
-const expiredContainer=document.getElementById('expiredNotifications');
-if(expiredToggle && expiredContainer){
-  const updateText=(state)=>{
-    const lang=document.documentElement.lang||'zh';
-    const key=state==='show'? 'notifications.show_expired' : 'notifications.hide_expired';
-    expiredToggle.textContent=translations[lang][key];
+document.addEventListener('DOMContentLoaded', function(){
+  const withDoubleConfirm = (message) => {
+    if (typeof doubleConfirm === 'function') {
+      return doubleConfirm(message);
+    }
+    return confirm(message) && confirm('Please confirm again to proceed.');
   };
-  expiredContainer.addEventListener('show.bs.collapse',()=>updateText('hide'));
-  expiredContainer.addEventListener('hide.bs.collapse',()=>updateText('show'));
-  updateText('show');
-}
-document.querySelectorAll('.view-details').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.getElementById('regDesc').textContent=btn.dataset.desc;
-    const files=JSON.parse(btn.dataset.files);
-    const list=document.getElementById('regFiles');
-    list.innerHTML='';
-    files.forEach(f=>{
-      const li=document.createElement('li');
-      li.className='list-group-item';
-      const a=document.createElement('a');
-      a.href='regulation_file.php?id='+f.id;
-      a.textContent=f.original_filename;
-      li.appendChild(a);
-      list.appendChild(li);
+
+  document.querySelectorAll('.toggle-members').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const ul=document.getElementById('members-'+btn.dataset.id);
+      if(!ul) return;
+      ul.style.display=ul.style.display==='none'?'block':'none';
     });
-    new bootstrap.Modal(document.getElementById('regDetailModal')).show();
   });
-});
-Sortable.create(document.getElementById('regulationList'), {
-  handle: '.drag-handle',
-  animation: 150,
-  onEnd: function(){
-    const order = Array.from(document.querySelectorAll('#regulationList tr')).map((row,index)=>({id:row.dataset.id, position:index}));
-    fetch('regulation_order.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:order})});
+
+  document.querySelectorAll('.delete-notification').forEach(link=>{
+    link.addEventListener('click',e=>{
+      const lang=document.documentElement.lang||'zh';
+      const msg=translations?.[lang]?.['notifications.confirm.revoke'] || 'Revoke this notification?';
+      if(!withDoubleConfirm(msg)) e.preventDefault();
+    });
+  });
+
+  document.querySelectorAll('.delete-regulation').forEach(link=>{
+    link.addEventListener('click',e=>{
+      const lang=document.documentElement.lang||'zh';
+      const msg=translations?.[lang]?.['regulations.confirm.delete'] || 'Delete this regulation?';
+      if(!withDoubleConfirm(msg)) e.preventDefault();
+    });
+  });
+
+  const expiredToggle=document.getElementById('toggleExpiredNotifications');
+  const expiredContainer=document.getElementById('expiredNotifications');
+  if(expiredToggle && expiredContainer){
+    const updateText=(state)=>{
+      const lang=document.documentElement.lang||'zh';
+      const key=state==='show'? 'notifications.show_expired' : 'notifications.hide_expired';
+      expiredToggle.textContent=translations?.[lang]?.[key] || expiredToggle.textContent;
+    };
+    expiredContainer.addEventListener('show.bs.collapse',()=>updateText('hide'));
+    expiredContainer.addEventListener('hide.bs.collapse',()=>updateText('show'));
+    updateText('show');
+  }
+
+  document.querySelectorAll('.view-details').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.getElementById('regDesc').textContent=btn.dataset.desc || '';
+      let files=[];
+      try{
+        files=JSON.parse(btn.dataset.files || '[]');
+      }catch(err){
+        files=[];
+      }
+      const list=document.getElementById('regFiles');
+      if(list){
+        list.innerHTML='';
+        files.forEach(f=>{
+          const li=document.createElement('li');
+          li.className='list-group-item';
+          const a=document.createElement('a');
+          a.href='regulation_file.php?id='+f.id;
+          a.textContent=f.original_filename;
+          a.target='_blank';
+          li.appendChild(a);
+          list.appendChild(li);
+        });
+      }
+      const modalEl = document.getElementById('regDetailModal');
+      if(modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal){
+        new bootstrap.Modal(modalEl).show();
+      }
+    });
+  });
+
+  const regulationList=document.getElementById('regulationList');
+  if(regulationList && typeof Sortable !== 'undefined'){
+    Sortable.create(regulationList, {
+      handle: '.drag-handle',
+      animation: 150,
+      onEnd: function(){
+        const order = Array.from(regulationList.querySelectorAll('tr')).map((row,index)=>({id:row.dataset.id, position:index}));
+        fetch('regulation_order.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:order})});
+      }
+    });
   }
 });
 </script>
