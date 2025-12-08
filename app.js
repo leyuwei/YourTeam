@@ -1835,7 +1835,13 @@ function setupResponsiveNav(nav, onUpdate) {
       collapseElement.style.width = previousWidth;
     }
 
-    const isOverflowing = nav.scrollWidth > availableWidth;
+    const navbarContainer = nav.closest('.container-fluid') || nav.closest('.navbar');
+    const containerOverflowing = navbarContainer
+      ? navbarContainer.scrollWidth - 1 > navbarContainer.clientWidth
+      : false;
+    const navOverflowing = nav.scrollWidth > availableWidth;
+    const isOverflowing = navOverflowing || containerOverflowing;
+
     if (isOverflowing !== forceMobileNav) {
       forceMobileNav = isOverflowing;
       updateMobileViewClass();

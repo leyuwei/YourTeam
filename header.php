@@ -134,6 +134,11 @@
     padding: 0.5rem 0.75rem;
     transition: color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
   }
+  @media (max-width: 991.98px) {
+    .navbar-nav .nav-link {
+      white-space: normal;
+    }
+  }
   @media (min-width: 992px) {
     .navbar-nav {
       flex-wrap: nowrap;
@@ -510,6 +515,9 @@
   body.mobile-view .navbar-nav {
     flex-wrap: wrap;
     overflow: visible;
+  }
+  body.mobile-view .navbar-nav .nav-link {
+    white-space: normal;
   }
   body.mobile-view .navbar-text {
     display: none;
