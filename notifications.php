@@ -25,26 +25,17 @@ unset($r);
   #regulationList .drag-handle {
     cursor: grab;
     user-select: none;
-    width: 32px;
+    width: 36px;
     text-align: center;
   }
   #regulationList .drag-handle:active {
     cursor: grabbing;
   }
-  #regulationList tr.reg-drag-ghost,
-  #regulationList tr.reg-drag-chosen {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
-    background-color: #f8fbff;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-    position: relative;
-    z-index: 5;
+  #regulationList tr.reg-ghost td {
+    background-color: #eef4ff !important;
   }
-  #regulationList tr.reg-drag-ghost td,
-  #regulationList tr.reg-drag-chosen td {
-    background-color: inherit !important;
-    vertical-align: middle;
+  #regulationList tr.reg-chosen td {
+    background-color: #fff7e6 !important;
   }
 </style>
 <div class="d-flex justify-content-between mb-3">
@@ -134,7 +125,7 @@ unset($r);
   <h2 data-i18n="regulations.title">Regulations</h2>
   <a class="btn btn-success" href="regulation_edit.php" data-i18n="regulations.add">Add Regulation</a>
 </div>
-<table class="table table-bordered table-hover">
+<table class="table table-bordered table-hover align-middle">
   <thead>
     <tr>
       <th></th>
@@ -257,41 +248,46 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   const regulationList=document.getElementById('regulationList');
   if(regulationList && typeof Sortable !== 'undefined'){
-    const freezeRow = (row)=>{
+    const lockWidths = (row)=>{
       if(!row) return;
-      const tableWidth = regulationList.getBoundingClientRect().width;
       const cells = Array.from(row.children || []);
-      row.style.display = 'table';
-      row.style.tableLayout = 'fixed';
-      row.style.width = tableWidth + 'px';
-      cells.forEach(cell=>{
-        const width = cell.getBoundingClientRect().width;
-        cell.style.width = width + 'px';
+      const widths = cells.map(cell=>cell.getBoundingClientRect().width);
+      row.style.display='table';
+      row.style.tableLayout='fixed';
+      row.style.width=regulationList.getBoundingClientRect().width + 'px';
+      cells.forEach((cell,idx)=>{
+        const w=widths[idx];
+        cell.style.width=w+'px';
+        cell.style.minWidth=w+'px';
       });
     };
 
-    const releaseRow = (row)=>{
+    const clearWidths = (row)=>{
       if(!row) return;
       row.removeAttribute('style');
-      (row.children ? Array.from(row.children) : []).forEach(cell=>cell.removeAttribute('style'));
+      (row.children?Array.from(row.children):[]).forEach(cell=>{
+        cell.style.width='';
+        cell.style.minWidth='';
+      });
     };
 
     Sortable.create(regulationList, {
       handle: '.drag-handle',
-      animation: 160,
-      chosenClass: 'reg-drag-chosen',
-      ghostClass: 'reg-drag-ghost',
-      dragClass: 'reg-dragging',
+      animation: 150,
+      chosenClass: 'reg-chosen',
+      ghostClass: 'reg-ghost',
+      forceFallback: true,
+      fallbackOnBody: true,
       setData: (dataTransfer)=>{ dataTransfer.setData('text/plain',''); },
       onStart: (evt)=>{
-        freezeRow(evt.item);
+        lockWidths(evt.item);
       },
       onClone: (evt)=>{
-        freezeRow(evt.clone);
+        lockWidths(evt.clone);
       },
       onEnd: function(evt){
-        releaseRow(evt.item);
-        const order = Array.from(regulationList.querySelectorAll('tr')).map((row,index)=>({id:row.dataset.id, position:index}));
+        clearWidths(evt.item);
+        const order = Array.from(regulationList.querySelectorAll('tr[data-id]')).map((row,index)=>({id:row.dataset.id, position:index}));
         fetch('regulation_order.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:order})});
       }
     });
