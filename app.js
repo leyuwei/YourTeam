@@ -1801,6 +1801,15 @@ function setupResponsiveNav(nav, onUpdate) {
   function adjustNav() {
     const isDesktop = window.matchMedia('(min-width: 992px)').matches;
 
+    if (collapseElement?.classList.contains('show') && isDesktop) {
+      if (!forceMobileNav) {
+        forceMobileNav = true;
+        updateMobileViewClass();
+      }
+      onUpdate?.();
+      return;
+    }
+
     if (!isDesktop) {
       if (forceMobileNav) {
         forceMobileNav = false;
@@ -1870,6 +1879,12 @@ function setupResponsiveNav(nav, onUpdate) {
   navbarContainer && resizeObserver?.observe(navbarContainer);
   if (navbarElement && navbarElement !== navbarContainer) {
     resizeObserver?.observe(navbarElement);
+  }
+
+  if (collapseElement) {
+    collapseElement.addEventListener('hidden.bs.collapse', () => {
+      debouncedAdjustNav();
+    });
   }
 
   adjustNav();
