@@ -1,15 +1,13 @@
 <?php
 include 'auth.php';
-if($_SESSION['role'] !== 'manager'){
-    http_response_code(403);
-    echo '<div class="alert alert-danger">No permission</div>';
-    exit;
-}
 include 'header.php';
+
+$isManager = ($_SESSION['role'] ?? '') === 'manager';
+$currentMemberId = $_SESSION['member_id'] ?? null;
 
 $validStatuses = ['open','paused','ended','void'];
 
-if($_SERVER['REQUEST_METHOD'] === 'POST'){
+if($isManager && $_SERVER['REQUEST_METHOD'] === 'POST'){
     $action = $_POST['action'] ?? '';
     if($action === 'create_template'){
         $title = trim($_POST['title'] ?? '');
@@ -73,40 +71,53 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
     }
 }
 
-$templates = $pdo->query("SELECT * FROM collect_templates ORDER BY FIELD(status,'open','paused','ended','void'), deadline ASC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
-$fields = $pdo->query("SELECT * FROM collect_fields ORDER BY template_id, sort_order, id")->fetchAll(PDO::FETCH_ASSOC);
-$fieldsByTemplate = [];
-foreach($fields as $f){
-    $fieldsByTemplate[$f['template_id']][] = $f;
+$templateSql = "SELECT * FROM collect_templates";
+if($isManager){
+    $templateSql .= " ORDER BY FIELD(status,'open','paused','ended','void'), deadline ASC, id DESC";
+    $tplStmt = $pdo->query($templateSql);
+} else {
+    $templateSql = "SELECT t.* FROM collect_templates t JOIN collect_template_targets tgt ON tgt.template_id=t.id WHERE tgt.member_id=? AND t.status IN ('open','paused') ORDER BY t.deadline ASC, t.id DESC";
+    $tplStmt = $pdo->prepare($templateSql);
+    $tplStmt->execute([$currentMemberId]);
 }
-$targetStmt = $pdo->query("SELECT t.*, m.name, m.campus_id, m.department, m.status AS member_status FROM collect_template_targets t JOIN members m ON t.member_id=m.id ORDER BY m.name");
+$templates = $tplStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$templateIds = array_column($templates, 'id');
+$fieldsByTemplate = [];
 $targetsByTemplate = [];
-foreach($targetStmt->fetchAll(PDO::FETCH_ASSOC) as $t){
-    $targetsByTemplate[$t['template_id']][] = $t;
+if(!empty($templateIds)){
+    $placeholders = implode(',', array_fill(0, count($templateIds), '?'));
+    $fieldStmt = $pdo->prepare("SELECT * FROM collect_fields WHERE template_id IN ($placeholders) ORDER BY template_id, sort_order, id");
+    $fieldStmt->execute($templateIds);
+    foreach($fieldStmt->fetchAll(PDO::FETCH_ASSOC) as $f){
+        $fieldsByTemplate[$f['template_id']][] = $f;
+    }
+
+    if($isManager){
+        $targetStmt = $pdo->query("SELECT t.*, m.name, m.campus_id, m.department, m.status AS member_status FROM collect_template_targets t JOIN members m ON t.member_id=m.id ORDER BY m.name");
+        foreach($targetStmt->fetchAll(PDO::FETCH_ASSOC) as $t){
+            $targetsByTemplate[$t['template_id']][] = $t;
+        }
+    } else {
+        $targetStmt = $pdo->prepare("SELECT t.*, m.name, m.campus_id, m.department, m.status AS member_status FROM collect_template_targets t JOIN members m ON t.member_id=m.id WHERE t.member_id=?");
+        $targetStmt->execute([$currentMemberId]);
+        foreach($targetStmt->fetchAll(PDO::FETCH_ASSOC) as $t){
+            $targetsByTemplate[$t['template_id']][] = $t;
+        }
+    }
 }
 
-$members = $pdo->query("SELECT id, name, campus_id, department, status FROM members ORDER BY status='in_work' DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$members = $isManager ? $pdo->query("SELECT id, name, campus_id, department, status FROM members ORDER BY status='in_work' DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC) : [];
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <p class="text-muted mb-1" data-i18n="collect.subtitle">Launch structured data collection and track completion at a glance.</p>
   </div>
-  <div class="d-flex gap-2">
-    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#templateModal" data-i18n="collect.add_template">New Template</button>
-  </div>
-</div>
-
-<div class="alert alert-info d-flex align-items-center" role="alert">
-  <div class="me-3">
-    <div class="fw-bold" data-i18n="collect.status.legend">Status Legend</div>
-    <div class="small text-muted" data-i18n="collect.status.desc">Open for filling, paused temporarily, or archived when finished/voided.</div>
-  </div>
-  <div class="ms-auto d-flex gap-2 align-items-center flex-wrap">
-    <span class="badge rounded-pill bg-success" data-i18n="collect.status.open">Open</span>
-    <span class="badge rounded-pill bg-warning text-dark" data-i18n="collect.status.paused">Paused</span>
-    <span class="badge rounded-pill bg-secondary" data-i18n="collect.status.ended">Ended</span>
-    <span class="badge rounded-pill bg-dark" data-i18n="collect.status.void">Voided</span>
-  </div>
+  <?php if($isManager): ?>
+    <div class="d-flex gap-2">
+      <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#templateModal" data-i18n="collect.add_template">New Template</button>
+    </div>
+  <?php endif; ?>
 </div>
 
 <?php
@@ -137,18 +148,20 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
                 elseif($tpl['status']==='ended') echo 'bg-secondary';
                 else echo 'bg-dark';
               ?>" data-i18n="collect.status.<?= $tpl['status']; ?>"></span>
-              <form class="mt-2" method="post">
-                <input type="hidden" name="action" value="update_status">
-                <input type="hidden" name="template_id" value="<?= $tpl['id']; ?>">
-                <div class="input-group input-group-sm">
-                  <select name="status" class="form-select">
-                    <?php foreach($validStatuses as $s): ?>
-                      <option value="<?= $s; ?>" <?= $tpl['status']===$s?'selected':''; ?> data-i18n="collect.status.<?= $s; ?>"></option>
-                    <?php endforeach; ?>
-                  </select>
-                  <button class="btn btn-outline-primary" type="submit" data-i18n="collect.status.update">Update</button>
-                </div>
-              </form>
+              <?php if($isManager): ?>
+                <form class="mt-2" method="post">
+                  <input type="hidden" name="action" value="update_status">
+                  <input type="hidden" name="template_id" value="<?= $tpl['id']; ?>">
+                  <div class="input-group input-group-sm">
+                    <select name="status" class="form-select">
+                      <?php foreach($validStatuses as $s): ?>
+                        <option value="<?= $s; ?>" <?= $tpl['status']===$s?'selected':''; ?> data-i18n="collect.status.<?= $s; ?>"><?php echo htmlspecialchars($s); ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                    <button class="btn btn-outline-primary" type="submit" data-i18n="collect.status.update">Update</button>
+                  </div>
+                </form>
+              <?php endif; ?>
             </div>
           </div>
           <div class="mt-3 row">
@@ -195,7 +208,9 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
                       <th data-i18n="collect.table.member">Member</th>
                       <th data-i18n="collect.table.department">Department</th>
                       <th data-i18n="collect.table.status">Status</th>
-                      <th class="text-end" data-i18n="collect.table.action">Action</th>
+                      <?php if($isManager): ?>
+                        <th class="text-end" data-i18n="collect.table.action">Action</th>
+                      <?php endif; ?>
                     </tr>
                   </thead>
                   <tbody>
@@ -209,18 +224,20 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
                         <td>
                           <span class="badge <?= $tg['status']==='submitted' ? 'bg-success' : 'bg-secondary'; ?>" data-i18n="collect.member_status.<?= $tg['status']; ?>"></span>
                         </td>
-                        <td class="text-end">
-                          <form method="post" class="d-inline">
-                            <input type="hidden" name="action" value="toggle_target">
-                            <input type="hidden" name="template_id" value="<?= $tpl['id']; ?>">
-                            <input type="hidden" name="member_id" value="<?= $tg['member_id']; ?>">
-                            <button class="btn btn-sm <?= $tg['status']==='submitted' ? 'btn-outline-secondary' : 'btn-outline-success'; ?>" type="submit" data-i18n="collect.member.toggle"></button>
-                          </form>
-                        </td>
+                        <?php if($isManager): ?>
+                          <td class="text-end">
+                            <form method="post" class="d-inline">
+                              <input type="hidden" name="action" value="toggle_target">
+                              <input type="hidden" name="template_id" value="<?= $tpl['id']; ?>">
+                              <input type="hidden" name="member_id" value="<?= $tg['member_id']; ?>">
+                              <button class="btn btn-sm <?= $tg['status']==='submitted' ? 'btn-outline-secondary' : 'btn-outline-success'; ?>" type="submit" data-i18n="collect.member.toggle"></button>
+                            </form>
+                          </td>
+                        <?php endif; ?>
                       </tr>
                     <?php endforeach; ?>
                     <?php if(empty($tplTargets)): ?>
-                      <tr><td colspan="4" class="text-muted" data-i18n="collect.targets.empty">No target members added.</td></tr>
+                      <tr><td colspan="<?= $isManager ? 4 : 3; ?>" class="text-muted" data-i18n="collect.targets.empty">No target members added.</td></tr>
                     <?php endif; ?>
                   </tbody>
                 </table>
@@ -233,6 +250,7 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
   <?php endforeach; ?>
 </div>
 
+<?php if($isManager): ?>
 <div class="mt-4">
   <button class="btn btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#archivedBox" aria-expanded="false" aria-controls="archivedBox" data-i18n="collect.archive.toggle">Show ended/voided templates</button>
   <div class="collapse mt-3" id="archivedBox">
@@ -259,7 +277,7 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
                   <div class="input-group input-group-sm">
                     <select name="status" class="form-select">
                       <?php foreach($validStatuses as $s): ?>
-                        <option value="<?= $s; ?>" <?= $tpl['status']===$s?'selected':''; ?> data-i18n="collect.status.<?= $s; ?>"></option>
+                        <option value="<?= $s; ?>" <?= $tpl['status']===$s?'selected':''; ?> data-i18n="collect.status.<?= $s; ?>"><?php echo htmlspecialchars($s); ?></option>
                       <?php endforeach; ?>
                     </select>
                     <button class="btn btn-outline-primary" type="submit" data-i18n="collect.status.update">Update</button>
@@ -276,7 +294,9 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
     </div>
   </div>
 </div>
+<?php endif; ?>
 
+<?php if($isManager): ?>
 <div class="modal fade" id="templateModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
@@ -301,7 +321,7 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
               <label class="form-label" data-i18n="collect.modal.status">Initial Status</label>
               <select name="status" class="form-select">
                 <?php foreach($validStatuses as $s): ?>
-                  <option value="<?= $s; ?>" data-i18n="collect.status.<?= $s; ?>"></option>
+                  <option value="<?= $s; ?>" data-i18n="collect.status.<?= $s; ?>"><?= htmlspecialchars($s); ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -362,6 +382,8 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
   </div>
 </div>
 
+<?php endif; ?>
+
 <script>
 (function(){
   const fieldsArea = document.getElementById('fieldsArea');
@@ -386,17 +408,17 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
         <div class="col-md-2">
           <label class="form-label" data-i18n="collect.field.type">Type</label>
           <select class="form-select field-type">
-            <option value="text" data-i18n="collect.type.text"></option>
-            <option value="number" data-i18n="collect.type.number"></option>
-            <option value="select" data-i18n="collect.type.select"></option>
-            <option value="file" data-i18n="collect.type.file"></option>
+            <option value="text" data-i18n="collect.type.text">Text</option>
+            <option value="number" data-i18n="collect.type.number">Number</option>
+            <option value="select" data-i18n="collect.type.select">Dropdown</option>
+            <option value="file" data-i18n="collect.type.file">File</option>
           </select>
         </div>
         <div class="col-md-2">
           <label class="form-label" data-i18n="collect.field.required">Required</label>
           <select class="form-select field-required">
-            <option value="1" data-i18n="collect.required"></option>
-            <option value="0" data-i18n="collect.optional"></option>
+            <option value="1" data-i18n="collect.required">Required</option>
+            <option value="0" data-i18n="collect.optional">Optional</option>
           </select>
         </div>
         <div class="col-md-2 text-end">
