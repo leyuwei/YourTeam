@@ -32,6 +32,17 @@ function clean_collect_files($templateId) {
     }
 }
 
+function delete_submission_files($templateId, $data) {
+    foreach ($data as $val) {
+        if (($val['type'] ?? '') === 'file' && isset($val['value']['stored'])) {
+            $filePath = __DIR__ . '/collect_uploads/' . intval($templateId) . '/' . $val['value']['stored'];
+            if (is_file($filePath)) {
+                @unlink($filePath);
+            }
+        }
+    }
+}
+
 if ($is_manager && isset($_GET['download'])) {
     $templateId = intval($_GET['download']);
     $stmt = $pdo->prepare("SELECT * FROM collect_templates WHERE id=?");
@@ -134,6 +145,7 @@ if ($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ??
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_submission') {
     $templateId = intval($_POST['template_id']);
     $submissionId = intval($_POST['submission_id'] ?? 0);
+    $toast = 'record_failed';
     $stmt = $pdo->prepare("SELECT * FROM collect_templates WHERE id=?");
     $stmt->execute([$templateId]);
     $template = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -177,12 +189,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
         if ($submissionId) {
             $stmt = $pdo->prepare("UPDATE collect_submissions SET data_json=?, updated_at=? WHERE id=? AND member_id=?");
             $stmt->execute([json_encode($data), $now, $submissionId, $member_id]);
+            $toast = 'record_updated';
         } else {
             $stmt = $pdo->prepare("INSERT INTO collect_submissions (template_id, member_id, data_json, created_at, updated_at) VALUES (?,?,?,?,?)");
             $stmt->execute([$templateId, $member_id, json_encode($data), $now, $now]);
+            $toast = 'record_created';
         }
     }
-    header('Location: collect.php');
+    header('Location: collect.php?toast=' . $toast);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_submission') {
+    $templateId = intval($_POST['template_id']);
+    $submissionId = intval($_POST['submission_id'] ?? 0);
+    $toast = 'record_failed';
+    $subStmt = $pdo->prepare("SELECT * FROM collect_submissions WHERE id=? AND template_id=?");
+    $subStmt->execute([$submissionId, $templateId]);
+    $submission = $subStmt->fetch(PDO::FETCH_ASSOC);
+    if ($submission) {
+        $tplStmt = $pdo->prepare("SELECT status, target_member_ids FROM collect_templates WHERE id=?");
+        $tplStmt->execute([$templateId]);
+        $template = $tplStmt->fetch(PDO::FETCH_ASSOC);
+        $targets = decode_json_or($template['target_member_ids'] ?? '[]');
+        $canDelete = $is_manager || ($template && $template['status'] === 'open' && $submission['member_id'] == $member_id && (empty($targets) || in_array($member_id, $targets)));
+        if ($canDelete) {
+            $data = decode_json_or($submission['data_json']);
+            delete_submission_files($templateId, $data);
+            $pdo->prepare("DELETE FROM collect_submissions WHERE id=?")->execute([$submissionId]);
+            $toast = 'record_deleted';
+        }
+    }
+    header('Location: collect.php?toast=' . $toast);
     exit;
 }
 
@@ -216,6 +254,14 @@ include 'header.php';
 </div>
 <div class="d-flex align-items-center mb-3">
   <button class="btn btn-outline-secondary" id="toggleArchived" data-i18n="collect.show_archived">Show ended/void forms</button>
+</div>
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1080;">
+  <div id="collectToast" class="toast align-items-center text-bg-primary" role="status" aria-live="polite" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
 </div>
 <?php
 $archived = [];
@@ -318,7 +364,7 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
             <?php endif; ?>
             <?php foreach($mySubs as $sub): $subData = decode_json_or($sub['data_json']); ?>
               <form class="border rounded p-3 mb-3" method="post" enctype="multipart/form-data">
-                <input type="hidden" name="action" value="save_submission">
+                <input type="hidden" name="action" value="save_submission" class="collect-action-input">
                 <input type="hidden" name="template_id" value="<?= $t['id']; ?>">
                 <input type="hidden" name="submission_id" value="<?= $sub['id']; ?>">
                 <div class="row g-3">
@@ -347,8 +393,9 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
                   </div>
                 <?php endforeach; ?>
                 </div>
-                <div class="mt-3 text-end">
-                  <button class="btn btn-primary" data-i18n="collect.update_record">Update</button>
+                <div class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                  <button class="btn btn-primary" data-i18n="collect.update_record" onclick="this.form.querySelector('.collect-action-input').value='save_submission';">Update</button>
+                  <button type="submit" class="btn btn-outline-danger" formnovalidate onclick="this.form.querySelector('.collect-action-input').value='delete_submission'; return doubleConfirm(translations[document.documentElement.lang||'zh']['collect.confirm_delete_record']);" data-i18n="collect.delete_record">Delete</button>
                 </div>
               </form>
             <?php endforeach; ?>
@@ -572,6 +619,33 @@ if(toggleArchivedBtn){
     toggleArchivedBtn.setAttribute('data-i18n', visible ? 'collect.show_archived' : 'collect.hide_archived');
     if(window.applyTranslations) applyTranslations();
   });
+}
+
+const toastParam = new URLSearchParams(window.location.search).get('toast');
+if (toastParam) {
+  const toastEl = document.getElementById('collectToast');
+  if (toastEl) {
+    const bodyEl = toastEl.querySelector('.toast-body');
+    const lang = document.documentElement.lang || 'zh';
+    const keyMap = {
+      record_created: 'collect.record_created',
+      record_updated: 'collect.record_updated',
+      record_deleted: 'collect.record_deleted',
+      record_failed: 'collect.record_failed'
+    };
+    const closeBtn = toastEl.querySelector('[aria-label="Close"]');
+    if (closeBtn && translations[lang]?.['collect.toast_close']) {
+      closeBtn.setAttribute('aria-label', translations[lang]['collect.toast_close']);
+    }
+    const key = keyMap[toastParam];
+    bodyEl.textContent = (translations[lang] && translations[lang][key]) ? translations[lang][key] : toastParam;
+    if(window.applyTranslations) applyTranslations();
+    const toast = new bootstrap.Toast(toastEl, { delay: 2500 });
+    toast.show();
+    const url = new URL(window.location);
+    url.searchParams.delete('toast');
+    window.history.replaceState({}, '', url);
+  }
 }
 </script>
 <?php include 'footer.php'; ?>

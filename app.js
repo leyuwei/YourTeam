@@ -924,7 +924,12 @@ const translations = {
     'collect.download_zip': 'Download ZIP',
     'collect.none': 'None',
     'collect.record_created': 'Record saved',
-    'collect.record_updated': 'Record updated'
+    'collect.record_updated': 'Record updated',
+    'collect.record_deleted': 'Record deleted',
+    'collect.record_failed': 'Operation failed',
+    'collect.delete_record': 'Delete',
+    'collect.confirm_delete_record': 'Delete this record? This cannot be undone.',
+    'collect.toast_close': 'Close'
   },
   zh: {
     'nav.home': '团队管理',
@@ -1851,7 +1856,12 @@ const translations = {
   'collect.download_zip': '打包下载',
   'collect.none': '暂无',
   'collect.record_created': '保存成功',
-  'collect.record_updated': '更新成功'
+  'collect.record_updated': '更新成功',
+  'collect.record_deleted': '删除成功',
+  'collect.record_failed': '操作失败',
+  'collect.delete_record': '删除',
+  'collect.confirm_delete_record': '确认删除该条记录？该操作无法撤销。',
+  'collect.toast_close': '关闭'
   }
 };
 
