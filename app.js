@@ -882,6 +882,8 @@ const translations = {
     'collect.targets': 'Target Members',
     'collect.member_selector.title': 'On-duty Members',
     'collect.member_selector.subtitle': 'Pick the members who need to fill this form.',
+    'collect.targets_select_all': 'Select all',
+    'collect.targets_invert': 'Invert',
     'collect.fields': 'Fields',
     'collect.field_label': 'Label',
     'collect.field_type': 'Type',
@@ -929,7 +931,8 @@ const translations = {
     'collect.record_failed': 'Operation failed',
     'collect.delete_record': 'Delete',
     'collect.confirm_delete_record': 'Delete this record? This cannot be undone.',
-    'collect.toast_close': 'Close'
+    'collect.toast_close': 'Close',
+    'collect.member_page_info': 'Page {current}/{total}'
   },
   zh: {
     'nav.home': '团队管理',
@@ -1814,6 +1817,8 @@ const translations = {
   'collect.targets': '待填成员',
   'collect.member_selector.title': '在岗成员列表',
   'collect.member_selector.subtitle': '勾选需要填写的成员。',
+  'collect.targets_select_all': '全选',
+  'collect.targets_invert': '反选',
   'collect.fields': '字段',
   'collect.field_label': '字段标题',
   'collect.field_type': '字段类型',
@@ -1861,8 +1866,9 @@ const translations = {
   'collect.record_failed': '操作失败',
   'collect.delete_record': '删除',
   'collect.confirm_delete_record': '确认删除该条记录？该操作无法撤销。',
-  'collect.toast_close': '关闭'
-  }
+  'collect.toast_close': '关闭',
+  'collect.member_page_info': '第 {current}/{total} 页'
+}
 };
 
 let forceMobileNav = false;

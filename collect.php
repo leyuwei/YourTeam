@@ -238,13 +238,16 @@ include 'header.php';
 <style>
   .collect-card { border:1px solid var(--app-surface-border); box-shadow:var(--app-card-shadow); }
   .collect-status { font-size:0.9rem; }
-  .target-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.5rem; max-height:320px; overflow:auto; padding:0.25rem; background:var(--app-table-striped-bg); border-radius:0.5rem; }
+  .target-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.5rem; max-height:280px; overflow:auto; padding:0.25rem; background:var(--app-table-striped-bg); border-radius:0.5rem; }
   .target-card { border:1px solid var(--app-table-border); border-radius:0.5rem; padding:0.5rem 0.6rem; background:var(--app-surface-bg); box-shadow:0 2px 6px rgba(0,0,0,0.04); }
   .target-card input { margin-right:0.35rem; }
   .collect-field-row { border:1px dashed var(--app-table-border); padding:0.75rem; border-radius:0.5rem; background:var(--app-table-striped-bg); }
   .collect-field-row + .collect-field-row { margin-top:0.5rem; }
   .archived-section { display:none; }
   .collect-badge { padding:0.25rem 0.5rem; border-radius:0.5rem; }
+  .member-list-body { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:0.5rem; }
+  .member-chip { border:1px solid var(--app-table-border); border-radius:0.45rem; padding:0.35rem 0.5rem; background:var(--app-surface-bg); display:flex; justify-content:space-between; align-items:center; gap:0.35rem; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
+  .member-chip .meta { color:var(--bs-gray-600); font-size:0.85rem; }
 </style>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="mb-0" data-i18n="collect.title">Collect</h2>
@@ -318,36 +321,46 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
           <?php endif; ?>
         </div>
         <?php if($is_manager): ?>
+        <?php
+          $submittedMembers = [];
+          foreach($members as $m){
+            if(in_array($m['id'],$submittedMemberIds)){
+              $submittedMembers[] = ['name'=>$m['name'],'department'=>$m['department']];
+            }
+          }
+          $pendingMembers = [];
+          foreach($members as $m){
+            if(in_array($m['id'],$remaining)){
+              $pendingMembers[] = ['name'=>$m['name'],'department'=>$m['department']];
+            }
+          }
+        ?>
         <div class="row g-3 mb-3">
           <div class="col-md-6">
             <h6 class="mb-2" data-i18n="collect.template_card.members_done">Submitted</h6>
-            <?php if($submittedMemberIds): ?>
-              <ul class="list-group small">
-                <?php foreach($members as $m): if(in_array($m['id'],$submittedMemberIds)): ?>
-                  <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span><?= htmlspecialchars($m['name']); ?></span>
-                    <span class="badge bg-success">✔</span>
-                  </li>
-                <?php endif; endforeach; ?>
-              </ul>
-            <?php else: ?>
-              <div class="text-muted" data-i18n="collect.none">None</div>
-            <?php endif; ?>
+            <div class="member-list-panel" data-members='<?= htmlspecialchars(json_encode($submittedMembers, JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>' data-size="8">
+              <div class="member-list-body"></div>
+              <div class="d-flex justify-content-between align-items-center mt-2 member-list-controls">
+                <div class="small text-muted member-page-indicator"></div>
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-outline-secondary member-page-prev">‹</button>
+                  <button type="button" class="btn btn-outline-secondary member-page-next">›</button>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="col-md-6">
             <h6 class="mb-2" data-i18n="collect.template_card.members_pending">Not submitted</h6>
-            <?php if($remaining): ?>
-              <ul class="list-group small">
-                <?php foreach($members as $m): if(in_array($m['id'],$remaining)): ?>
-                  <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <span><?= htmlspecialchars($m['name']); ?></span>
-                    <span class="badge bg-warning text-dark">…</span>
-                  </li>
-                <?php endif; endforeach; ?>
-              </ul>
-            <?php else: ?>
-              <div class="text-muted" data-i18n="collect.none">None</div>
-            <?php endif; ?>
+            <div class="member-list-panel" data-members='<?= htmlspecialchars(json_encode($pendingMembers, JSON_UNESCAPED_UNICODE), ENT_QUOTES); ?>' data-size="8">
+              <div class="member-list-body"></div>
+              <div class="d-flex justify-content-between align-items-center mt-2 member-list-controls">
+                <div class="small text-muted member-page-indicator"></div>
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-outline-secondary member-page-prev">‹</button>
+                  <button type="button" class="btn btn-outline-secondary member-page-next">›</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <?php endif; ?>
@@ -489,6 +502,10 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
                 <label class="form-label" data-i18n="collect.targets">Target Members</label>
                 <div class="text-muted small" data-i18n="collect.member_selector.subtitle">Pick the members who need to fill this form.</div>
               </div>
+              <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-secondary" id="targetSelectAll" data-i18n="collect.targets_select_all">Select All</button>
+                <button type="button" class="btn btn-outline-secondary" id="targetInvert" data-i18n="collect.targets_invert">Invert</button>
+              </div>
             </div>
             <div class="target-grid">
               <?php foreach($members as $m): if($m['status']!=='in_work') continue; ?>
@@ -523,6 +540,8 @@ const templateModal = document.getElementById('templateModal');
 const templateForm = document.getElementById('templateForm');
 const toggleArchivedBtn = document.getElementById('toggleArchived');
 const archivedSection = document.querySelector('.archived-section');
+const targetSelectAllBtn = document.getElementById('targetSelectAll');
+const targetInvertBtn = document.getElementById('targetInvert');
 
 function createFieldRow(field){
   const wrapper = document.createElement('div');
@@ -585,6 +604,18 @@ if(templateForm){
   });
 }
 
+function selectTargets(mode){
+  const boxes = document.querySelectorAll('input[name="targets[]"]');
+  if(!boxes.length) return;
+  boxes.forEach(cb => {
+    if(mode==='all') cb.checked = true;
+    if(mode==='invert') cb.checked = !cb.checked;
+  });
+}
+
+targetSelectAllBtn?.addEventListener('click', ()=>selectTargets('all'));
+targetInvertBtn?.addEventListener('click', ()=>selectTargets('invert'));
+
 if(templateModal){
   templateModal.addEventListener('show.bs.modal', event => {
     const button = event.relatedTarget;
@@ -620,6 +651,57 @@ if(toggleArchivedBtn){
     if(window.applyTranslations) applyTranslations();
   });
 }
+
+function renderMemberPanels(){
+  const lang = document.documentElement.lang || 'zh';
+  const noneLabel = translations[lang]?.['collect.none'] || 'None';
+  const pageTemplate = translations[lang]?.['collect.member_page_info'] || 'Page {current}/{total}';
+  document.querySelectorAll('.member-list-panel').forEach(panel => {
+    const members = JSON.parse(panel.dataset.members || '[]');
+    const size = parseInt(panel.dataset.size || '8');
+    const body = panel.querySelector('.member-list-body');
+    const indicator = panel.querySelector('.member-page-indicator');
+    const prev = panel.querySelector('.member-page-prev');
+    const next = panel.querySelector('.member-page-next');
+    let page = 0;
+    const renderPage = () => {
+      body.innerHTML = '';
+      const totalPages = Math.max(1, Math.ceil(members.length / size));
+      page = Math.min(Math.max(page, 0), totalPages - 1);
+      const start = page * size;
+      const items = members.slice(start, start + size);
+      if(items.length === 0){
+        const empty = document.createElement('div');
+        empty.className = 'text-muted small';
+        empty.textContent = noneLabel;
+        body.appendChild(empty);
+      } else {
+        items.forEach(m => {
+          const chip = document.createElement('div');
+          chip.className = 'member-chip';
+          chip.innerHTML = `<span>${m.name || ''}</span>${m.department ? `<span class="meta">${m.department}</span>` : ''}`;
+          body.appendChild(chip);
+        });
+      }
+      if(indicator){
+        indicator.textContent = pageTemplate.replace('{current}', page + 1).replace('{total}', totalPages);
+      }
+      if(prev && next){
+        prev.disabled = page <= 0;
+        next.disabled = page >= totalPages - 1;
+        const controls = prev.closest('.member-list-controls');
+        if(controls){
+          controls.style.display = totalPages > 1 ? 'flex' : 'none';
+        }
+      }
+    };
+    prev?.addEventListener('click', ()=>{ page--; renderPage(); });
+    next?.addEventListener('click', ()=>{ page++; renderPage(); });
+    renderPage();
+  });
+}
+
+renderMemberPanels();
 
 const toastParam = new URLSearchParams(window.location.search).get('toast');
 if (toastParam) {
