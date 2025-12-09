@@ -657,77 +657,96 @@ function renderMemberPanels(){
   const noneLabel = translations[lang]?.['collect.none'] || 'None';
   const pageTemplate = translations[lang]?.['collect.member_page_info'] || 'Page {current}/{total}';
   document.querySelectorAll('.member-list-panel').forEach(panel => {
-    const members = JSON.parse(panel.dataset.members || '[]');
-    const size = parseInt(panel.dataset.size || '8');
-    const body = panel.querySelector('.member-list-body');
-    const indicator = panel.querySelector('.member-page-indicator');
-    const prev = panel.querySelector('.member-page-prev');
-    const next = panel.querySelector('.member-page-next');
-    let page = 0;
-    const renderPage = () => {
-      body.innerHTML = '';
-      const totalPages = Math.max(1, Math.ceil(members.length / size));
-      page = Math.min(Math.max(page, 0), totalPages - 1);
-      const start = page * size;
-      const items = members.slice(start, start + size);
-      if(items.length === 0){
+    try {
+      const members = JSON.parse(panel.dataset.members || '[]');
+      const size = parseInt(panel.dataset.size || '8');
+      const body = panel.querySelector('.member-list-body');
+      const indicator = panel.querySelector('.member-page-indicator');
+      const prev = panel.querySelector('.member-page-prev');
+      const next = panel.querySelector('.member-page-next');
+      let page = 0;
+      const renderPage = () => {
+        body.innerHTML = '';
+        const totalPages = Math.max(1, Math.ceil(members.length / size));
+        page = Math.min(Math.max(page, 0), totalPages - 1);
+        const start = page * size;
+        const items = members.slice(start, start + size);
+        if(items.length === 0){
+          const empty = document.createElement('div');
+          empty.className = 'text-muted small';
+          empty.textContent = noneLabel;
+          body.appendChild(empty);
+        } else {
+          items.forEach(m => {
+            const chip = document.createElement('div');
+            chip.className = 'member-chip';
+            chip.innerHTML = `<span>${m.name || ''}</span>${m.department ? `<span class="meta">${m.department}</span>` : ''}`;
+            body.appendChild(chip);
+          });
+        }
+        if(indicator){
+          indicator.textContent = pageTemplate.replace('{current}', page + 1).replace('{total}', totalPages);
+        }
+        if(prev && next){
+          prev.disabled = page <= 0;
+          next.disabled = page >= totalPages - 1;
+          const controls = prev.closest('.member-list-controls');
+          if(controls){
+            controls.style.display = totalPages > 1 ? 'flex' : 'none';
+          }
+        }
+      };
+      prev?.addEventListener('click', ()=>{ page--; renderPage(); });
+      next?.addEventListener('click', ()=>{ page++; renderPage(); });
+      renderPage();
+    } catch (err) {
+      console.error('Failed to render member list', err);
+      const fallback = panel.querySelector('.member-list-body');
+      if (fallback) {
         const empty = document.createElement('div');
         empty.className = 'text-muted small';
         empty.textContent = noneLabel;
-        body.appendChild(empty);
-      } else {
-        items.forEach(m => {
-          const chip = document.createElement('div');
-          chip.className = 'member-chip';
-          chip.innerHTML = `<span>${m.name || ''}</span>${m.department ? `<span class="meta">${m.department}</span>` : ''}`;
-          body.appendChild(chip);
-        });
+        fallback.appendChild(empty);
       }
-      if(indicator){
-        indicator.textContent = pageTemplate.replace('{current}', page + 1).replace('{total}', totalPages);
-      }
-      if(prev && next){
-        prev.disabled = page <= 0;
-        next.disabled = page >= totalPages - 1;
-        const controls = prev.closest('.member-list-controls');
-        if(controls){
-          controls.style.display = totalPages > 1 ? 'flex' : 'none';
-        }
-      }
-    };
-    prev?.addEventListener('click', ()=>{ page--; renderPage(); });
-    next?.addEventListener('click', ()=>{ page++; renderPage(); });
-    renderPage();
+    }
   });
 }
 
-renderMemberPanels();
-
 const toastParam = new URLSearchParams(window.location.search).get('toast');
 if (toastParam) {
-  const toastEl = document.getElementById('collectToast');
-  if (toastEl) {
-    const bodyEl = toastEl.querySelector('.toast-body');
-    const lang = document.documentElement.lang || 'zh';
-    const keyMap = {
-      record_created: 'collect.record_created',
-      record_updated: 'collect.record_updated',
-      record_deleted: 'collect.record_deleted',
-      record_failed: 'collect.record_failed'
-    };
-    const closeBtn = toastEl.querySelector('[aria-label="Close"]');
-    if (closeBtn && translations[lang]?.['collect.toast_close']) {
-      closeBtn.setAttribute('aria-label', translations[lang]['collect.toast_close']);
+  try {
+    const toastEl = document.getElementById('collectToast');
+    if (toastEl) {
+      const bodyEl = toastEl.querySelector('.toast-body');
+      const lang = document.documentElement.lang || 'zh';
+      const keyMap = {
+        record_created: 'collect.record_created',
+        record_updated: 'collect.record_updated',
+        record_deleted: 'collect.record_deleted',
+        record_failed: 'collect.record_failed'
+      };
+      const closeBtn = toastEl.querySelector('[aria-label="Close"]');
+      if (closeBtn && translations[lang]?.['collect.toast_close']) {
+        closeBtn.setAttribute('aria-label', translations[lang]['collect.toast_close']);
+      }
+      const key = keyMap[toastParam];
+      bodyEl.textContent = (translations[lang] && translations[lang][key]) ? translations[lang][key] : toastParam;
+      if(window.applyTranslations) applyTranslations();
+      const toast = new bootstrap.Toast(toastEl, { delay: 2500 });
+      toast.show();
+      const url = new URL(window.location);
+      url.searchParams.delete('toast');
+      window.history.replaceState({}, '', url);
     }
-    const key = keyMap[toastParam];
-    bodyEl.textContent = (translations[lang] && translations[lang][key]) ? translations[lang][key] : toastParam;
-    if(window.applyTranslations) applyTranslations();
-    const toast = new bootstrap.Toast(toastEl, { delay: 2500 });
-    toast.show();
-    const url = new URL(window.location);
-    url.searchParams.delete('toast');
-    window.history.replaceState({}, '', url);
+  } catch (err) {
+    console.error('Collect toast error', err);
   }
+}
+
+try {
+  renderMemberPanels();
+} catch (err) {
+  console.error('Collect member panel render error', err);
 }
 </script>
 <?php include 'footer.php'; ?>
