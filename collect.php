@@ -1,6 +1,5 @@
 <?php
 include 'auth.php';
-include 'header.php';
 
 $is_manager = ($_SESSION['role'] === 'manager');
 $member_id = $_SESSION['member_id'] ?? null;
@@ -90,6 +89,9 @@ if ($is_manager && isset($_GET['download'])) {
         $zip->addFromString('submissions.csv', $csvContent);
         $zip->close();
 
+        if (ob_get_length()) {
+            ob_clean();
+        }
         header('Content-Type: application/zip');
         header('Content-Disposition: attachment; filename="collect_' . $templateId . '.zip"');
         header('Content-Length: ' . filesize($tmp));
@@ -192,12 +194,14 @@ $submissionStmt = $pdo->query("SELECT cs.*, m.name FROM collect_submissions cs L
 foreach ($submissionStmt as $sub) {
     $templateSubmissions[$sub['template_id']][] = $sub;
 }
+
+include 'header.php';
 ?>
 <style>
   .collect-card { border:1px solid var(--app-surface-border); box-shadow:var(--app-card-shadow); }
   .collect-status { font-size:0.9rem; }
-  .target-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:0.75rem; }
-  .target-card { border:1px solid var(--app-table-border); border-radius:0.5rem; padding:0.75rem; background:var(--app-surface-bg); box-shadow:0 3px 8px rgba(0,0,0,0.04); }
+  .target-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.5rem; max-height:320px; overflow:auto; padding:0.25rem; background:var(--app-table-striped-bg); border-radius:0.5rem; }
+  .target-card { border:1px solid var(--app-table-border); border-radius:0.5rem; padding:0.5rem 0.6rem; background:var(--app-surface-bg); box-shadow:0 2px 6px rgba(0,0,0,0.04); }
   .target-card input { margin-right:0.35rem; }
   .collect-field-row { border:1px dashed var(--app-table-border); padding:0.75rem; border-radius:0.5rem; background:var(--app-table-striped-bg); }
   .collect-field-row + .collect-field-row { margin-top:0.5rem; }
@@ -253,7 +257,7 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
         <?php endif; ?>
         <div class="d-flex flex-wrap gap-2 mb-3">
           <?php if($is_manager): ?>
-            <button class="btn btn-sm btn-secondary edit-template" data-template='<?= htmlspecialchars(json_encode($t, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT), ENT_QUOTES); ?>' data-i18n="collect.template_card.edit">Edit</button>
+            <button class="btn btn-sm btn-secondary edit-template" data-bs-toggle="modal" data-bs-target="#templateModal" data-mode="edit" data-template='<?= htmlspecialchars(json_encode($t, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT), ENT_QUOTES); ?>' data-i18n="collect.template_card.edit">Edit</button>
             <form method="post" class="d-inline" onsubmit="return doubleConfirm(translations[document.documentElement.lang||'zh']['collect.confirm_delete']);">
               <input type="hidden" name="action" value="delete_template">
               <input type="hidden" name="id" value="<?= $t['id']; ?>">
