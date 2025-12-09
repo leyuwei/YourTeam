@@ -4,68 +4,164 @@ include 'header.php';
 
 $isManager = ($_SESSION['role'] ?? '') === 'manager';
 $currentMemberId = $_SESSION['member_id'] ?? null;
+$alerts = [];
 
 $validStatuses = ['open','paused','ended','void'];
 
-if($isManager && $_SERVER['REQUEST_METHOD'] === 'POST'){
+if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $action = $_POST['action'] ?? '';
-    if($action === 'create_template'){
-        $title = trim($_POST['title'] ?? '');
-        $deadline = $_POST['deadline'] ?? null;
-        $status = $_POST['status'] ?? 'open';
-        if(!in_array($status, $validStatuses, true)) $status = 'open';
-        $fieldsJson = $_POST['fields'] ?? '[]';
-        $fieldsData = json_decode($fieldsJson, true) ?: [];
-        $targets = $_POST['targets'] ?? [];
+    if($isManager){
+        if($action === 'create_template'){
+            $title = trim($_POST['title'] ?? '');
+            $deadline = $_POST['deadline'] ?? null;
+            $status = $_POST['status'] ?? 'open';
+            if(!in_array($status, $validStatuses, true)) $status = 'open';
+            $fieldsJson = $_POST['fields'] ?? '[]';
+            $fieldsData = json_decode($fieldsJson, true) ?: [];
+            $targets = $_POST['targets'] ?? [];
 
-        if($title && $deadline){
-            $stmt = $pdo->prepare("INSERT INTO collect_templates (title, deadline, status, created_by) VALUES (?,?,?,?)");
-            $stmt->execute([$title, $deadline, $status, $_SESSION['username']]);
-            $templateId = $pdo->lastInsertId();
+            if($title && $deadline){
+                $stmt = $pdo->prepare("INSERT INTO collect_templates (title, deadline, status, created_by) VALUES (?,?,?,?)");
+                $stmt->execute([$title, $deadline, $status, $_SESSION['username']]);
+                $templateId = $pdo->lastInsertId();
 
-            $fieldStmt = $pdo->prepare("INSERT INTO collect_fields (template_id, sort_order, label_en, label_zh, field_type, is_required, options) VALUES (?,?,?,?,?,?,?)");
-            $sort = 0;
-            foreach($fieldsData as $f){
-                $labelEn = trim($f['label_en'] ?? '');
-                $labelZh = trim($f['label_zh'] ?? '');
-                $type = in_array($f['type'] ?? '', ['number','text','select','file'], true) ? $f['type'] : 'text';
-                $required = !empty($f['required']) ? 1 : 0;
-                $options = '';
-                if($type === 'select' && !empty($f['options'])){
-                    $options = implode(',', array_filter(array_map('trim', explode(',', $f['options']))));
+                $fieldStmt = $pdo->prepare("INSERT INTO collect_fields (template_id, sort_order, label_en, label_zh, field_type, is_required, options) VALUES (?,?,?,?,?,?,?)");
+                $sort = 0;
+                foreach($fieldsData as $f){
+                    $labelEn = trim($f['label_en'] ?? '');
+                    $labelZh = trim($f['label_zh'] ?? '');
+                    $type = in_array($f['type'] ?? '', ['number','text','select','file'], true) ? $f['type'] : 'text';
+                    $required = !empty($f['required']) ? 1 : 0;
+                    $options = '';
+                    if($type === 'select' && !empty($f['options'])){
+                        $options = implode(',', array_filter(array_map('trim', explode(',', $f['options']))));
+                    }
+                    if($labelEn || $labelZh){
+                        $fieldStmt->execute([$templateId, $sort++, $labelEn, $labelZh, $type, $required, $options]);
+                    }
                 }
-                if($labelEn || $labelZh){
-                    $fieldStmt->execute([$templateId, $sort++, $labelEn, $labelZh, $type, $required, $options]);
+
+                $targetStmt = $pdo->prepare("INSERT IGNORE INTO collect_template_targets (template_id, member_id, status) VALUES (?,?, 'pending')");
+                foreach($targets as $memberId){
+                    $targetStmt->execute([$templateId, $memberId]);
                 }
             }
+        }
 
-            $targetStmt = $pdo->prepare("INSERT IGNORE INTO collect_template_targets (template_id, member_id, status) VALUES (?,?, 'pending')");
-            foreach($targets as $memberId){
-                $targetStmt->execute([$templateId, $memberId]);
+        if($action === 'update_status'){
+            $templateId = (int)($_POST['template_id'] ?? 0);
+            $newStatus = $_POST['status'] ?? 'open';
+            if($templateId && in_array($newStatus, $validStatuses, true)){
+                $stmt = $pdo->prepare("UPDATE collect_templates SET status=? WHERE id=?");
+                $stmt->execute([$newStatus, $templateId]);
+            }
+        }
+
+        if($action === 'toggle_target'){
+            $templateId = (int)($_POST['template_id'] ?? 0);
+            $memberId = (int)($_POST['member_id'] ?? 0);
+            if($templateId && $memberId){
+                $stmt = $pdo->prepare("SELECT status FROM collect_template_targets WHERE template_id=? AND member_id=?");
+                $stmt->execute([$templateId, $memberId]);
+                $current = $stmt->fetchColumn();
+                if($current){
+                    $newStatus = $current === 'submitted' ? 'pending' : 'submitted';
+                    $update = $pdo->prepare("UPDATE collect_template_targets SET status=?, submitted_at = (CASE WHEN ?='submitted' THEN NOW() ELSE NULL END) WHERE template_id=? AND member_id=?");
+                    $update->execute([$newStatus, $newStatus, $templateId, $memberId]);
+                }
             }
         }
     }
 
-    if($action === 'update_status'){
+    if($action === 'submit_response' && $currentMemberId){
         $templateId = (int)($_POST['template_id'] ?? 0);
-        $newStatus = $_POST['status'] ?? 'open';
-        if($templateId && in_array($newStatus, $validStatuses, true)){
-            $stmt = $pdo->prepare("UPDATE collect_templates SET status=? WHERE id=?");
-            $stmt->execute([$newStatus, $templateId]);
-        }
-    }
+        $tplStmt = $pdo->prepare("SELECT * FROM collect_templates WHERE id=?");
+        $tplStmt->execute([$templateId]);
+        $tpl = $tplStmt->fetch(PDO::FETCH_ASSOC);
 
-    if($action === 'toggle_target'){
-        $templateId = (int)($_POST['template_id'] ?? 0);
-        $memberId = (int)($_POST['member_id'] ?? 0);
-        if($templateId && $memberId){
-            $stmt = $pdo->prepare("SELECT status FROM collect_template_targets WHERE template_id=? AND member_id=?");
-            $stmt->execute([$templateId, $memberId]);
-            $current = $stmt->fetchColumn();
-            if($current){
-                $newStatus = $current === 'submitted' ? 'pending' : 'submitted';
-                $update = $pdo->prepare("UPDATE collect_template_targets SET status=?, submitted_at = (CASE WHEN ?='submitted' THEN NOW() ELSE NULL END) WHERE template_id=? AND member_id=?");
-                $update->execute([$newStatus, $newStatus, $templateId, $memberId]);
+        if(!$tpl){
+            $alerts[] = ['type' => 'danger', 'text_key' => 'collect.alert.template_missing'];
+        } elseif($tpl['status'] !== 'open'){
+            $alerts[] = ['type' => 'warning', 'text_key' => 'collect.alert.not_open'];
+        } else {
+            $targetStmt = $pdo->prepare("SELECT status FROM collect_template_targets WHERE template_id=? AND member_id=?");
+            $targetStmt->execute([$templateId, $currentMemberId]);
+            $targetRow = $targetStmt->fetch(PDO::FETCH_ASSOC);
+            if(!$targetRow){
+                $alerts[] = ['type' => 'danger', 'text_key' => 'collect.alert.not_assigned'];
+            } else {
+                $fieldStmt = $pdo->prepare("SELECT * FROM collect_fields WHERE template_id=? ORDER BY sort_order, id");
+                $fieldStmt->execute([$templateId]);
+                $fields = $fieldStmt->fetchAll(PDO::FETCH_ASSOC);
+                $errors = [];
+                $values = [];
+                $uploadDir = __DIR__ . '/collect_uploads';
+                if(!is_dir($uploadDir)){
+                    @mkdir($uploadDir, 0775, true);
+                }
+
+                foreach($fields as $field){
+                    $inputName = 'field_'.$field['id'];
+                    $fileInput = 'file_field_'.$field['id'];
+                    $valueText = '';
+                    $filePath = null;
+
+                    if($field['field_type'] === 'file'){
+                        $file = $_FILES[$fileInput] ?? null;
+                        if($file && $file['error'] === UPLOAD_ERR_OK && $file['size'] > 0){
+                            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+                            $safeName = uniqid('collect_', true) . ($ext ? '.'.$ext : '');
+                            $destPath = $uploadDir . '/' . $safeName;
+                            if(move_uploaded_file($file['tmp_name'], $destPath)){
+                                $filePath = 'collect_uploads/' . $safeName;
+                            } else {
+                                $errors[] = ['text_key' => 'collect.alert.upload_failed'];
+                            }
+                        } elseif($field['is_required']){
+                            $errors[] = ['text_key' => 'collect.alert.required'];
+                        }
+                    } else {
+                        $valueText = trim($_POST[$inputName] ?? '');
+                        if($field['is_required'] && $valueText === ''){
+                            $errors[] = ['text_key' => 'collect.alert.required'];
+                        }
+                        if($field['field_type'] === 'number' && $valueText !== '' && !is_numeric($valueText)){
+                            $errors[] = ['text_key' => 'collect.alert.invalid_number'];
+                        }
+                        if($field['field_type'] === 'select' && $valueText !== ''){
+                            $options = array_filter(array_map('trim', explode(',', $field['options'])));
+                            if(!in_array($valueText, $options, true)){
+                                $errors[] = ['text_key' => 'collect.alert.invalid_option'];
+                            }
+                        }
+                    }
+
+                    $values[] = [
+                        'field_id' => $field['id'],
+                        'value_text' => $valueText,
+                        'file_path' => $filePath
+                    ];
+                }
+
+                if(empty($errors)){
+                    $respStmt = $pdo->prepare("INSERT INTO collect_responses (template_id, member_id, submitted_at) VALUES (?,?,NOW())");
+                    $respStmt->execute([$templateId, $currentMemberId]);
+                    $responseId = $pdo->lastInsertId();
+
+                    $valueStmt = $pdo->prepare("INSERT INTO collect_response_values (response_id, field_id, value_text, file_path) VALUES (?,?,?,?)");
+                    foreach($values as $val){
+                        $valueStmt->execute([$responseId, $val['field_id'], $val['value_text'], $val['file_path']]);
+                    }
+
+                    $update = $pdo->prepare("UPDATE collect_template_targets SET status='submitted', submitted_at = IFNULL(submitted_at, NOW()) WHERE template_id=? AND member_id=?");
+                    $update->execute([$templateId, $currentMemberId]);
+
+                    $alerts[] = ['type' => 'success', 'text_key' => 'collect.alert.submitted'];
+                } else {
+                    foreach($errors as $err){
+                        $alerts[] = ['type' => 'danger', 'text_key' => $err['text_key']];
+                    }
+                }
             }
         }
     }
@@ -85,12 +181,21 @@ $templates = $tplStmt->fetchAll(PDO::FETCH_ASSOC);
 $templateIds = array_column($templates, 'id');
 $fieldsByTemplate = [];
 $targetsByTemplate = [];
+$submissionCounts = [];
+$responsesByTemplate = [];
 if(!empty($templateIds)){
     $placeholders = implode(',', array_fill(0, count($templateIds), '?'));
     $fieldStmt = $pdo->prepare("SELECT * FROM collect_fields WHERE template_id IN ($placeholders) ORDER BY template_id, sort_order, id");
     $fieldStmt->execute($templateIds);
     foreach($fieldStmt->fetchAll(PDO::FETCH_ASSOC) as $f){
         $fieldsByTemplate[$f['template_id']][] = $f;
+    }
+
+    $responseCountStmt = $pdo->prepare("SELECT template_id, member_id, COUNT(*) as cnt FROM collect_responses WHERE template_id IN ($placeholders) GROUP BY template_id, member_id");
+    $responseCountStmt->execute($templateIds);
+    $submissionCounts = [];
+    foreach($responseCountStmt->fetchAll(PDO::FETCH_ASSOC) as $row){
+        $submissionCounts[$row['template_id']][$row['member_id']] = (int)$row['cnt'];
     }
 
     if($isManager){
@@ -104,6 +209,17 @@ if(!empty($templateIds)){
         foreach($targetStmt->fetchAll(PDO::FETCH_ASSOC) as $t){
             $targetsByTemplate[$t['template_id']][] = $t;
         }
+    }
+
+    if(!$isManager && $currentMemberId){
+        $respStmt = $pdo->prepare("SELECT * FROM collect_responses WHERE member_id=? AND template_id IN ($placeholders) ORDER BY submitted_at DESC");
+        $respStmt->execute(array_merge([$currentMemberId], $templateIds));
+        $responsesByTemplate = [];
+        foreach($respStmt->fetchAll(PDO::FETCH_ASSOC) as $r){
+            $responsesByTemplate[$r['template_id']][] = $r;
+        }
+    } else {
+        $responsesByTemplate = [];
     }
 }
 
@@ -119,6 +235,15 @@ $members = $isManager ? $pdo->query("SELECT id, name, campus_id, department, sta
     </div>
   <?php endif; ?>
 </div>
+
+<?php if(!empty($alerts)): ?>
+  <?php foreach($alerts as $alert): ?>
+    <div class="alert alert-<?= htmlspecialchars($alert['type']); ?> alert-dismissible fade show" role="alert">
+      <span data-i18n="<?= htmlspecialchars($alert['text_key']); ?>"></span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  <?php endforeach; ?>
+<?php endif; ?>
 
 <?php
 $activeTemplates = array_filter($templates, fn($t) => in_array($t['status'], ['open','paused']));
@@ -215,6 +340,7 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
                   </thead>
                   <tbody>
                     <?php foreach($tplTargets as $tg): ?>
+                      <?php $memberCount = $submissionCounts[$tpl['id']][$tg['member_id']] ?? 0; ?>
                       <tr>
                         <td>
                           <div class="fw-semibold"><?= htmlspecialchars($tg['name']); ?></div>
@@ -223,6 +349,7 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
                         <td class="text-muted small"><?= htmlspecialchars($tg['department']); ?></td>
                         <td>
                           <span class="badge <?= $tg['status']==='submitted' ? 'bg-success' : 'bg-secondary'; ?>" data-i18n="collect.member_status.<?= $tg['status']; ?>"></span>
+                          <div class="small text-muted" data-i18n="collect.member.submissions" data-i18n-params='{"count":"<?= $memberCount; ?>"}'><?= $memberCount; ?> entries</div>
                         </td>
                         <?php if($isManager): ?>
                           <td class="text-end">
@@ -244,6 +371,72 @@ $archivedTemplates = array_filter($templates, fn($t) => in_array($t['status'], [
               </div>
             </div>
           </div>
+          <?php if(!$isManager): ?>
+            <hr class="my-3">
+            <?php $responses = $responsesByTemplate[$tpl['id']] ?? []; ?>
+            <div class="row g-3 align-items-start">
+              <div class="col-md-8">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="fw-semibold" data-i18n="collect.fill.title">Fill and submit</div>
+                  <span class="badge bg-light text-dark" data-i18n="collect.fill.multi">Multiple submissions allowed</span>
+                </div>
+                <?php if($tpl['status'] !== 'open'): ?>
+                  <div class="alert alert-warning mb-0" data-i18n="collect.fill.paused">This template is paused or closed for new submissions.</div>
+                <?php else: ?>
+                  <form method="post" enctype="multipart/form-data" class="d-grid gap-3">
+                    <input type="hidden" name="action" value="submit_response">
+                    <input type="hidden" name="template_id" value="<?= $tpl['id']; ?>">
+                    <?php foreach($tplFields as $field): ?>
+                      <div class="card card-body shadow-sm">
+                        <label class="form-label fw-semibold"> <?= htmlspecialchars($field['label_zh'] ?: $field['label_en']); ?>
+                          <?php if($field['is_required']): ?><span class="text-danger">*</span><?php endif; ?>
+                        </label>
+                        <?php if($field['label_en']): ?><div class="text-muted small mb-1"><?= htmlspecialchars($field['label_en']); ?></div><?php endif; ?>
+                        <?php if($field['field_type'] === 'text'): ?>
+                          <textarea class="form-control" name="field_<?= $field['id']; ?>" rows="3" <?= $field['is_required'] ? 'required' : ''; ?>></textarea>
+                        <?php elseif($field['field_type'] === 'number'): ?>
+                          <input type="number" class="form-control" name="field_<?= $field['id']; ?>" step="any" <?= $field['is_required'] ? 'required' : ''; ?>>
+                        <?php elseif($field['field_type'] === 'select'): ?>
+                          <?php $options = array_filter(array_map('trim', explode(',', $field['options']))); ?>
+                          <select class="form-select" name="field_<?= $field['id']; ?>" <?= $field['is_required'] ? 'required' : ''; ?>>
+                            <option value="" data-i18n="collect.fill.select_placeholder">Please choose</option>
+                            <?php foreach($options as $opt): ?>
+                              <option value="<?= htmlspecialchars($opt); ?>"><?= htmlspecialchars($opt); ?></option>
+                            <?php endforeach; ?>
+                          </select>
+                        <?php else: ?>
+                          <input type="file" class="form-control" name="file_field_<?= $field['id']; ?>" <?= $field['is_required'] ? 'required' : ''; ?>>
+                        <?php endif; ?>
+                      </div>
+                    <?php endforeach; ?>
+                    <div>
+                      <button type="submit" class="btn btn-primary" data-i18n="collect.fill.submit">Submit</button>
+                    </div>
+                  </form>
+                <?php endif; ?>
+              </div>
+              <div class="col-md-4">
+                <div class="card border-0 bg-light">
+                  <div class="card-body">
+                    <div class="fw-semibold" data-i18n="collect.fill.history">Your submissions</div>
+                    <div class="text-muted small" data-i18n="collect.fill.count" data-i18n-params='{"count":"<?= count($responses); ?>"}'>You have submitted <?= count($responses); ?> time(s).</div>
+                    <?php if(empty($responses)): ?>
+                      <div class="text-muted" data-i18n="collect.fill.empty">No submissions yet. Please fill the form.</div>
+                    <?php else: ?>
+                      <ul class="list-group list-group-flush mt-2">
+                        <?php foreach($responses as $resp): ?>
+                          <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-check2-circle text-success me-2"></i><?= htmlspecialchars($resp['submitted_at']); ?></span>
+                            <span class="badge bg-success" data-i18n="collect.fill.completed">Submitted</span>
+                          </li>
+                        <?php endforeach; ?>
+                      </ul>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
     </div>
