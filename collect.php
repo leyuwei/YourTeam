@@ -533,220 +533,231 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
 <?php endif; ?>
 
 <script>
-const fieldsContainer = document.getElementById('fieldsContainer');
-const addFieldBtn = document.getElementById('addFieldBtn');
-const fieldsJson = document.getElementById('fieldsJson');
-const templateModal = document.getElementById('templateModal');
-const templateForm = document.getElementById('templateForm');
-const toggleArchivedBtn = document.getElementById('toggleArchived');
-const archivedSection = document.querySelector('.archived-section');
-const targetSelectAllBtn = document.getElementById('targetSelectAll');
-const targetInvertBtn = document.getElementById('targetInvert');
+function getCollectTranslations() {
+  if (typeof window !== 'undefined' && window.translations) {
+    return window.translations;
+  }
+  return {};
+}
 
-function createFieldRow(field){
-  const wrapper = document.createElement('div');
-  wrapper.className = 'collect-field-row';
-  wrapper.dataset.id = field.id;
-  wrapper.innerHTML = `
-    <div class="row g-2 align-items-end">
-      <div class="col-md-4">
-        <label class="form-label" data-i18n="collect.field_label">Label</label>
-        <input type="text" class="form-control" name="field_label" value="${field.label || ''}" required>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" data-i18n="collect.field_type">Type</label>
-        <select class="form-select" name="field_type">
-          <option value="text" ${field.type==='text'?'selected':''} data-i18n="collect.field_types.text">Text</option>
-          <option value="number" ${field.type==='number'?'selected':''} data-i18n="collect.field_types.number">Number</option>
-          <option value="select" ${field.type==='select'?'selected':''} data-i18n="collect.field_types.select">Dropdown</option>
-          <option value="file" ${field.type==='file'?'selected':''} data-i18n="collect.field_types.file">File</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" data-i18n="collect.field_options">Options</label>
-        <input type="text" class="form-control" name="field_options" value="${(field.options||[]).join(', ')}" placeholder=", ">
-      </div>
-      <div class="col-md-1 text-center">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="field_required" ${field.required?'checked':''}>
-          <label class="form-check-label" data-i18n="collect.field_required">Required</label>
+window.addEventListener('load', () => {
+  const fieldsContainer = document.getElementById('fieldsContainer');
+  const addFieldBtn = document.getElementById('addFieldBtn');
+  const fieldsJson = document.getElementById('fieldsJson');
+  const templateModal = document.getElementById('templateModal');
+  const templateForm = document.getElementById('templateForm');
+  const toggleArchivedBtn = document.getElementById('toggleArchived');
+  const archivedSection = document.querySelector('.archived-section');
+  const targetSelectAllBtn = document.getElementById('targetSelectAll');
+  const targetInvertBtn = document.getElementById('targetInvert');
+
+  function createFieldRow(field){
+    const wrapper = document.createElement('div');
+    wrapper.className = 'collect-field-row';
+    wrapper.dataset.id = field.id;
+    wrapper.innerHTML = `
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label" data-i18n="collect.field_label">Label</label>
+          <input type="text" class="form-control" name="field_label" value="${field.label || ''}" required>
         </div>
-      </div>
-      <div class="col-md-1 text-end">
-        <button type="button" class="btn btn-sm btn-outline-danger remove-field">×</button>
-      </div>
-    </div>`;
-  wrapper.querySelector('.remove-field').addEventListener('click', ()=>wrapper.remove());
-  fieldsContainer.appendChild(wrapper);
-}
+        <div class="col-md-3">
+          <label class="form-label" data-i18n="collect.field_type">Type</label>
+          <select class="form-select" name="field_type">
+            <option value="text" ${field.type==='text'?'selected':''} data-i18n="collect.field_types.text">Text</option>
+            <option value="number" ${field.type==='number'?'selected':''} data-i18n="collect.field_types.number">Number</option>
+            <option value="select" ${field.type==='select'?'selected':''} data-i18n="collect.field_types.select">Dropdown</option>
+            <option value="file" ${field.type==='file'?'selected':''} data-i18n="collect.field_types.file">File</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" data-i18n="collect.field_options">Options</label>
+          <input type="text" class="form-control" name="field_options" value="${(field.options||[]).join(', ')}" placeholder=", ">
+        </div>
+        <div class="col-md-1 text-center">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="field_required" ${field.required?'checked':''}>
+            <label class="form-check-label" data-i18n="collect.field_required">Required</label>
+          </div>
+        </div>
+        <div class="col-md-1 text-end">
+          <button type="button" class="btn btn-sm btn-outline-danger remove-field">×</button>
+        </div>
+      </div>`;
+    wrapper.querySelector('.remove-field').addEventListener('click', ()=>wrapper.remove());
+    fieldsContainer.appendChild(wrapper);
+  }
 
-function collectFields(){
-  const data = [];
-  fieldsContainer.querySelectorAll('.collect-field-row').forEach(row => {
-    const label = row.querySelector('input[name="field_label"]').value.trim();
-    const type = row.querySelector('select[name="field_type"]').value;
-    const options = row.querySelector('input[name="field_options"]').value.split(',').map(v=>v.trim()).filter(Boolean);
-    const required = row.querySelector('input[name="field_required"]').checked;
-    data.push({ id: row.dataset.id, label, type, options, required });
-  });
-  fieldsJson.value = JSON.stringify(data);
-}
+  function collectFields(){
+    const data = [];
+    fieldsContainer.querySelectorAll('.collect-field-row').forEach(row => {
+      const label = row.querySelector('input[name="field_label"]').value.trim();
+      const type = row.querySelector('select[name="field_type"]').value;
+      const options = row.querySelector('input[name="field_options"]').value.split(',').map(v=>v.trim()).filter(Boolean);
+      const required = row.querySelector('input[name="field_required"]').checked;
+      data.push({ id: row.dataset.id, label, type, options, required });
+    });
+    fieldsJson.value = JSON.stringify(data);
+  }
 
-if(addFieldBtn){
-  addFieldBtn.addEventListener('click', ()=>{
-    createFieldRow({id: 'f'+Date.now(), label:'', type:'text', options:[], required:false});
-  });
-}
+  if(addFieldBtn){
+    addFieldBtn.addEventListener('click', ()=>{
+      createFieldRow({id: 'f'+Date.now(), label:'', type:'text', options:[], required:false});
+    });
+  }
 
-if(templateForm){
-  templateForm.addEventListener('submit', (e)=>{
-    collectFields();
-  });
-}
+  if(templateForm){
+    templateForm.addEventListener('submit', ()=>{
+      collectFields();
+    });
+  }
 
-function selectTargets(mode){
-  const boxes = document.querySelectorAll('input[name="targets[]"]');
-  if(!boxes.length) return;
-  boxes.forEach(cb => {
-    if(mode==='all') cb.checked = true;
-    if(mode==='invert') cb.checked = !cb.checked;
-  });
-}
+  function selectTargets(mode){
+    const boxes = document.querySelectorAll('input[name="targets[]"]');
+    if(!boxes.length) return;
+    boxes.forEach(cb => {
+      if(mode==='all') cb.checked = true;
+      if(mode==='invert') cb.checked = !cb.checked;
+    });
+  }
 
-targetSelectAllBtn?.addEventListener('click', ()=>selectTargets('all'));
-targetInvertBtn?.addEventListener('click', ()=>selectTargets('invert'));
+  targetSelectAllBtn?.addEventListener('click', ()=>selectTargets('all'));
+  targetInvertBtn?.addEventListener('click', ()=>selectTargets('invert'));
 
-if(templateModal){
-  templateModal.addEventListener('show.bs.modal', event => {
-    const button = event.relatedTarget;
-    fieldsContainer.innerHTML='';
-    document.querySelectorAll('input[name="targets[]"]').forEach(cb=>cb.checked=false);
-    if(button?.dataset.mode==='add'){
-      templateForm.reset();
-      document.getElementById('templateId').value='';
-      document.querySelector('#templateModal .modal-title').setAttribute('data-i18n','collect.add_template');
-    }
-    if(button?.classList.contains('edit-template')){
-      const data = JSON.parse(button.dataset.template);
-      document.getElementById('templateId').value = data.id;
-      document.getElementById('templateName').value = data.name;
-      document.getElementById('templateDescription').value = data.description || '';
-      document.getElementById('templateStatus').value = data.status;
-      document.getElementById('templateDeadline').value = data.deadline || '';
-      const targets = JSON.parse(data.target_member_ids || '[]');
-      document.querySelectorAll('input[name="targets[]"]').forEach(cb=>cb.checked = targets.includes(parseInt(cb.value)));
-      const fields = JSON.parse(data.fields_json || '[]');
-      fields.forEach(f=>createFieldRow(f));
-      document.querySelector('#templateModal .modal-title').setAttribute('data-i18n','collect.edit_template');
-    }
-    if(window.applyTranslations) applyTranslations();
-  });
-}
+  if(templateModal){
+    templateModal.addEventListener('show.bs.modal', event => {
+      const button = event.relatedTarget;
+      fieldsContainer.innerHTML='';
+      document.querySelectorAll('input[name="targets[]"]').forEach(cb=>cb.checked=false);
+      if(button?.dataset.mode==='add'){
+        templateForm.reset();
+        document.getElementById('templateId').value='';
+        document.querySelector('#templateModal .modal-title').setAttribute('data-i18n','collect.add_template');
+      }
+      if(button?.classList.contains('edit-template')){
+        const data = JSON.parse(button.dataset.template);
+        document.getElementById('templateId').value = data.id;
+        document.getElementById('templateName').value = data.name;
+        document.getElementById('templateDescription').value = data.description || '';
+        document.getElementById('templateStatus').value = data.status;
+        document.getElementById('templateDeadline').value = data.deadline || '';
+        const targets = JSON.parse(data.target_member_ids || '[]');
+        document.querySelectorAll('input[name="targets[]"]').forEach(cb=>cb.checked = targets.includes(parseInt(cb.value)));
+        const fields = JSON.parse(data.fields_json || '[]');
+        fields.forEach(f=>createFieldRow(f));
+        document.querySelector('#templateModal .modal-title').setAttribute('data-i18n','collect.edit_template');
+      }
+      if(window.applyTranslations) applyTranslations();
+    });
+  }
 
-if(toggleArchivedBtn){
-  toggleArchivedBtn.addEventListener('click', ()=>{
-    const visible = archivedSection.style.display==='block';
-    archivedSection.style.display = visible ? 'none' : 'block';
-    toggleArchivedBtn.setAttribute('data-i18n', visible ? 'collect.show_archived' : 'collect.hide_archived');
-    if(window.applyTranslations) applyTranslations();
-  });
-}
+  if(toggleArchivedBtn){
+    toggleArchivedBtn.addEventListener('click', ()=>{
+      const visible = archivedSection.style.display==='block';
+      archivedSection.style.display = visible ? 'none' : 'block';
+      toggleArchivedBtn.setAttribute('data-i18n', visible ? 'collect.show_archived' : 'collect.hide_archived');
+      if(window.applyTranslations) applyTranslations();
+    });
+  }
 
-function renderMemberPanels(){
-  const lang = document.documentElement.lang || 'zh';
-  const noneLabel = translations[lang]?.['collect.none'] || 'None';
-  const pageTemplate = translations[lang]?.['collect.member_page_info'] || 'Page {current}/{total}';
-  document.querySelectorAll('.member-list-panel').forEach(panel => {
-    try {
-      const members = JSON.parse(panel.dataset.members || '[]');
-      const size = parseInt(panel.dataset.size || '8');
-      const body = panel.querySelector('.member-list-body');
-      const indicator = panel.querySelector('.member-page-indicator');
-      const prev = panel.querySelector('.member-page-prev');
-      const next = panel.querySelector('.member-page-next');
-      let page = 0;
-      const renderPage = () => {
-        body.innerHTML = '';
-        const totalPages = Math.max(1, Math.ceil(members.length / size));
-        page = Math.min(Math.max(page, 0), totalPages - 1);
-        const start = page * size;
-        const items = members.slice(start, start + size);
-        if(items.length === 0){
+  function renderMemberPanels(){
+    const lang = document.documentElement.lang || 'zh';
+    const dict = getCollectTranslations();
+    const noneLabel = dict[lang]?.['collect.none'] || 'None';
+    const pageTemplate = dict[lang]?.['collect.member_page_info'] || 'Page {current}/{total}';
+    document.querySelectorAll('.member-list-panel').forEach(panel => {
+      try {
+        const members = JSON.parse(panel.dataset.members || '[]');
+        const size = parseInt(panel.dataset.size || '8');
+        const body = panel.querySelector('.member-list-body');
+        const indicator = panel.querySelector('.member-page-indicator');
+        const prev = panel.querySelector('.member-page-prev');
+        const next = panel.querySelector('.member-page-next');
+        let page = 0;
+        const renderPage = () => {
+          body.innerHTML = '';
+          const totalPages = Math.max(1, Math.ceil(members.length / size));
+          page = Math.min(Math.max(page, 0), totalPages - 1);
+          const start = page * size;
+          const items = members.slice(start, start + size);
+          if(items.length === 0){
+            const empty = document.createElement('div');
+            empty.className = 'text-muted small';
+            empty.textContent = noneLabel;
+            body.appendChild(empty);
+          } else {
+            items.forEach(m => {
+              const chip = document.createElement('div');
+              chip.className = 'member-chip';
+              chip.innerHTML = `<span>${m.name || ''}</span>${m.department ? `<span class="meta">${m.department}</span>` : ''}`;
+              body.appendChild(chip);
+            });
+          }
+          if(indicator){
+            indicator.textContent = pageTemplate.replace('{current}', page + 1).replace('{total}', totalPages);
+          }
+          if(prev && next){
+            prev.disabled = page <= 0;
+            next.disabled = page >= totalPages - 1;
+            const controls = prev.closest('.member-list-controls');
+            if(controls){
+              controls.style.display = totalPages > 1 ? 'flex' : 'none';
+            }
+          }
+        };
+        prev?.addEventListener('click', ()=>{ page--; renderPage(); });
+        next?.addEventListener('click', ()=>{ page++; renderPage(); });
+        renderPage();
+      } catch (err) {
+        console.error('Failed to render member list', err);
+        const fallback = panel.querySelector('.member-list-body');
+        if (fallback) {
           const empty = document.createElement('div');
           empty.className = 'text-muted small';
           empty.textContent = noneLabel;
-          body.appendChild(empty);
-        } else {
-          items.forEach(m => {
-            const chip = document.createElement('div');
-            chip.className = 'member-chip';
-            chip.innerHTML = `<span>${m.name || ''}</span>${m.department ? `<span class="meta">${m.department}</span>` : ''}`;
-            body.appendChild(chip);
-          });
+          fallback.appendChild(empty);
         }
-        if(indicator){
-          indicator.textContent = pageTemplate.replace('{current}', page + 1).replace('{total}', totalPages);
-        }
-        if(prev && next){
-          prev.disabled = page <= 0;
-          next.disabled = page >= totalPages - 1;
-          const controls = prev.closest('.member-list-controls');
-          if(controls){
-            controls.style.display = totalPages > 1 ? 'flex' : 'none';
-          }
-        }
-      };
-      prev?.addEventListener('click', ()=>{ page--; renderPage(); });
-      next?.addEventListener('click', ()=>{ page++; renderPage(); });
-      renderPage();
-    } catch (err) {
-      console.error('Failed to render member list', err);
-      const fallback = panel.querySelector('.member-list-body');
-      if (fallback) {
-        const empty = document.createElement('div');
-        empty.className = 'text-muted small';
-        empty.textContent = noneLabel;
-        fallback.appendChild(empty);
       }
-    }
-  });
-}
-
-const toastParam = new URLSearchParams(window.location.search).get('toast');
-if (toastParam) {
-  try {
-    const toastEl = document.getElementById('collectToast');
-    if (toastEl) {
-      const bodyEl = toastEl.querySelector('.toast-body');
-      const lang = document.documentElement.lang || 'zh';
-      const keyMap = {
-        record_created: 'collect.record_created',
-        record_updated: 'collect.record_updated',
-        record_deleted: 'collect.record_deleted',
-        record_failed: 'collect.record_failed'
-      };
-      const closeBtn = toastEl.querySelector('[aria-label="Close"]');
-      if (closeBtn && translations[lang]?.['collect.toast_close']) {
-        closeBtn.setAttribute('aria-label', translations[lang]['collect.toast_close']);
-      }
-      const key = keyMap[toastParam];
-      bodyEl.textContent = (translations[lang] && translations[lang][key]) ? translations[lang][key] : toastParam;
-      if(window.applyTranslations) applyTranslations();
-      const toast = new bootstrap.Toast(toastEl, { delay: 2500 });
-      toast.show();
-      const url = new URL(window.location);
-      url.searchParams.delete('toast');
-      window.history.replaceState({}, '', url);
-    }
-  } catch (err) {
-    console.error('Collect toast error', err);
+    });
   }
-}
 
-try {
-  renderMemberPanels();
-} catch (err) {
-  console.error('Collect member panel render error', err);
-}
+  const toastParam = new URLSearchParams(window.location.search).get('toast');
+  if (toastParam) {
+    try {
+      const toastEl = document.getElementById('collectToast');
+      if (toastEl) {
+        const bodyEl = toastEl.querySelector('.toast-body');
+        const lang = document.documentElement.lang || 'zh';
+        const dict = getCollectTranslations();
+        const keyMap = {
+          record_created: 'collect.record_created',
+          record_updated: 'collect.record_updated',
+          record_deleted: 'collect.record_deleted',
+          record_failed: 'collect.record_failed'
+        };
+        const closeBtn = toastEl.querySelector('[aria-label="Close"]');
+        if (closeBtn && dict[lang]?.['collect.toast_close']) {
+          closeBtn.setAttribute('aria-label', dict[lang]['collect.toast_close']);
+        }
+        const key = keyMap[toastParam];
+        bodyEl.textContent = (dict[lang] && dict[lang][key]) ? dict[lang][key] : toastParam;
+        if(window.applyTranslations) applyTranslations();
+        const toast = new bootstrap.Toast(toastEl, { delay: 2500 });
+        toast.show();
+        const url = new URL(window.location);
+        url.searchParams.delete('toast');
+        window.history.replaceState({}, '', url);
+      }
+    } catch (err) {
+      console.error('Collect toast error', err);
+    }
+  }
+
+  try {
+    renderMemberPanels();
+  } catch (err) {
+    console.error('Collect member panel render error', err);
+  }
+});
 </script>
 <?php include 'footer.php'; ?>
