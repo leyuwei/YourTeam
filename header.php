@@ -563,6 +563,7 @@
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'project') === 0 ? 'active' : ''); ?>" href="projects.php" data-i18n="nav.projects">Projects</a></li>
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'direction') === 0 ? 'active' : ''); ?>" href="directions.php" data-i18n="nav.directions">Research</a></li>
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'office') === 0 ? 'active' : ''); ?>" href="offices.php" data-i18n="nav.offices">Offices</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'collect') === 0 ? 'active' : ''); ?>" href="collect.php" data-i18n="nav.collect">Collect</a></li>
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'reimburse') === 0 ? 'active' : ''); ?>" href="reimbursements.php" data-i18n="nav.reimburse">Reimbursement</a></li>
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'assets.php' ? 'active' : ''); ?>" href="assets.php" data-i18n="nav.assets">Assets</a></li>
           <?php if($_SESSION['role']==='manager'): ?>
