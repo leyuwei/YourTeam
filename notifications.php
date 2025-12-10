@@ -1,5 +1,38 @@
 <?php
 include 'auth_manager.php';
+
+if($_SERVER['REQUEST_METHOD']==='POST'){
+    $action = $_POST['action'] ?? '';
+    $content = trim($_POST['content'] ?? '');
+    $begin = $_POST['valid_begin_date'] ?? '';
+    $end = $_POST['valid_end_date'] ?? '';
+    $members_selected = $_POST['members'] ?? [];
+
+    if($action==='create_notification' && $content && $begin && $end){
+        $stmt = $pdo->prepare('INSERT INTO notifications(content,valid_begin_date,valid_end_date) VALUES(?,?,?)');
+        $stmt->execute([$content,$begin,$end]);
+        $nid = $pdo->lastInsertId();
+        foreach($members_selected as $m){
+            $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$nid,$m]);
+        }
+    }
+
+    if($action==='update_notification'){
+        $nid = $_POST['notification_id'] ?? null;
+        if($nid && $content && $begin && $end){
+            $stmt = $pdo->prepare('UPDATE notifications SET content=?, valid_begin_date=?, valid_end_date=? WHERE id=?');
+            $stmt->execute([$content,$begin,$end,$nid]);
+            $pdo->prepare('DELETE FROM notification_targets WHERE notification_id=?')->execute([$nid]);
+            foreach($members_selected as $m){
+                $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$nid,$m]);
+            }
+        }
+    }
+
+    header('Location: notifications.php');
+    exit();
+}
+
 include 'header.php';
 $notifications = $pdo->query('SELECT * FROM notifications WHERE is_revoked=0 ORDER BY id DESC')->fetchAll();
 $activeNotifications = [];
@@ -20,10 +53,13 @@ foreach($regulations as &$r){
     $r['files'] = $stmt->fetchAll();
 }
 unset($r);
+
+$memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_join FROM members WHERE status='in_work' ORDER BY name")
+    ->fetchAll();
 ?>
-<div class="d-flex justify-content-between mb-3">
+<div id="notification-page" class="d-flex justify-content-between mb-3" data-edit-id="<?= htmlspecialchars($_GET['edit'] ?? '') ?>">
   <h2 data-i18n="notifications.title">Notifications</h2>
-  <a class="btn btn-success" href="notification_edit.php" data-i18n="notifications.add">Add Notification</a>
+  <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#notificationModal" data-i18n="notifications.add">Add Notification</button>
 </div>
 <table class="table table-bordered">
   <tr><th data-i18n="notifications.table_content">Content</th><th data-i18n="notifications.table_begin">Begin</th><th data-i18n="notifications.table_end">End</th><th data-i18n="notifications.table_actions">Actions</th></tr>
@@ -35,31 +71,105 @@ unset($r);
     <td>
       <?= nl2br(htmlspecialchars($n['content'])); ?>
       <?php
-        $stmt = $pdo->prepare('SELECT m.name, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
+        $stmt = $pdo->prepare('SELECT m.id, m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
         $stmt->execute([$n['id']]);
         $targets = $stmt->fetchAll();
+        $targetIds = array_column($targets,'id');
       ?>
       <div>
         <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
-        <ul class="list-group mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
+        <div class="target-chip-grid mt-2 d-none" id="members-<?= $n['id']; ?>">
           <?php foreach($targets as $t): ?>
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <?= htmlspecialchars($t['name']); ?>
-            <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
-          </li>
+          <?php $isUnread = !in_array($t['status'], ['seen','checked'], true); ?>
+          <div class="target-chip<?= $isUnread ? ' target-chip-unread' : ''; ?>">
+            <div class="target-chip-header">
+              <div class="fw-semibold"><?= htmlspecialchars($t['name']); ?></div>
+              <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
+            </div>
+            <div class="target-chip-meta"><?= htmlspecialchars($t['department'] ?: '-'); ?></div>
+            <div class="target-chip-meta">
+              <?= htmlspecialchars($t['degree_pursuing'] ?: '-'); ?>
+              <?php if(!empty($t['year_of_join'])): ?>· <?= htmlspecialchars($t['year_of_join']); ?><?php endif; ?>
+            </div>
+          </div>
           <?php endforeach; ?>
-        </ul>
+        </div>
+        <div class="chip-pagination" data-target="members-<?= $n['id']; ?>"></div>
       </div>
     </td>
     <td><?= htmlspecialchars($n['valid_begin_date']); ?></td>
     <td><?= htmlspecialchars($n['valid_end_date']); ?></td>
     <td>
-      <a class="btn btn-sm btn-primary" href="notification_edit.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_edit">Edit</a>
+      <button class="btn btn-sm btn-primary edit-notification" type="button"
+              data-id="<?= $n['id']; ?>"
+              data-content="<?= htmlspecialchars($n['content']); ?>"
+              data-begin="<?= htmlspecialchars($n['valid_begin_date']); ?>"
+              data-end="<?= htmlspecialchars($n['valid_end_date']); ?>"
+              data-members='<?= json_encode($targetIds, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>'
+              data-i18n="notifications.action_edit">Edit</button>
       <a class="btn btn-sm btn-danger delete-notification" href="notification_revoke.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_revoke">Revoke</a>
     </td>
   </tr>
   <?php endforeach; ?>
 </table>
+
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="create_notification" id="notificationFormAction">
+        <input type="hidden" name="notification_id" id="notificationId" value="">
+        <div class="modal-header">
+          <h5 class="modal-title" id="notificationModalTitle" data-i18n="notification_edit.title_add">Add Notification</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" data-i18n="notification_edit.label_content">Content</label>
+            <textarea name="content" class="form-control" rows="4" required></textarea>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" data-i18n="notification_edit.label_begin">Begin Date</label>
+              <input type="date" name="valid_begin_date" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" data-i18n="notification_edit.label_end">End Date</label>
+              <input type="date" name="valid_end_date" class="form-control" required>
+            </div>
+          </div>
+          <div class="mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="form-label mb-0" data-i18n="notification_edit.label_members">Target Members</label>
+              <button type="button" id="select-all" class="btn btn-sm btn-outline-secondary" data-i18n="notification_edit.select_all">Select All</button>
+            </div>
+            <div class="target-select-grid">
+              <?php foreach($memberList as $m): ?>
+                <label class="target-select-card">
+                  <div class="d-flex align-items-start">
+                    <input class="form-check-input mt-1 member-checkbox" type="checkbox" name="members[]" value="<?= $m['id']; ?>">
+                    <div class="ms-2">
+                      <div class="fw-semibold"><?= htmlspecialchars($m['name']); ?></div>
+                      <div class="target-select-meta"><?= htmlspecialchars($m['department'] ?: '-'); ?></div>
+                      <div class="target-select-meta">
+                        <?= htmlspecialchars($m['degree_pursuing'] ?: '-'); ?>
+                        <?php if(!empty($m['year_of_join'])): ?>· <?= htmlspecialchars($m['year_of_join']); ?><?php endif; ?>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="notification_edit.cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="notificationSubmit" data-i18n="notification_edit.save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <?php if(!empty($expiredNotifications)): ?>
 <div class="mt-4">
@@ -73,26 +183,42 @@ unset($r);
         <td>
           <?= nl2br(htmlspecialchars($n['content'])); ?>
           <?php
-            $stmt = $pdo->prepare('SELECT m.name, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
+            $stmt = $pdo->prepare('SELECT m.id, m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
             $stmt->execute([$n['id']]);
             $targets = $stmt->fetchAll();
+            $targetIds = array_column($targets,'id');
           ?>
           <div>
             <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
-            <ul class="list-group mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
+            <div class="target-chip-grid mt-2 d-none" id="members-<?= $n['id']; ?>">
               <?php foreach($targets as $t): ?>
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <?= htmlspecialchars($t['name']); ?>
-                <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
-              </li>
+              <?php $isUnread = !in_array($t['status'], ['seen','checked'], true); ?>
+              <div class="target-chip<?= $isUnread ? ' target-chip-unread' : ''; ?>">
+                <div class="target-chip-header">
+                  <div class="fw-semibold"><?= htmlspecialchars($t['name']); ?></div>
+                  <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
+                </div>
+                <div class="target-chip-meta"><?= htmlspecialchars($t['department'] ?: '-'); ?></div>
+                <div class="target-chip-meta">
+                  <?= htmlspecialchars($t['degree_pursuing'] ?: '-'); ?>
+                  <?php if(!empty($t['year_of_join'])): ?>· <?= htmlspecialchars($t['year_of_join']); ?><?php endif; ?>
+                </div>
+              </div>
               <?php endforeach; ?>
-            </ul>
+            </div>
+            <div class="chip-pagination" data-target="members-<?= $n['id']; ?>"></div>
           </div>
         </td>
         <td><?= htmlspecialchars($n['valid_begin_date']); ?></td>
         <td><?= htmlspecialchars($n['valid_end_date']); ?></td>
         <td>
-          <a class="btn btn-sm btn-primary" href="notification_edit.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_edit">Edit</a>
+          <button class="btn btn-sm btn-primary edit-notification" type="button"
+                  data-id="<?= $n['id']; ?>"
+                  data-content="<?= htmlspecialchars($n['content']); ?>"
+                  data-begin="<?= htmlspecialchars($n['valid_begin_date']); ?>"
+                  data-end="<?= htmlspecialchars($n['valid_end_date']); ?>"
+                  data-members='<?= json_encode($targetIds, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>'
+                  data-i18n="notifications.action_edit">Edit</button>
           <a class="btn btn-sm btn-danger delete-notification" href="notification_revoke.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_revoke">Revoke</a>
         </td>
       </tr>
@@ -107,6 +233,19 @@ unset($r);
 <style>
   .drag-handle { cursor: grab; }
   .drag-handle:active { cursor: grabbing; }
+  .target-chip-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:0.6rem; background:var(--app-table-striped-bg); padding:0.75rem; border-radius:0.75rem; border:1px solid var(--app-table-border); }
+  .target-chip { border:1px solid var(--app-table-border); border-radius:0.6rem; padding:0.55rem 0.65rem; background:var(--app-surface-bg); box-shadow:0 1px 4px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:0.2rem; min-height:88px; transition:background-color 0.15s ease, border-color 0.15s ease; }
+  .target-chip-header { display:flex; justify-content:space-between; align-items:flex-start; gap:0.35rem; }
+  .target-chip .badge { font-size:0.75rem; }
+  .target-chip-meta { font-size:0.85rem; color:var(--bs-gray-600); line-height:1.2; }
+  .target-chip-unread { background:#fff7d6; border-color:#f5c86a; box-shadow:0 1px 6px rgba(245,200,106,0.45); }
+  .chip-pagination { display:none; justify-content:flex-end; align-items:center; gap:0.35rem; margin-top:0.35rem; font-size:0.9rem; color:var(--bs-gray-600); }
+  .chip-pagination button { padding:0.15rem 0.45rem; }
+  .target-select-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:0.5rem; max-height:320px; overflow:auto; padding:0.5rem; background:var(--app-table-striped-bg); border-radius:0.75rem; border:1px solid var(--app-table-border); }
+  .target-select-card { border:1px solid var(--app-table-border); border-radius:0.55rem; padding:0.5rem 0.65rem; background:var(--app-surface-bg); display:flex; flex-direction:column; gap:0.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.04); transition:transform 0.08s ease, box-shadow 0.08s ease; }
+  .target-select-card:hover { transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,0.06); }
+  .target-select-card input { margin-right:0.35rem; }
+  .target-select-meta { font-size:0.85rem; color:var(--bs-gray-600); }
 </style>
 
 <div class="d-flex justify-content-between mb-3">
@@ -175,11 +314,130 @@ document.addEventListener('DOMContentLoaded', function(){
     return confirm(message) && confirm('Please confirm again to proceed.');
   };
 
+  const calculatePerPage = (grid) => {
+    const minWidth = 180;
+    const cols = Math.max(1, Math.floor((grid?.clientWidth || minWidth) / minWidth));
+    return cols * 2;
+  };
+
+  const renderChipPagination = (grid) => {
+    if(!grid) return;
+    const chips = Array.from(grid.querySelectorAll('.target-chip'));
+    const pagerEls = Array.from(document.querySelectorAll(`.chip-pagination[data-target="${grid.id}"]`));
+    if(!pagerEls.length) return;
+    if(grid.classList.contains('d-none')){
+      pagerEls.forEach(p => { p.style.display = 'none'; });
+      return;
+    }
+    if(!chips.length) {
+      pagerEls.forEach(p => { p.style.display = 'none'; });
+      return;
+    }
+
+    const perPage = calculatePerPage(grid);
+    const totalPages = Math.max(1, Math.ceil(chips.length / perPage));
+    let currentPage = parseInt(grid.dataset.page || '1', 10);
+    if(currentPage < 1) currentPage = 1;
+    if(currentPage > totalPages) currentPage = totalPages;
+    grid.dataset.page = String(currentPage);
+
+    chips.forEach((chip, idx) => {
+      const page = Math.floor(idx / perPage) + 1;
+      chip.style.display = page === currentPage ? '' : 'none';
+    });
+
+    pagerEls.forEach(pager => {
+      pager.innerHTML = '';
+      if(totalPages <= 1){
+        pager.style.display = 'none';
+        return;
+      }
+      pager.style.display = 'flex';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.className = 'btn btn-sm btn-outline-secondary';
+      prevBtn.textContent = '<';
+      prevBtn.disabled = currentPage === 1;
+      prevBtn.addEventListener('click', () => {
+        grid.dataset.page = String(Math.max(1, currentPage - 1));
+        renderChipPagination(grid);
+      });
+
+      const info = document.createElement('span');
+      info.textContent = `${currentPage}/${totalPages}`;
+
+      const nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.className = 'btn btn-sm btn-outline-secondary';
+      nextBtn.textContent = '>';
+      nextBtn.disabled = currentPage === totalPages;
+      nextBtn.addEventListener('click', () => {
+        grid.dataset.page = String(Math.min(totalPages, currentPage + 1));
+        renderChipPagination(grid);
+      });
+
+      pager.append(prevBtn, info, nextBtn);
+    });
+  };
+
+  const modalEl = document.getElementById('notificationModal');
+  const modal = modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal ? new bootstrap.Modal(modalEl) : null;
+  const form = modalEl?.querySelector('form');
+  const actionInput = document.getElementById('notificationFormAction');
+  const idInput = document.getElementById('notificationId');
+  const titleEl = document.getElementById('notificationModalTitle');
+  const submitEl = document.getElementById('notificationSubmit');
+  const contentField = form?.querySelector('textarea[name="content"]');
+  const beginField = form?.querySelector('input[name="valid_begin_date"]');
+  const endField = form?.querySelector('input[name="valid_end_date"]');
+  const memberCheckboxes = () => Array.from(form?.querySelectorAll('.member-checkbox') || []);
+
+  const setMemberSelections = (ids = []) => {
+    const idSet = new Set(ids.map(String));
+    memberCheckboxes().forEach(cb => { cb.checked = idSet.has(cb.value); });
+  };
+
+  const openCreateModal = () => {
+    if(!form) return;
+    form.reset();
+    actionInput.value = 'create_notification';
+    idInput.value = '';
+    titleEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.title_add'] || 'Add Notification';
+    submitEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.save'] || 'Save';
+    setMemberSelections([]);
+  };
+
+  modalEl?.addEventListener('hidden.bs.modal', openCreateModal);
+
+  document.querySelector('[data-bs-target="#notificationModal"][data-i18n="notifications.add"]')?.addEventListener('click', openCreateModal);
+
   document.querySelectorAll('.toggle-members').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const ul=document.getElementById('members-'+btn.dataset.id);
       if(!ul) return;
-      ul.style.display=ul.style.display==='none'?'block':'none';
+      const isHidden = ul.classList.contains('d-none');
+      if(isHidden){
+        ul.classList.remove('d-none');
+      } else {
+        ul.classList.add('d-none');
+      }
+      btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      const lang=document.documentElement.lang||'zh';
+      const showText = translations?.[lang]?.['notifications.toggle_details'] || btn.textContent;
+      const hideText = translations?.[lang]?.['notifications.toggle_hide'] || showText;
+      btn.textContent = isHidden ? hideText : showText;
+      setTimeout(()=>renderChipPagination(ul),50);
+    });
+  });
+
+  document.querySelectorAll('.target-chip-grid').forEach(grid => renderChipPagination(grid));
+
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('.target-chip-grid').forEach(grid => {
+      if(grid.style.display !== 'none'){
+        renderChipPagination(grid);
+      }
     });
   });
 
@@ -197,6 +455,36 @@ document.addEventListener('DOMContentLoaded', function(){
       const msg=translations?.[lang]?.['regulations.confirm.delete'] || 'Delete this regulation?';
       if(!withDoubleConfirm(msg)) e.preventDefault();
     });
+  });
+
+  document.querySelectorAll('.edit-notification').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      if(!form || !modal) return;
+      form.reset();
+      actionInput.value = 'update_notification';
+      idInput.value = btn.dataset.id || '';
+      if(contentField) contentField.value = btn.dataset.content || '';
+      if(beginField) beginField.value = btn.dataset.begin || '';
+      if(endField) endField.value = btn.dataset.end || '';
+      const members = (()=>{ try { return JSON.parse(btn.dataset.members || '[]'); } catch(e){ return []; }})();
+      setMemberSelections(members);
+      titleEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.title_edit'] || 'Edit Notification';
+      submitEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.save'] || 'Save';
+      modal.show();
+    });
+  });
+
+  const pendingEdit = document.getElementById('notification-page')?.dataset.editId;
+  if(pendingEdit){
+    const btn=document.querySelector(`.edit-notification[data-id="${pendingEdit}"]`);
+    btn?.click();
+  }
+
+  const selectAllBtn=document.getElementById('select-all');
+  selectAllBtn?.addEventListener('click',()=>{
+    const boxes=document.querySelectorAll('.member-checkbox');
+    const allChecked=Array.from(boxes).every(cb=>cb.checked);
+    boxes.forEach(cb=>cb.checked=!allChecked);
   });
 
   const expiredToggle=document.getElementById('toggleExpiredNotifications');
