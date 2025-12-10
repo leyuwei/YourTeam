@@ -52,7 +52,7 @@ foreach($batches as $batch){
         $activeBatches[] = $batch;
     }
 }
-$members = $pdo->query("SELECT id, name FROM members ORDER BY name")->fetchAll();
+$members = $pdo->query("SELECT id, name, degree_pursuing, year_of_join FROM members WHERE status = 'in_work' ORDER BY sort_order, name")->fetchAll();
 $announcement = $pdo->query("SELECT content_en, content_zh FROM reimbursement_announcement WHERE id=1")
                 ->fetch(PDO::FETCH_ASSOC);
 ?>
@@ -287,7 +287,18 @@ if(completedToggle && completedContainer){
           <select name="in_charge" class="form-select" id="batch-incharge">
             <option value="" data-i18n="reimburse.batch.none">None</option>
             <?php foreach($members as $m): ?>
-            <option value="<?= $m['id']; ?>"><?= htmlspecialchars($m['name']); ?></option>
+            <?php
+              $detailParts = [];
+              $degreeLabel = trim((string)($m['degree_pursuing'] ?? ''));
+              $yearLabel = trim((string)($m['year_of_join'] ?? ''));
+              if($degreeLabel !== '') $detailParts[] = $degreeLabel;
+              if($yearLabel !== '') $detailParts[] = $yearLabel;
+              $displayName = $m['name'];
+              if($detailParts){
+                $displayName .= ' (' . implode(',', $detailParts) . ')';
+              }
+            ?>
+            <option value="<?= $m['id']; ?>"><?= htmlspecialchars($displayName); ?></option>
             <?php endforeach; ?>
           </select>
         </div>

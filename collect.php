@@ -225,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
 }
 
 $templates = $pdo->query("SELECT * FROM collect_templates ORDER BY (status IN ('ended','void')), COALESCE(deadline,'9999-12-31') ASC, updated_at DESC")->fetchAll(PDO::FETCH_ASSOC);
-$members = $pdo->query("SELECT id,name,status,department FROM members ORDER BY status='in_work' DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$members = $pdo->query("SELECT id,name,status,department,degree_pursuing,year_of_join FROM members ORDER BY status='in_work' DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 $templateSubmissions = [];
 $submissionStmt = $pdo->query("SELECT cs.*, m.name FROM collect_submissions cs LEFT JOIN members m ON cs.member_id=m.id");
@@ -246,7 +246,7 @@ include 'header.php';
   .archived-section { display:none; }
   .collect-badge { padding:0.25rem 0.5rem; border-radius:0.5rem; }
   .member-list-body { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:0.5rem; }
-  .member-chip { border:1px solid var(--app-table-border); border-radius:0.45rem; padding:0.35rem 0.5rem; background:var(--app-surface-bg); display:flex; justify-content:space-between; align-items:center; gap:0.35rem; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
+  .member-chip { border:1px solid var(--app-table-border); border-radius:0.45rem; padding:0.35rem 0.5rem; background:var(--app-surface-bg); display:flex; flex-direction:column; align-items:flex-start; gap:0.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
   .member-chip .meta { color:var(--bs-gray-600); font-size:0.85rem; }
 </style>
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -325,13 +325,23 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
           $submittedMembers = [];
           foreach($members as $m){
             if(in_array($m['id'],$submittedMemberIds)){
-              $submittedMembers[] = ['name'=>$m['name'],'department'=>$m['department']];
+              $submittedMembers[] = [
+                'name'=>$m['name'],
+                'department'=>$m['department'],
+                'degree'=>$m['degree_pursuing'] ?? '',
+                'year'=>$m['year_of_join'] ?? ''
+              ];
             }
           }
           $pendingMembers = [];
           foreach($members as $m){
             if(in_array($m['id'],$remaining)){
-              $pendingMembers[] = ['name'=>$m['name'],'department'=>$m['department']];
+              $pendingMembers[] = [
+                'name'=>$m['name'],
+                'department'=>$m['department'],
+                'degree'=>$m['degree_pursuing'] ?? '',
+                'year'=>$m['year_of_join'] ?? ''
+              ];
             }
           }
         ?>
@@ -512,6 +522,12 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
                 <label class="target-card">
                   <input type="checkbox" name="targets[]" value="<?= $m['id']; ?>"> <?= htmlspecialchars($m['name']); ?>
                   <?php if(!empty($m['department'])): ?><div class="text-muted small"><?= htmlspecialchars($m['department']); ?></div><?php endif; ?>
+                  <?php
+                    $detailParts = [];
+                    if(!empty($m['degree_pursuing'])) $detailParts[] = $m['degree_pursuing'];
+                    if(!empty($m['year_of_join'])) $detailParts[] = $m['year_of_join'];
+                  ?>
+                  <?php if($detailParts): ?><div class="text-muted small"><?= htmlspecialchars(implode(' · ',$detailParts)); ?></div><?php endif; ?>
                 </label>
               <?php endforeach; ?>
             </div>
@@ -689,7 +705,14 @@ window.addEventListener('load', () => {
             items.forEach(m => {
               const chip = document.createElement('div');
               chip.className = 'member-chip';
-              chip.innerHTML = `<span>${m.name || ''}</span>${m.department ? `<span class="meta">${m.department}</span>` : ''}`;
+              const detailParts = [];
+              if (m.degree) detailParts.push(m.degree);
+              if (m.year) detailParts.push(m.year);
+              chip.innerHTML = `
+                <span class="fw-semibold">${m.name || ''}</span>
+                ${m.department ? `<span class="meta">${m.department}</span>` : ''}
+                ${detailParts.length ? `<span class="meta">${detailParts.join(' · ')}</span>` : ''}
+              `;
               body.appendChild(chip);
             });
           }
