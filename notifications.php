@@ -1,13 +1,14 @@
 <?php
 include 'auth_manager.php';
 
-if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='create_notification'){
+if($_SERVER['REQUEST_METHOD']==='POST'){
+    $action = $_POST['action'] ?? '';
     $content = trim($_POST['content'] ?? '');
     $begin = $_POST['valid_begin_date'] ?? '';
     $end = $_POST['valid_end_date'] ?? '';
     $members_selected = $_POST['members'] ?? [];
 
-    if($content && $begin && $end){
+    if($action==='create_notification' && $content && $begin && $end){
         $stmt = $pdo->prepare('INSERT INTO notifications(content,valid_begin_date,valid_end_date) VALUES(?,?,?)');
         $stmt->execute([$content,$begin,$end]);
         $nid = $pdo->lastInsertId();
@@ -15,6 +16,19 @@ if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='create_not
             $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$nid,$m]);
         }
     }
+
+    if($action==='update_notification'){
+        $nid = $_POST['notification_id'] ?? null;
+        if($nid && $content && $begin && $end){
+            $stmt = $pdo->prepare('UPDATE notifications SET content=?, valid_begin_date=?, valid_end_date=? WHERE id=?');
+            $stmt->execute([$content,$begin,$end,$nid]);
+            $pdo->prepare('DELETE FROM notification_targets WHERE notification_id=?')->execute([$nid]);
+            foreach($members_selected as $m){
+                $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$nid,$m]);
+            }
+        }
+    }
+
     header('Location: notifications.php');
     exit();
 }
@@ -43,7 +57,7 @@ unset($r);
 $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_join FROM members WHERE status='in_work' ORDER BY name")
     ->fetchAll();
 ?>
-<div class="d-flex justify-content-between mb-3">
+<div id="notification-page" class="d-flex justify-content-between mb-3" data-edit-id="<?= htmlspecialchars($_GET['edit'] ?? '') ?>">
   <h2 data-i18n="notifications.title">Notifications</h2>
   <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#notificationModal" data-i18n="notifications.add">Add Notification</button>
 </div>
@@ -57,16 +71,17 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
     <td>
       <?= nl2br(htmlspecialchars($n['content'])); ?>
       <?php
-        $stmt = $pdo->prepare('SELECT m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
+        $stmt = $pdo->prepare('SELECT m.id, m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
         $stmt->execute([$n['id']]);
         $targets = $stmt->fetchAll();
+        $targetIds = array_column($targets,'id');
       ?>
       <div>
         <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
         <div class="target-chip-grid mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
           <?php foreach($targets as $t): ?>
           <div class="target-chip">
-            <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="target-chip-header">
               <div class="fw-semibold"><?= htmlspecialchars($t['name']); ?></div>
               <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
             </div>
@@ -83,7 +98,13 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
     <td><?= htmlspecialchars($n['valid_begin_date']); ?></td>
     <td><?= htmlspecialchars($n['valid_end_date']); ?></td>
     <td>
-      <a class="btn btn-sm btn-primary" href="notification_edit.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_edit">Edit</a>
+      <button class="btn btn-sm btn-primary edit-notification" type="button"
+              data-id="<?= $n['id']; ?>"
+              data-content="<?= htmlspecialchars($n['content']); ?>"
+              data-begin="<?= htmlspecialchars($n['valid_begin_date']); ?>"
+              data-end="<?= htmlspecialchars($n['valid_end_date']); ?>"
+              data-members='<?= json_encode($targetIds, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>'
+              data-i18n="notifications.action_edit">Edit</button>
       <a class="btn btn-sm btn-danger delete-notification" href="notification_revoke.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_revoke">Revoke</a>
     </td>
   </tr>
@@ -94,9 +115,10 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <form method="post">
-        <input type="hidden" name="action" value="create_notification">
+        <input type="hidden" name="action" value="create_notification" id="notificationFormAction">
+        <input type="hidden" name="notification_id" id="notificationId" value="">
         <div class="modal-header">
-          <h5 class="modal-title" data-i18n="notification_edit.title_add">Add Notification</h5>
+          <h5 class="modal-title" id="notificationModalTitle" data-i18n="notification_edit.title_add">Add Notification</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
@@ -140,7 +162,7 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="notification_edit.cancel">Cancel</button>
-          <button type="submit" class="btn btn-primary" data-i18n="notification_edit.save">Save</button>
+          <button type="submit" class="btn btn-primary" id="notificationSubmit" data-i18n="notification_edit.save">Save</button>
         </div>
       </form>
     </div>
@@ -159,16 +181,17 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
         <td>
           <?= nl2br(htmlspecialchars($n['content'])); ?>
           <?php
-            $stmt = $pdo->prepare('SELECT m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
+            $stmt = $pdo->prepare('SELECT m.id, m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
             $stmt->execute([$n['id']]);
             $targets = $stmt->fetchAll();
+            $targetIds = array_column($targets,'id');
           ?>
           <div>
             <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
             <div class="target-chip-grid mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
               <?php foreach($targets as $t): ?>
               <div class="target-chip">
-                <div class="d-flex justify-content-between align-items-start gap-2">
+                <div class="target-chip-header">
                   <div class="fw-semibold"><?= htmlspecialchars($t['name']); ?></div>
                   <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
                 </div>
@@ -185,7 +208,13 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
         <td><?= htmlspecialchars($n['valid_begin_date']); ?></td>
         <td><?= htmlspecialchars($n['valid_end_date']); ?></td>
         <td>
-          <a class="btn btn-sm btn-primary" href="notification_edit.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_edit">Edit</a>
+          <button class="btn btn-sm btn-primary edit-notification" type="button"
+                  data-id="<?= $n['id']; ?>"
+                  data-content="<?= htmlspecialchars($n['content']); ?>"
+                  data-begin="<?= htmlspecialchars($n['valid_begin_date']); ?>"
+                  data-end="<?= htmlspecialchars($n['valid_end_date']); ?>"
+                  data-members='<?= json_encode($targetIds, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>'
+                  data-i18n="notifications.action_edit">Edit</button>
           <a class="btn btn-sm btn-danger delete-notification" href="notification_revoke.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_revoke">Revoke</a>
         </td>
       </tr>
@@ -200,11 +229,14 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
 <style>
   .drag-handle { cursor: grab; }
   .drag-handle:active { cursor: grabbing; }
-  .target-chip-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:0.75rem; background:var(--app-table-striped-bg); padding:0.75rem; border-radius:0.75rem; border:1px solid var(--app-table-border); }
-  .target-chip { border:1px solid var(--app-table-border); border-radius:0.6rem; padding:0.6rem 0.75rem; background:var(--app-surface-bg); box-shadow:0 2px 6px rgba(0,0,0,0.05); display:flex; flex-direction:column; gap:0.25rem; }
-  .target-chip-meta { font-size:0.85rem; color:var(--bs-gray-600); }
+  .target-chip-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:0.6rem; background:var(--app-table-striped-bg); padding:0.75rem; border-radius:0.75rem; border:1px solid var(--app-table-border); }
+  .target-chip { border:1px solid var(--app-table-border); border-radius:0.6rem; padding:0.55rem 0.65rem; background:var(--app-surface-bg); box-shadow:0 1px 4px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:0.2rem; min-height:88px; }
+  .target-chip-header { display:flex; justify-content:space-between; align-items:flex-start; gap:0.35rem; }
+  .target-chip .badge { font-size:0.75rem; }
+  .target-chip-meta { font-size:0.85rem; color:var(--bs-gray-600); line-height:1.2; }
   .target-select-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:0.5rem; max-height:320px; overflow:auto; padding:0.5rem; background:var(--app-table-striped-bg); border-radius:0.75rem; border:1px solid var(--app-table-border); }
-  .target-select-card { border:1px solid var(--app-table-border); border-radius:0.55rem; padding:0.5rem 0.65rem; background:var(--app-surface-bg); display:flex; flex-direction:column; gap:0.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+  .target-select-card { border:1px solid var(--app-table-border); border-radius:0.55rem; padding:0.5rem 0.65rem; background:var(--app-surface-bg); display:flex; flex-direction:column; gap:0.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.04); transition:transform 0.08s ease, box-shadow 0.08s ease; }
+  .target-select-card:hover { transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,0.06); }
   .target-select-card input { margin-right:0.35rem; }
   .target-select-meta { font-size:0.85rem; color:var(--bs-gray-600); }
 </style>
@@ -275,11 +307,48 @@ document.addEventListener('DOMContentLoaded', function(){
     return confirm(message) && confirm('Please confirm again to proceed.');
   };
 
+  const modalEl = document.getElementById('notificationModal');
+  const modal = modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal ? new bootstrap.Modal(modalEl) : null;
+  const form = modalEl?.querySelector('form');
+  const actionInput = document.getElementById('notificationFormAction');
+  const idInput = document.getElementById('notificationId');
+  const titleEl = document.getElementById('notificationModalTitle');
+  const submitEl = document.getElementById('notificationSubmit');
+  const contentField = form?.querySelector('textarea[name="content"]');
+  const beginField = form?.querySelector('input[name="valid_begin_date"]');
+  const endField = form?.querySelector('input[name="valid_end_date"]');
+  const memberCheckboxes = () => Array.from(form?.querySelectorAll('.member-checkbox') || []);
+
+  const setMemberSelections = (ids = []) => {
+    const idSet = new Set(ids.map(String));
+    memberCheckboxes().forEach(cb => { cb.checked = idSet.has(cb.value); });
+  };
+
+  const openCreateModal = () => {
+    if(!form) return;
+    form.reset();
+    actionInput.value = 'create_notification';
+    idInput.value = '';
+    titleEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.title_add'] || 'Add Notification';
+    submitEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.save'] || 'Save';
+    setMemberSelections([]);
+  };
+
+  modalEl?.addEventListener('hidden.bs.modal', openCreateModal);
+
+  document.querySelector('[data-bs-target="#notificationModal"][data-i18n="notifications.add"]')?.addEventListener('click', openCreateModal);
+
   document.querySelectorAll('.toggle-members').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const ul=document.getElementById('members-'+btn.dataset.id);
       if(!ul) return;
-      ul.style.display=ul.style.display==='none'?'block':'none';
+      const isHidden = ul.style.display==='none';
+      ul.style.display=isHidden?'block':'none';
+      btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      const lang=document.documentElement.lang||'zh';
+      const showText = translations?.[lang]?.['notifications.toggle_details'] || btn.textContent;
+      const hideText = translations?.[lang]?.['notifications.toggle_hide'] || showText;
+      btn.textContent = isHidden ? hideText : showText;
     });
   });
 
@@ -298,6 +367,29 @@ document.addEventListener('DOMContentLoaded', function(){
       if(!withDoubleConfirm(msg)) e.preventDefault();
     });
   });
+
+  document.querySelectorAll('.edit-notification').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      if(!form || !modal) return;
+      form.reset();
+      actionInput.value = 'update_notification';
+      idInput.value = btn.dataset.id || '';
+      if(contentField) contentField.value = btn.dataset.content || '';
+      if(beginField) beginField.value = btn.dataset.begin || '';
+      if(endField) endField.value = btn.dataset.end || '';
+      const members = (()=>{ try { return JSON.parse(btn.dataset.members || '[]'); } catch(e){ return []; }})();
+      setMemberSelections(members);
+      titleEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.title_edit'] || 'Edit Notification';
+      submitEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.save'] || 'Save';
+      modal.show();
+    });
+  });
+
+  const pendingEdit = document.getElementById('notification-page')?.dataset.editId;
+  if(pendingEdit){
+    const btn=document.querySelector(`.edit-notification[data-id="${pendingEdit}"]`);
+    btn?.click();
+  }
 
   const selectAllBtn=document.getElementById('select-all');
   selectAllBtn?.addEventListener('click',()=>{
