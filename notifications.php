@@ -80,7 +80,8 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
         <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
         <div class="target-chip-grid mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
           <?php foreach($targets as $t): ?>
-          <div class="target-chip">
+          <?php $isUnread = !in_array($t['status'], ['seen','checked'], true); ?>
+          <div class="target-chip<?= $isUnread ? ' target-chip-unread' : ''; ?>">
             <div class="target-chip-header">
               <div class="fw-semibold"><?= htmlspecialchars($t['name']); ?></div>
               <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
@@ -93,6 +94,7 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
           </div>
           <?php endforeach; ?>
         </div>
+        <div class="chip-pagination" data-target="members-<?= $n['id']; ?>"></div>
       </div>
     </td>
     <td><?= htmlspecialchars($n['valid_begin_date']); ?></td>
@@ -190,7 +192,8 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
             <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
             <div class="target-chip-grid mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
               <?php foreach($targets as $t): ?>
-              <div class="target-chip">
+              <?php $isUnread = !in_array($t['status'], ['seen','checked'], true); ?>
+              <div class="target-chip<?= $isUnread ? ' target-chip-unread' : ''; ?>">
                 <div class="target-chip-header">
                   <div class="fw-semibold"><?= htmlspecialchars($t['name']); ?></div>
                   <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
@@ -203,6 +206,7 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
               </div>
               <?php endforeach; ?>
             </div>
+            <div class="chip-pagination" data-target="members-<?= $n['id']; ?>"></div>
           </div>
         </td>
         <td><?= htmlspecialchars($n['valid_begin_date']); ?></td>
@@ -230,10 +234,13 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
   .drag-handle { cursor: grab; }
   .drag-handle:active { cursor: grabbing; }
   .target-chip-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:0.6rem; background:var(--app-table-striped-bg); padding:0.75rem; border-radius:0.75rem; border:1px solid var(--app-table-border); }
-  .target-chip { border:1px solid var(--app-table-border); border-radius:0.6rem; padding:0.55rem 0.65rem; background:var(--app-surface-bg); box-shadow:0 1px 4px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:0.2rem; min-height:88px; }
+  .target-chip { border:1px solid var(--app-table-border); border-radius:0.6rem; padding:0.55rem 0.65rem; background:var(--app-surface-bg); box-shadow:0 1px 4px rgba(0,0,0,0.04); display:flex; flex-direction:column; gap:0.2rem; min-height:88px; transition:background-color 0.15s ease, border-color 0.15s ease; }
   .target-chip-header { display:flex; justify-content:space-between; align-items:flex-start; gap:0.35rem; }
   .target-chip .badge { font-size:0.75rem; }
   .target-chip-meta { font-size:0.85rem; color:var(--bs-gray-600); line-height:1.2; }
+  .target-chip-unread { background:#fff7d6; border-color:#f5c86a; box-shadow:0 1px 6px rgba(245,200,106,0.45); }
+  .chip-pagination { display:none; justify-content:flex-end; align-items:center; gap:0.35rem; margin-top:0.35rem; font-size:0.9rem; color:var(--bs-gray-600); }
+  .chip-pagination button { padding:0.15rem 0.45rem; }
   .target-select-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:0.5rem; max-height:320px; overflow:auto; padding:0.5rem; background:var(--app-table-striped-bg); border-radius:0.75rem; border:1px solid var(--app-table-border); }
   .target-select-card { border:1px solid var(--app-table-border); border-radius:0.55rem; padding:0.5rem 0.65rem; background:var(--app-surface-bg); display:flex; flex-direction:column; gap:0.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.04); transition:transform 0.08s ease, box-shadow 0.08s ease; }
   .target-select-card:hover { transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,0.06); }
@@ -307,6 +314,65 @@ document.addEventListener('DOMContentLoaded', function(){
     return confirm(message) && confirm('Please confirm again to proceed.');
   };
 
+  const calculatePerPage = (grid) => {
+    const minWidth = 180;
+    const cols = Math.max(1, Math.floor((grid?.clientWidth || minWidth) / minWidth));
+    return cols * 2;
+  };
+
+  const renderChipPagination = (grid) => {
+    if(!grid) return;
+    const chips = Array.from(grid.querySelectorAll('.target-chip'));
+    const pagerEls = Array.from(document.querySelectorAll(`.chip-pagination[data-target="${grid.id}"]`));
+    if(!chips.length || !pagerEls.length) return;
+
+    const perPage = calculatePerPage(grid);
+    const totalPages = Math.max(1, Math.ceil(chips.length / perPage));
+    let currentPage = parseInt(grid.dataset.page || '1', 10);
+    if(currentPage < 1) currentPage = 1;
+    if(currentPage > totalPages) currentPage = totalPages;
+    grid.dataset.page = String(currentPage);
+
+    chips.forEach((chip, idx) => {
+      const page = Math.floor(idx / perPage) + 1;
+      chip.style.display = page === currentPage ? '' : 'none';
+    });
+
+    pagerEls.forEach(pager => {
+      pager.innerHTML = '';
+      if(totalPages <= 1){
+        pager.style.display = 'none';
+        return;
+      }
+      pager.style.display = 'flex';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.className = 'btn btn-sm btn-outline-secondary';
+      prevBtn.textContent = '<';
+      prevBtn.disabled = currentPage === 1;
+      prevBtn.addEventListener('click', () => {
+        grid.dataset.page = String(Math.max(1, currentPage - 1));
+        renderChipPagination(grid);
+      });
+
+      const info = document.createElement('span');
+      info.textContent = `${currentPage}/${totalPages}`;
+
+      const nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.className = 'btn btn-sm btn-outline-secondary';
+      nextBtn.textContent = '>';
+      nextBtn.disabled = currentPage === totalPages;
+      nextBtn.addEventListener('click', () => {
+        grid.dataset.page = String(Math.min(totalPages, currentPage + 1));
+        renderChipPagination(grid);
+      });
+
+      pager.append(prevBtn, info, nextBtn);
+    });
+  };
+
   const modalEl = document.getElementById('notificationModal');
   const modal = modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal ? new bootstrap.Modal(modalEl) : null;
   const form = modalEl?.querySelector('form');
@@ -349,6 +415,19 @@ document.addEventListener('DOMContentLoaded', function(){
       const showText = translations?.[lang]?.['notifications.toggle_details'] || btn.textContent;
       const hideText = translations?.[lang]?.['notifications.toggle_hide'] || showText;
       btn.textContent = isHidden ? hideText : showText;
+      if(isHidden){
+        setTimeout(()=>renderChipPagination(ul),50);
+      }
+    });
+  });
+
+  document.querySelectorAll('.target-chip-grid').forEach(grid => renderChipPagination(grid));
+
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('.target-chip-grid').forEach(grid => {
+      if(grid.style.display !== 'none'){
+        renderChipPagination(grid);
+      }
     });
   });
 
