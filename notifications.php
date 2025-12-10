@@ -78,7 +78,7 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
       ?>
       <div>
         <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
-        <div class="target-chip-grid mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
+        <div class="target-chip-grid mt-2 d-none" id="members-<?= $n['id']; ?>">
           <?php foreach($targets as $t): ?>
           <?php $isUnread = !in_array($t['status'], ['seen','checked'], true); ?>
           <div class="target-chip<?= $isUnread ? ' target-chip-unread' : ''; ?>">
@@ -190,7 +190,7 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
           ?>
           <div>
             <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
-            <div class="target-chip-grid mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
+            <div class="target-chip-grid mt-2 d-none" id="members-<?= $n['id']; ?>">
               <?php foreach($targets as $t): ?>
               <?php $isUnread = !in_array($t['status'], ['seen','checked'], true); ?>
               <div class="target-chip<?= $isUnread ? ' target-chip-unread' : ''; ?>">
@@ -408,8 +408,12 @@ document.addEventListener('DOMContentLoaded', function(){
     btn.addEventListener('click',()=>{
       const ul=document.getElementById('members-'+btn.dataset.id);
       if(!ul) return;
-      const isHidden = ul.style.display==='none';
-      ul.style.display=isHidden?'block':'none';
+      const isHidden = ul.classList.contains('d-none');
+      if(isHidden){
+        ul.classList.remove('d-none');
+      } else {
+        ul.classList.add('d-none');
+      }
       btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
       const lang=document.documentElement.lang||'zh';
       const showText = translations?.[lang]?.['notifications.toggle_details'] || btn.textContent;
