@@ -324,7 +324,15 @@ document.addEventListener('DOMContentLoaded', function(){
     if(!grid) return;
     const chips = Array.from(grid.querySelectorAll('.target-chip'));
     const pagerEls = Array.from(document.querySelectorAll(`.chip-pagination[data-target="${grid.id}"]`));
-    if(!chips.length || !pagerEls.length) return;
+    if(!pagerEls.length) return;
+    if(grid.classList.contains('d-none')){
+      pagerEls.forEach(p => { p.style.display = 'none'; });
+      return;
+    }
+    if(!chips.length) {
+      pagerEls.forEach(p => { p.style.display = 'none'; });
+      return;
+    }
 
     const perPage = calculatePerPage(grid);
     const totalPages = Math.max(1, Math.ceil(chips.length / perPage));
@@ -419,9 +427,7 @@ document.addEventListener('DOMContentLoaded', function(){
       const showText = translations?.[lang]?.['notifications.toggle_details'] || btn.textContent;
       const hideText = translations?.[lang]?.['notifications.toggle_hide'] || showText;
       btn.textContent = isHidden ? hideText : showText;
-      if(isHidden){
-        setTimeout(()=>renderChipPagination(ul),50);
-      }
+      setTimeout(()=>renderChipPagination(ul),50);
     });
   });
 
