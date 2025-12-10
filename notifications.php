@@ -1,5 +1,24 @@
 <?php
 include 'auth_manager.php';
+
+if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['action'] ?? '')==='create_notification'){
+    $content = trim($_POST['content'] ?? '');
+    $begin = $_POST['valid_begin_date'] ?? '';
+    $end = $_POST['valid_end_date'] ?? '';
+    $members_selected = $_POST['members'] ?? [];
+
+    if($content && $begin && $end){
+        $stmt = $pdo->prepare('INSERT INTO notifications(content,valid_begin_date,valid_end_date) VALUES(?,?,?)');
+        $stmt->execute([$content,$begin,$end]);
+        $nid = $pdo->lastInsertId();
+        foreach($members_selected as $m){
+            $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$nid,$m]);
+        }
+    }
+    header('Location: notifications.php');
+    exit();
+}
+
 include 'header.php';
 $notifications = $pdo->query('SELECT * FROM notifications WHERE is_revoked=0 ORDER BY id DESC')->fetchAll();
 $activeNotifications = [];
@@ -20,10 +39,13 @@ foreach($regulations as &$r){
     $r['files'] = $stmt->fetchAll();
 }
 unset($r);
+
+$memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_join FROM members WHERE status='in_work' ORDER BY name")
+    ->fetchAll();
 ?>
 <div class="d-flex justify-content-between mb-3">
   <h2 data-i18n="notifications.title">Notifications</h2>
-  <a class="btn btn-success" href="notification_edit.php" data-i18n="notifications.add">Add Notification</a>
+  <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#notificationModal" data-i18n="notifications.add">Add Notification</button>
 </div>
 <table class="table table-bordered">
   <tr><th data-i18n="notifications.table_content">Content</th><th data-i18n="notifications.table_begin">Begin</th><th data-i18n="notifications.table_end">End</th><th data-i18n="notifications.table_actions">Actions</th></tr>
@@ -35,20 +57,27 @@ unset($r);
     <td>
       <?= nl2br(htmlspecialchars($n['content'])); ?>
       <?php
-        $stmt = $pdo->prepare('SELECT m.name, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
+        $stmt = $pdo->prepare('SELECT m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
         $stmt->execute([$n['id']]);
         $targets = $stmt->fetchAll();
       ?>
       <div>
         <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
-        <ul class="list-group mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
+        <div class="target-chip-grid mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
           <?php foreach($targets as $t): ?>
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <?= htmlspecialchars($t['name']); ?>
-            <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
-          </li>
+          <div class="target-chip">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div class="fw-semibold"><?= htmlspecialchars($t['name']); ?></div>
+              <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
+            </div>
+            <div class="target-chip-meta"><?= htmlspecialchars($t['department'] ?: '-'); ?></div>
+            <div class="target-chip-meta">
+              <?= htmlspecialchars($t['degree_pursuing'] ?: '-'); ?>
+              <?php if(!empty($t['year_of_join'])): ?>· <?= htmlspecialchars($t['year_of_join']); ?><?php endif; ?>
+            </div>
+          </div>
           <?php endforeach; ?>
-        </ul>
+        </div>
       </div>
     </td>
     <td><?= htmlspecialchars($n['valid_begin_date']); ?></td>
@@ -60,6 +89,63 @@ unset($r);
   </tr>
   <?php endforeach; ?>
 </table>
+
+<div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="create_notification">
+        <div class="modal-header">
+          <h5 class="modal-title" data-i18n="notification_edit.title_add">Add Notification</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" data-i18n="notification_edit.label_content">Content</label>
+            <textarea name="content" class="form-control" rows="4" required></textarea>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" data-i18n="notification_edit.label_begin">Begin Date</label>
+              <input type="date" name="valid_begin_date" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" data-i18n="notification_edit.label_end">End Date</label>
+              <input type="date" name="valid_end_date" class="form-control" required>
+            </div>
+          </div>
+          <div class="mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="form-label mb-0" data-i18n="notification_edit.label_members">Target Members</label>
+              <button type="button" id="select-all" class="btn btn-sm btn-outline-secondary" data-i18n="notification_edit.select_all">Select All</button>
+            </div>
+            <div class="target-select-grid">
+              <?php foreach($memberList as $m): ?>
+                <label class="target-select-card">
+                  <div class="d-flex align-items-start">
+                    <input class="form-check-input mt-1 member-checkbox" type="checkbox" name="members[]" value="<?= $m['id']; ?>">
+                    <div class="ms-2">
+                      <div class="fw-semibold"><?= htmlspecialchars($m['name']); ?></div>
+                      <div class="target-select-meta"><?= htmlspecialchars($m['department'] ?: '-'); ?></div>
+                      <div class="target-select-meta">
+                        <?= htmlspecialchars($m['degree_pursuing'] ?: '-'); ?>
+                        <?php if(!empty($m['year_of_join'])): ?>· <?= htmlspecialchars($m['year_of_join']); ?><?php endif; ?>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="notification_edit.cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" data-i18n="notification_edit.save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <?php if(!empty($expiredNotifications)): ?>
 <div class="mt-4">
@@ -73,20 +159,27 @@ unset($r);
         <td>
           <?= nl2br(htmlspecialchars($n['content'])); ?>
           <?php
-            $stmt = $pdo->prepare('SELECT m.name, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
+            $stmt = $pdo->prepare('SELECT m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
             $stmt->execute([$n['id']]);
             $targets = $stmt->fetchAll();
           ?>
           <div>
             <button class="btn btn-link p-0 toggle-members" data-id="<?= $n['id']; ?>" data-i18n="notifications.toggle_details">Show Target Details</button>
-            <ul class="list-group mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
+            <div class="target-chip-grid mt-2" id="members-<?= $n['id']; ?>" style="display:none;">
               <?php foreach($targets as $t): ?>
-              <li class="list-group-item d-flex justify-content-between align-items-center">
-                <?= htmlspecialchars($t['name']); ?>
-                <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
-              </li>
+              <div class="target-chip">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div class="fw-semibold"><?= htmlspecialchars($t['name']); ?></div>
+                  <span class="badge bg-secondary" data-i18n="notifications.status.<?= $t['status']; ?>"><?= $t['status']; ?></span>
+                </div>
+                <div class="target-chip-meta"><?= htmlspecialchars($t['department'] ?: '-'); ?></div>
+                <div class="target-chip-meta">
+                  <?= htmlspecialchars($t['degree_pursuing'] ?: '-'); ?>
+                  <?php if(!empty($t['year_of_join'])): ?>· <?= htmlspecialchars($t['year_of_join']); ?><?php endif; ?>
+                </div>
+              </div>
               <?php endforeach; ?>
-            </ul>
+            </div>
           </div>
         </td>
         <td><?= htmlspecialchars($n['valid_begin_date']); ?></td>
@@ -107,6 +200,13 @@ unset($r);
 <style>
   .drag-handle { cursor: grab; }
   .drag-handle:active { cursor: grabbing; }
+  .target-chip-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:0.75rem; background:var(--app-table-striped-bg); padding:0.75rem; border-radius:0.75rem; border:1px solid var(--app-table-border); }
+  .target-chip { border:1px solid var(--app-table-border); border-radius:0.6rem; padding:0.6rem 0.75rem; background:var(--app-surface-bg); box-shadow:0 2px 6px rgba(0,0,0,0.05); display:flex; flex-direction:column; gap:0.25rem; }
+  .target-chip-meta { font-size:0.85rem; color:var(--bs-gray-600); }
+  .target-select-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:0.5rem; max-height:320px; overflow:auto; padding:0.5rem; background:var(--app-table-striped-bg); border-radius:0.75rem; border:1px solid var(--app-table-border); }
+  .target-select-card { border:1px solid var(--app-table-border); border-radius:0.55rem; padding:0.5rem 0.65rem; background:var(--app-surface-bg); display:flex; flex-direction:column; gap:0.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+  .target-select-card input { margin-right:0.35rem; }
+  .target-select-meta { font-size:0.85rem; color:var(--bs-gray-600); }
 </style>
 
 <div class="d-flex justify-content-between mb-3">
@@ -197,6 +297,13 @@ document.addEventListener('DOMContentLoaded', function(){
       const msg=translations?.[lang]?.['regulations.confirm.delete'] || 'Delete this regulation?';
       if(!withDoubleConfirm(msg)) e.preventDefault();
     });
+  });
+
+  const selectAllBtn=document.getElementById('select-all');
+  selectAllBtn?.addEventListener('click',()=>{
+    const boxes=document.querySelectorAll('.member-checkbox');
+    const allChecked=Array.from(boxes).every(cb=>cb.checked);
+    boxes.forEach(cb=>cb.checked=!allChecked);
   });
 
   const expiredToggle=document.getElementById('toggleExpiredNotifications');
