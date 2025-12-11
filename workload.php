@@ -366,124 +366,129 @@ include 'header.php';
 </table>
 <?php endif; ?>
 <script>
-const rangeForm = document.getElementById('workloadForm');
-rangeForm.addEventListener('submit', function(e){
-  refreshCategorySummary();
-  const startField = rangeForm.querySelector('input[name="start"]').value;
-  const endField = rangeForm.querySelector('input[name="end"]').value;
-  if(startField && endField && new Date(endField) <= new Date(startField)){
-    alert(translations[document.documentElement.lang]['workload.error.range']);
-    e.preventDefault();
-  }
-});
-
-function setMonthRange(offset = 0){
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + offset;
-  const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
-  rangeForm.querySelector('input[name="start"]').value = first.toISOString().slice(0,10);
-  rangeForm.querySelector('input[name="end"]').value = last.toISOString().slice(0,10);
-}
-document.getElementById('thisMonthBtn')?.addEventListener('click', ()=>setMonthRange(0));
-document.getElementById('lastMonthBtn')?.addEventListener('click', ()=>setMonthRange(-1));
-document.getElementById('applyMonthBtn')?.addEventListener('click', ()=>{
-  const picker = document.getElementById('monthPicker');
-  if(!picker.value) return;
-  const [year, month] = picker.value.split('-').map(v=>parseInt(v,10));
-  const first = new Date(year, month - 1, 1);
-  const last = new Date(year, month, 0);
-  rangeForm.querySelector('input[name="start"]').value = first.toISOString().slice(0,10);
-  rangeForm.querySelector('input[name="end"]').value = last.toISOString().slice(0,10);
-});
-
-function syncSortInput(){
-  const sortInput = document.getElementById('sortInput');
-  const primary = document.getElementById('primarySort').value;
-  const secondary = document.getElementById('secondarySort').value;
-  const parts = [primary, secondary].filter((v,i,arr)=>v && arr.indexOf(v)===i);
-  sortInput.value = parts.join(',') || 'total_desc';
-}
-document.getElementById('primarySort').addEventListener('change', syncSortInput);
-document.getElementById('secondarySort').addEventListener('change', syncSortInput);
-syncSortInput();
-
-const categoryInputsContainer = document.getElementById('categoryInputs');
-const categoryBadges = document.getElementById('categoryBadges');
-const categorySummary = document.getElementById('categorySummary');
-const categoryOptions = Array.from(document.querySelectorAll('.category-option'));
-const categorySelectAll = document.getElementById('categorySelectAll');
-const langCode = document.documentElement.lang || 'zh';
-const categoryStateInput = document.getElementById('categoriesState');
-
-function refreshCategorySummary(){
-  const t = translations[langCode] || translations['zh'];
-  categoryInputsContainer.innerHTML = '';
-  categoryBadges.innerHTML = '';
-  const selected = categoryOptions.filter(opt => opt.checked);
-  const isAll = selected.length === 0 || selected.length === categoryOptions.length;
-  categorySelectAll.checked = isAll;
-  if(isAll){
-    categorySummary.textContent = t['workload.category.all'];
-  } else {
-    categorySummary.textContent = (t['workload.category.some'] || '').replace('%d', selected.length);
-  }
-  if(!isAll){
-    selected.forEach(opt => {
-      const badge = document.createElement('span');
-      badge.className = 'badge bg-light text-dark border';
-      badge.textContent = opt.dataset.label;
-      categoryBadges.appendChild(badge);
-      const hidden = document.createElement('input');
-      hidden.type = 'hidden';
-      hidden.name = 'categories[]';
-      hidden.value = opt.value;
-      categoryInputsContainer.appendChild(hidden);
-    });
-  }
-  categoryStateInput.value = selected.map(opt => opt.value).join(',');
-}
-
-categoryOptions.forEach(opt => {
-  opt.addEventListener('change', () => {
-    const total = categoryOptions.length;
-    const selectedCount = categoryOptions.filter(o => o.checked).length;
-    categorySelectAll.checked = selectedCount === total;
+document.addEventListener('DOMContentLoaded', () => {
+  const rangeForm = document.getElementById('workloadForm');
+  rangeForm.addEventListener('submit', function(e){
+    refreshCategorySummary();
+    const startField = rangeForm.querySelector('input[name="start"]').value;
+    const endField = rangeForm.querySelector('input[name="end"]').value;
+    const dict = window.translations || {};
+    if(startField && endField && new Date(endField) <= new Date(startField)){
+      const lang = document.documentElement.lang;
+      alert(dict[lang]?.['workload.error.range'] || 'Invalid date range');
+      e.preventDefault();
+    }
   });
-});
 
-categorySelectAll?.addEventListener('change', () => {
-  categoryOptions.forEach(opt => opt.checked = categorySelectAll.checked);
-});
-
-document.getElementById('saveCategories')?.addEventListener('click', () => {
-  refreshCategorySummary();
-  if(window.bootstrap){
-    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('categoryModal'));
-    modal.hide();
+  function setMonthRange(offset = 0){
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + offset;
+    const first = new Date(year, month, 1);
+    const last = new Date(year, month + 1, 0);
+    rangeForm.querySelector('input[name="start"]').value = first.toISOString().slice(0,10);
+    rangeForm.querySelector('input[name="end"]').value = last.toISOString().slice(0,10);
   }
-});
+  document.getElementById('thisMonthBtn')?.addEventListener('click', ()=>setMonthRange(0));
+  document.getElementById('lastMonthBtn')?.addEventListener('click', ()=>setMonthRange(-1));
+  document.getElementById('applyMonthBtn')?.addEventListener('click', ()=>{
+    const picker = document.getElementById('monthPicker');
+    if(!picker.value) return;
+    const [year, month] = picker.value.split('-').map(v=>parseInt(v,10));
+    const first = new Date(year, month - 1, 1);
+    const last = new Date(year, month, 0);
+    rangeForm.querySelector('input[name="start"]').value = first.toISOString().slice(0,10);
+    rangeForm.querySelector('input[name="end"]').value = last.toISOString().slice(0,10);
+  });
 
-refreshCategorySummary();
+  function syncSortInput(){
+    const sortInput = document.getElementById('sortInput');
+    const primary = document.getElementById('primarySort').value;
+    const secondary = document.getElementById('secondarySort').value;
+    const parts = [primary, secondary].filter((v,i,arr)=>v && arr.indexOf(v)===i);
+    sortInput.value = parts.join(',') || 'total_desc';
+  }
+  document.getElementById('primarySort').addEventListener('change', syncSortInput);
+  document.getElementById('secondarySort').addEventListener('change', syncSortInput);
+  syncSortInput();
 
-function buildExportUrl(base){
-  const params = new URLSearchParams(new FormData(rangeForm));
-  const lang=document.documentElement.lang||'zh';
-  params.set('lang', lang);
-  return base + '?' + params.toString();
-}
-document.getElementById('exportBtn')?.addEventListener('click',function(e){
-  e.preventDefault();
+  const categoryInputsContainer = document.getElementById('categoryInputs');
+  const categoryBadges = document.getElementById('categoryBadges');
+  const categorySummary = document.getElementById('categorySummary');
+  const categoryOptions = Array.from(document.querySelectorAll('.category-option'));
+  const categorySelectAll = document.getElementById('categorySelectAll');
+  const langCode = document.documentElement.lang || 'zh';
+  const categoryStateInput = document.getElementById('categoriesState');
+
+  function refreshCategorySummary(){
+    const dict = window.translations || {};
+    const t = dict[langCode] || dict['zh'] || {};
+    categoryInputsContainer.innerHTML = '';
+    categoryBadges.innerHTML = '';
+    const selected = categoryOptions.filter(opt => opt.checked);
+    const isAll = selected.length === 0 || selected.length === categoryOptions.length;
+    categorySelectAll.checked = isAll;
+    if(isAll){
+      categorySummary.textContent = t['workload.category.all'] || '';
+    } else {
+      const label = t['workload.category.some'] || '%d';
+      categorySummary.textContent = label.replace('%d', selected.length);
+    }
+    if(!isAll){
+      selected.forEach(opt => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-light text-dark border';
+        badge.textContent = opt.dataset.label;
+        categoryBadges.appendChild(badge);
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'categories[]';
+        hidden.value = opt.value;
+        categoryInputsContainer.appendChild(hidden);
+      });
+    }
+    categoryStateInput.value = selected.map(opt => opt.value).join(',');
+  }
+
+  categoryOptions.forEach(opt => {
+    opt.addEventListener('change', () => {
+      const total = categoryOptions.length;
+      const selectedCount = categoryOptions.filter(o => o.checked).length;
+      categorySelectAll.checked = selectedCount === total;
+    });
+  });
+
+  categorySelectAll?.addEventListener('change', () => {
+    categoryOptions.forEach(opt => opt.checked = categorySelectAll.checked);
+  });
+
+  document.getElementById('saveCategories')?.addEventListener('click', () => {
+    refreshCategorySummary();
+    if(window.bootstrap){
+      const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('categoryModal'));
+      modal.hide();
+    }
+  });
+
   refreshCategorySummary();
-  this.href = buildExportUrl('workload.php') + '&export=1';
-  window.location.href = this.href;
-});
-document.getElementById('exportTxtBtn')?.addEventListener('click',function(e){
-  e.preventDefault();
-  refreshCategorySummary();
-  this.href = buildExportUrl('workload.php') + '&export_txt=1';
-  window.location.href = this.href;
+
+  function buildExportUrl(base){
+    refreshCategorySummary();
+    const params = new URLSearchParams(new FormData(rangeForm));
+    const lang=document.documentElement.lang||'zh';
+    params.set('lang', lang);
+    return base + '?' + params.toString();
+  }
+  document.getElementById('exportBtn')?.addEventListener('click',function(e){
+    e.preventDefault();
+    this.href = buildExportUrl('workload.php') + '&export=1';
+    window.location.href = this.href;
+  });
+  document.getElementById('exportTxtBtn')?.addEventListener('click',function(e){
+    e.preventDefault();
+    this.href = buildExportUrl('workload.php') + '&export_txt=1';
+    window.location.href = this.href;
+  });
 });
 </script>
 <?php include 'footer.php'; ?>
