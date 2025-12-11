@@ -8,31 +8,51 @@ if(!$task_id){
     exit();
 }
 
-$taskStmt = $pdo->prepare('SELECT title FROM tasks WHERE id=?');
+$taskStmt = $pdo->prepare('SELECT title,status FROM tasks WHERE id=?');
 $taskStmt->execute([$task_id]);
-$taskTitle = $taskStmt->fetchColumn();
-if (!$taskTitle) { echo 'Task not found'; exit(); }
+$taskRow = $taskStmt->fetch(PDO::FETCH_ASSOC);
+if (!$taskRow) { echo 'Task not found'; exit(); }
+$taskTitle = $taskRow['title'];
+$taskStatus = $taskRow['status'];
+
+$isManager = ($_SESSION['role'] ?? '') === 'manager';
+$loggedMemberId = ($_SESSION['role'] ?? '') === 'member' ? ($_SESSION['member_id'] ?? null) : null;
+
+if ($loggedMemberId) {
+    $_SESSION['fill_member_id'] = $loggedMemberId;
+    $_SESSION['fill_task_id'] = $task_id;
+}
 if(isset($_SESSION['fill_task_id']) && $_SESSION['fill_task_id'] != $task_id){
     unset($_SESSION['fill_task_id'], $_SESSION['fill_member_id']);
 }
-$member_id = $_SESSION['fill_member_id'] ?? null;
+$member_id = $_SESSION['fill_member_id'] ?? $loggedMemberId;
 $error = '';
 $msg = '';
+
+$canModify = $isManager || $taskStatus === 'active';
+if(!$canModify && $_SERVER['REQUEST_METHOD'] === 'POST'){
+    $error = '该任务已暂停或结束，无法继续申报。';
+}
+
 if(!$member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'verify'){
-    $name = $_POST['name'] ?? '';
-    $identity = $_POST['identity_number'] ?? '';
-    $stmt = $pdo->prepare('SELECT id FROM members WHERE name=? AND identity_number=?');
-    $stmt->execute([$name,$identity]);
-    $member = $stmt->fetch();
-    if($member){
-        $_SESSION['fill_member_id'] = $member['id'];
-        $_SESSION['fill_task_id'] = $task_id;
-        $member_id = $member['id'];
+    if(!$canModify){
+        $error = '该任务已暂停或结束，无法继续申报。';
     } else {
-        $error = '身份验证失败';
+        $name = $_POST['name'] ?? '';
+        $identity = $_POST['identity_number'] ?? '';
+        $stmt = $pdo->prepare('SELECT id FROM members WHERE name=? AND identity_number=?');
+        $stmt->execute([$name,$identity]);
+        $member = $stmt->fetch();
+        if($member){
+            $_SESSION['fill_member_id'] = $member['id'];
+            $_SESSION['fill_task_id'] = $task_id;
+            $member_id = $member['id'];
+        } else {
+            $error = '身份验证失败';
+        }
     }
 }
-if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add'){
+if($member_id && $canModify && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add'){
     $description = $_POST['description'];
     $start_date = $_POST['start_time'];
     $end_date = $_POST['end_time'];
@@ -48,7 +68,7 @@ if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']
         $msg = '已提交';
     }
 }
-if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'join'){
+if($member_id && $canModify && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'join'){
     $affair_id = $_POST['affair_id'];
     $check = $pdo->prepare('SELECT 1 FROM task_affair_members WHERE affair_id=? AND member_id=?');
     $check->execute([$affair_id,$member_id]);
@@ -57,7 +77,7 @@ if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']
         $msg = '已加入该事务';
     }
 }
-if($member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'leave'){
+if($member_id && $canModify && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'leave'){
     $affair_id = $_POST['affair_id'];
     $pdo->prepare('DELETE FROM task_affair_members WHERE affair_id=? AND member_id=?')->execute([$affair_id,$member_id]);
     $msg = '已撤回加入';
@@ -84,8 +104,11 @@ if($member_id){
 <h2>团队</h2>
 <h2>工作量报备 - 与绩效挂钩！</h2>
 <h4><span style="color:red">您正在申报：<?= htmlspecialchars($taskTitle); ?>方面的工作</span></h4>
+<p><strong>当前任务状态：</strong> <?= htmlspecialchars($taskStatus); ?></p>
 <br>
-<?php if(!$member_id): ?>
+<?php if(!$canModify): ?>
+<div class="alert alert-warning">该任务目前已暂停或结束，暂不接受新的工作量申报。</div>
+<?php elseif(!$member_id): ?>
 <form method="post" class="mt-4">
   <input type="hidden" name="action" value="verify">
   <div class="mb-3">
@@ -118,24 +141,27 @@ if($member_id){
   <td><?= htmlspecialchars($days); ?></td>
   <td><?= $status_text; ?></td>
   <td>
-    <?php if(!$joined): ?>
+    <?php if(!$joined && $canModify): ?>
     <form method="post" style="display:inline;">
       <input type="hidden" name="action" value="join">
       <input type="hidden" name="affair_id" value="<?= $a['id']; ?>">
       <button type="submit" class="btn btn-sm btn-success">加入</button>
     </form>
-    <?php else: ?>
+    <?php elseif($joined && $canModify): ?>
     <form method="post" style="display:inline;">
       <input type="hidden" name="action" value="leave">
       <input type="hidden" name="affair_id" value="<?= $a['id']; ?>">
       <button type="submit" class="btn btn-sm btn-warning">撤回</button>
     </form>
+    <?php elseif($joined): ?>
+    <span class="text-muted">已加入</span>
     <?php endif; ?>
   </td>
 </tr>
 <?php endforeach; ?>
 </table>
 <br>
+ <?php if($canModify): ?>
  <h4><b>新增工作量</b></h4>
  <div class="alert alert-danger">
    <ul class="mb-0">
@@ -158,50 +184,55 @@ if($member_id){
      <label class="form-label">结束日期（请诚信填写，时长与工资挂钩）</label>
      <input type="date" name="end_time" id="endTime" class="form-control" required>
      <div id="timeWarning" class="text-danger mt-2" style="display:none;"></div>
-     <div id="dayCount" class="mt-2"></div>
-   </div>
-   <button type="submit" class="btn btn-primary">申报该工作量</button>
- </form>
+   <div id="dayCount" class="mt-2"></div>
+ </div>
+ <button type="submit" class="btn btn-primary">申报该工作量</button>
+</form>
+ <?php else: ?>
+ <div class="alert alert-warning">该任务当前不开放新增工作量填报。</div>
+ <?php endif; ?>
 <script>
  const startInput = document.getElementById('startTime');
  const endInput = document.getElementById('endTime');
  const warning = document.getElementById('timeWarning');
  const dayCount = document.getElementById('dayCount');
  const form = document.getElementById('taskForm');
- function updateInfo(){
-   if(startInput.value && endInput.value){
-     const start = new Date(startInput.value);
-     const end = new Date(endInput.value);
-     let diff = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-     if(diff <= 0){
-       warning.textContent = '结束日期必须不早于起始日期';
-       warning.style.display = 'block';
-       dayCount.textContent = '';
-       endInput.value = '';
-       return false;
-     } else if(diff > 6){
-       warning.textContent = '请确认您所选择的任务时长不超过6天，超过6天的任务请切分填写！（注意此处任务需保持较细颗粒度，便于考核）';
-       warning.style.display = 'block';
-       dayCount.textContent = '';
-       endInput.value = '';
-       return false;
+ if(form && startInput && endInput && warning && dayCount){
+   function updateInfo(){
+     if(startInput.value && endInput.value){
+       const start = new Date(startInput.value);
+       const end = new Date(endInput.value);
+       let diff = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+       if(diff <= 0){
+         warning.textContent = '结束日期必须不早于起始日期';
+         warning.style.display = 'block';
+         dayCount.textContent = '';
+         endInput.value = '';
+         return false;
+       } else if(diff > 6){
+         warning.textContent = '请确认您所选择的任务时长不超过6天，超过6天的任务请切分填写！（注意此处任务需保持较细颗粒度，便于考核）';
+         warning.style.display = 'block';
+         dayCount.textContent = '';
+         endInput.value = '';
+         return false;
+       } else {
+         warning.style.display = 'none';
+         dayCount.textContent = `本次申报工作量：${diff} 天`;
+       }
      } else {
        warning.style.display = 'none';
-       dayCount.textContent = `本次申报工作量：${diff} 天`;
+       dayCount.textContent = '';
      }
-   } else {
-     warning.style.display = 'none';
-     dayCount.textContent = '';
+     return true;
    }
-   return true;
+   startInput.addEventListener('change', updateInfo);
+   endInput.addEventListener('change', updateInfo);
+   form.addEventListener('submit', function(e){
+     if(!updateInfo()){
+       e.preventDefault();
+     }
+   });
  }
- startInput.addEventListener('change', updateInfo);
- endInput.addEventListener('change', updateInfo);
- form.addEventListener('submit', function(e){
-   if(!updateInfo()){
-     e.preventDefault();
-   }
- });
  </script>
 <?php endif; ?>
 <script src="team_name.js"></script>
