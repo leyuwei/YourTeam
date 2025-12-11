@@ -362,6 +362,7 @@ include 'header.php';
 <script>
 const rangeForm = document.getElementById('workloadForm');
 rangeForm.addEventListener('submit', function(e){
+  refreshCategorySummary();
   const startField = rangeForm.querySelector('input[name="start"]').value;
   const endField = rangeForm.querySelector('input[name="end"]').value;
   if(startField && endField && new Date(endField) <= new Date(startField)){
@@ -466,11 +467,13 @@ function buildExportUrl(base){
 }
 document.getElementById('exportBtn')?.addEventListener('click',function(e){
   e.preventDefault();
+  refreshCategorySummary();
   this.href = buildExportUrl('workload.php') + '&export=1';
   window.location.href = this.href;
 });
 document.getElementById('exportTxtBtn')?.addEventListener('click',function(e){
   e.preventDefault();
+  refreshCategorySummary();
   this.href = buildExportUrl('workload.php') + '&export_txt=1';
   window.location.href = this.href;
 });
