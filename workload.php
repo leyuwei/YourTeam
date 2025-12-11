@@ -16,160 +16,173 @@ $summaryCards = ['total_days'=>0,'member_count'=>0,'category_variety'=>0];
 $error = '';
 
 $hasTaskCategory = false;
-$categoryColumnCheck = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'tasks' AND column_name = 'category'");
-$categoryColumnCheck->execute();
-$hasTaskCategory = $categoryColumnCheck->fetchColumn() > 0;
-$categoryLabelSql = $hasTaskCategory ? "COALESCE(NULLIF(t.category, ''), t.title)" : "t.title";
-$categoryLabelAlias = $hasTaskCategory ? 'task_category' : 'task_title_as_category';
+$categoryLabelSql = "t.title";
+$categoryLabelAlias = 'task_title_as_category';
+$taskCatalog = [];
+try {
+    $categoryColumnCheck = $pdo->query("SHOW COLUMNS FROM tasks LIKE 'category'");
+    $hasTaskCategory = $categoryColumnCheck && $categoryColumnCheck->rowCount() > 0;
+    $categoryLabelSql = $hasTaskCategory ? "COALESCE(NULLIF(t.category, ''), t.title)" : "t.title";
+    $categoryLabelAlias = $hasTaskCategory ? 'task_category' : 'task_title_as_category';
 
-$taskCatalogStmt = $pdo->query("SELECT id, title, {$categoryLabelSql} AS {$categoryLabelAlias} FROM tasks ORDER BY {$categoryLabelAlias} ASC, title ASC");
-$taskCatalog = $taskCatalogStmt->fetchAll();
+    $taskCatalogStmt = $pdo->query("SELECT id, title, {$categoryLabelSql} AS {$categoryLabelAlias} FROM tasks ORDER BY {$categoryLabelAlias} ASC, title ASC");
+    $taskCatalog = $taskCatalogStmt->fetchAll();
+} catch(PDOException $e){
+    $error = 'workload.error.db';
+}
 
 if($start && $end){
     if(strtotime($end) <= strtotime($start)){
         $error = 'workload.error.range';
     } else {
-        $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited'")->fetchAll();
-        foreach($members as $m){
-            $total_task = 0;
-            $task_hours = [];
-            $task_categories = [];
-            $params = [$m['id'],$end,$start];
-            $categoryWhere = '';
-            if($selectedCategories){
-                $placeholders = implode(',', array_fill(0, count($selectedCategories), '?'));
-                $categoryWhere = " AND t.id IN ({$placeholders})";
-                $params = array_merge($params, $selectedCategories);
-            }
-            $stmt = $pdo->prepare("SELECT t.id AS task_id, t.title, {$categoryLabelSql} AS category_label, a.description, a.start_time, a.end_time FROM task_affairs a JOIN task_affair_members am ON a.id=am.affair_id JOIN tasks t ON a.task_id=t.id WHERE am.member_id=? AND a.start_time < ? AND a.end_time > ? AND a.status=\"confirmed\"{$categoryWhere}");
-            $stmt->execute($params);
-            foreach($stmt as $row){
-                $join = max($row['start_time'],$start);
-                $exit = min($row['end_time'],$end);
-                if(strtotime($exit) > strtotime($join)){
-                    $seconds = strtotime($exit) - strtotime($join);
-                    $categoryKey = $row['category_label'] ?: $row['title'];
-                    $key = $row['title'].' - '.$row['description'];
-                    $task_hours[$key] = ($task_hours[$key] ?? 0) + $seconds;
-                    $task_categories[$categoryKey] = ($task_categories[$categoryKey] ?? 0) + $seconds;
-                    $total_task += $seconds;
-                    if(!isset($categoryReport[$categoryKey])){
-                        $categoryReport[$categoryKey] = [];
+        try {
+            $members = $pdo->query("SELECT id, campus_id, name FROM members WHERE status != 'exited'")->fetchAll();
+            foreach($members as $m){
+                $total_task = 0;
+                $task_hours = [];
+                $task_categories = [];
+                $params = [$m['id'],$end,$start];
+                $categoryWhere = '';
+                if($selectedCategories){
+                    $placeholders = implode(',', array_fill(0, count($selectedCategories), '?'));
+                    $categoryWhere = " AND t.id IN ({$placeholders})";
+                    $params = array_merge($params, $selectedCategories);
+                }
+                $stmt = $pdo->prepare("SELECT t.id AS task_id, t.title, {$categoryLabelSql} AS category_label, a.description, a.start_time, a.end_time FROM task_affairs a JOIN task_affair_members am ON a.id=am.affair_id JOIN tasks t ON a.task_id=t.id WHERE am.member_id=? AND a.start_time < ? AND a.end_time > ? AND a.status='confirmed'{$categoryWhere}");
+                $stmt->execute($params);
+                foreach($stmt as $row){
+                    $join = max($row['start_time'],$start);
+                    $exit = min($row['end_time'],$end);
+                    if(strtotime($exit) > strtotime($join)){
+                        $seconds = strtotime($exit) - strtotime($join);
+                        $categoryKey = $row['category_label'] ?: $row['title'];
+                        $key = $row['title'].' - '.$row['description'];
+                        $task_hours[$key] = ($task_hours[$key] ?? 0) + $seconds;
+                        $task_categories[$categoryKey] = ($task_categories[$categoryKey] ?? 0) + $seconds;
+                        $total_task += $seconds;
+                        if(!isset($categoryReport[$categoryKey])){
+                            $categoryReport[$categoryKey] = [];
+                        }
+                        $categoryReport[$categoryKey][$m['name']] = ($categoryReport[$categoryKey][$m['name']] ?? 0) + $seconds;
                     }
-                    $categoryReport[$categoryKey][$m['name']] = ($categoryReport[$categoryKey][$m['name']] ?? 0) + $seconds;
                 }
-            }
-            $tasks = [];
-            foreach($task_hours as $key=>$sec){
-                $tasks[] = ['key'=>$key,'days'=>round($sec/86400,2)];
-            }
-            $categoryTotals = [];
-            foreach($task_categories as $cat=>$sec){
-                $categoryTotals[$cat] = round($sec/86400,2);
-            }
-
-            $memberTotalDays = round($total_task/86400,2);
-            $summaryCards['total_days'] += $memberTotalDays;
-
-            $report[] = [
-                'campus_id'=>$m['campus_id'],
-                'name'=>$m['name'],
-                'tasks'=>$tasks,
-                'categories'=>$categoryTotals,
-                'category_count'=>count($categoryTotals),
-                'task_total'=>round($total_task/86400,2),
-                'total_hours'=>round($total_task/86400,2)
-            ];
-        }
-        $summaryCards['member_count'] = count($report);
-        $summaryCards['category_variety'] = count(array_keys($categoryReport));
-
-        $sorter = function($a,$b) use ($sortKeys){
-            $map = [
-                'total_desc'=>function($x,$y){ return $y['total_hours'] <=> $x['total_hours']; },
-                'total_asc'=>function($x,$y){ return $x['total_hours'] <=> $y['total_hours']; },
-                'categories_desc'=>function($x,$y){ return $y['category_count'] <=> $x['category_count']; },
-                'categories_asc'=>function($x,$y){ return $x['category_count'] <=> $y['category_count']; },
-                'name_asc'=>function($x,$y){ return strcmp($x['name'],$y['name']); },
-                'name_desc'=>function($x,$y){ return strcmp($y['name'],$x['name']); },
-            ];
-            foreach($sortKeys as $key){
-                if(!isset($map[$key])) continue;
-                $cmp = $map[$key]($a,$b);
-                if($cmp !== 0) return $cmp;
-            }
-            return strcmp($a['name'],$b['name']);
-        };
-        usort($report, $sorter);
-        foreach($report as $i=>$r){
-            $report[$i]['rank'] = $i + 1;
-        }
-        if(isset($_GET['export_txt'])){
-            header('Content-Type: text/plain; charset=UTF-8');
-            header('Content-Disposition: attachment; filename="workload.txt"');
-            echo "\xEF\xBB\xBF";
-            $labels = [
-                'en'=>[
-                    'title'=>'Workload Report',
-                    'range'=>'Date Range',
-                    'category'=>'Category',
-                    'member'=>'Member',
-                    'days'=>'days',
-                    'empty'=>'No workload records in this range.',
-                ],
-                'zh'=>[
-                    'title'=>'工作量报表',
-                    'range'=>'统计区间',
-                    'category'=>'任务类别',
-                    'member'=>'成员',
-                    'days'=>'天',
-                    'empty'=>'该时间范围内暂无工作量记录。',
-                ]
-            ];
-            $lines = [];
-            $lines[] = $labels[$lang]['title'];
-            $lines[] = $labels[$lang]['range'] . ": {$start} ~ {$end}";
-            if(!$categoryReport){
-                $lines[] = $labels[$lang]['empty'];
-            }
-            ksort($categoryReport);
-            foreach($categoryReport as $cat=>$entries){
-                $lines[] = "";
-                $lines[] = "# " . $labels[$lang]['category'] . ': ' . $cat;
-                arsort($entries);
-                foreach($entries as $memberName=>$seconds){
-                    $lines[] = "- " . $labels[$lang]['member'] . " " . $memberName . " (" . round($seconds/86400,2) . " " . $labels[$lang]['days'] . ")";
+                $tasks = [];
+                foreach($task_hours as $key=>$sec){
+                    $tasks[] = ['key'=>$key,'days'=>round($sec/86400,2)];
                 }
-            }
-            echo implode("\n", $lines);
-            exit();
-        }
-        if(isset($_GET['export'])){
-            header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
-            header('Content-Disposition: attachment; filename="workload.xls"');
-            echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
-            $labels = [
-                'en'=>['rank'=>'Rank','campus_id'=>'Campus ID','name'=>'Name','tasks'=>'Tasks','hours'=>'Task Days','categories'=>'Task Categories'],
-                'zh'=>['rank'=>'排名','campus_id'=>'一卡通号','name'=>'姓名','tasks'=>'具体任务','hours'=>'任务投入天数','categories'=>'参与任务类别数']
-            ];
-            echo "<table border='1'>";
-            echo "<tr><th>".$labels[$lang]['rank']."</th><th>".$labels[$lang]['campus_id']."</th><th>".$labels[$lang]['name']."</th><th>".$labels[$lang]['tasks']."</th><th>".$labels[$lang]['categories']."</th><th>".$labels[$lang]['hours']."</th></tr>";
-            foreach($report as $r){
-                echo "<tr>";
-                echo "<td>".htmlspecialchars($r['rank'])."</td>";
-                echo "<td>".htmlspecialchars($r['campus_id'])."</td>";
-                echo "<td>".htmlspecialchars($r['name'])."</td>";
-                echo "<td>";
-                foreach($r['tasks'] as $t){
-                    echo htmlspecialchars($t['key'])." (".htmlspecialchars($t['days'])."d)<br>";
+                $categoryTotals = [];
+                foreach($task_categories as $cat=>$sec){
+                    $categoryTotals[$cat] = round($sec/86400,2);
                 }
-                echo "</td>";
-                echo "<td>".htmlspecialchars($r['category_count'])."</td>";
-                echo "<td>".htmlspecialchars($r['task_total'])."</td>";
-                echo "</tr>";
+
+                $memberTotalDays = round($total_task/86400,2);
+                $summaryCards['total_days'] += $memberTotalDays;
+
+                $report[] = [
+                    'campus_id'=>$m['campus_id'],
+                    'name'=>$m['name'],
+                    'tasks'=>$tasks,
+                    'categories'=>$categoryTotals,
+                    'category_count'=>count($categoryTotals),
+                    'task_total'=>round($total_task/86400,2),
+                    'total_hours'=>round($total_task/86400,2)
+                ];
             }
-            echo "</table>";
-            exit();
+            $summaryCards['member_count'] = count($report);
+            $summaryCards['category_variety'] = count(array_keys($categoryReport));
+
+            $sorter = function($a,$b) use ($sortKeys){
+                $map = [
+                    'total_desc'=>function($x,$y){ return $y['total_hours'] <=> $x['total_hours']; },
+                    'total_asc'=>function($x,$y){ return $x['total_hours'] <=> $y['total_hours']; },
+                    'categories_desc'=>function($x,$y){ return $y['category_count'] <=> $x['category_count']; },
+                    'categories_asc'=>function($x,$y){ return $x['category_count'] <=> $y['category_count']; },
+                    'name_asc'=>function($x,$y){ return strcmp($x['name'],$y['name']); },
+                    'name_desc'=>function($x,$y){ return strcmp($y['name'],$x['name']); },
+                ];
+                foreach($sortKeys as $key){
+                    if(!isset($map[$key])) continue;
+                    $cmp = $map[$key]($a,$b);
+                    if($cmp !== 0) return $cmp;
+                }
+                return strcmp($a['name'],$b['name']);
+            };
+            usort($report, $sorter);
+            foreach($report as $i=>$r){
+                $report[$i]['rank'] = $i + 1;
+            }
+            if(isset($_GET['export_txt'])){
+                header('Content-Type: text/plain; charset=UTF-8');
+                header('Content-Disposition: attachment; filename="workload.txt"');
+                echo "\xEF\xBB\xBF";
+                $labels = [
+                    'en'=>[
+                        'title'=>'Workload Report',
+                        'range'=>'Date Range',
+                        'category'=>'Category',
+                        'member'=>'Member',
+                        'days'=>'days',
+                        'empty'=>'No workload records in this range.',
+                    ],
+                    'zh'=>[
+                        'title'=>'工作量报表',
+                        'range'=>'统计区间',
+                        'category'=>'任务类别',
+                        'member'=>'成员',
+                        'days'=>'天',
+                        'empty'=>'该时间范围内暂无工作量记录。',
+                    ]
+                ];
+                $lines = [];
+                $lines[] = $labels[$lang]['title'];
+                $lines[] = $labels[$lang]['range'] . ": {$start} ~ {$end}";
+                if(!$categoryReport){
+                    $lines[] = $labels[$lang]['empty'];
+                }
+                ksort($categoryReport);
+                foreach($categoryReport as $cat=>$entries){
+                    $lines[] = "";
+                    $lines[] = "# " . $labels[$lang]['category'] . ': ' . $cat;
+                    arsort($entries);
+                    foreach($entries as $memberName=>$seconds){
+                        $lines[] = "- " . $labels[$lang]['member'] . " " . $memberName . " (" . round($seconds/86400,2) . " " . $labels[$lang]['days'] . ")";
+                    }
+                }
+                echo implode("\n", $lines);
+                exit();
+            }
+            if(isset($_GET['export'])){
+                header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+                header('Content-Disposition: attachment; filename="workload.xls"');
+                echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
+                $labels = [
+                    'en'=>['rank'=>'Rank','campus_id'=>'Campus ID','name'=>'Name','tasks'=>'Tasks','hours'=>'Task Days','categories'=>'Task Categories'],
+                    'zh'=>['rank'=>'排名','campus_id'=>'一卡通号','name'=>'姓名','tasks'=>'具体任务','hours'=>'任务投入天数','categories'=>'参与任务类别数']
+                ];
+                echo "<table border='1'>";
+                echo "<tr><th>".$labels[$lang]['rank']."</th><th>".$labels[$lang]['campus_id']."</th><th>".$labels[$lang]['name']."</th><th>".$labels[$lang]['tasks']."</th><th>".$labels[$lang]['categories']."</th><th>".$labels[$lang]['hours']."</th></tr>";
+                foreach($report as $r){
+                    echo "<tr>";
+                    echo "<td>".htmlspecialchars($r['rank'])."</td>";
+                    echo "<td>".htmlspecialchars($r['campus_id'])."</td>";
+                    echo "<td>".htmlspecialchars($r['name'])."</td>";
+                    echo "<td>";
+                    foreach($r['tasks'] as $t){
+                        echo htmlspecialchars($t['key'])." (".htmlspecialchars($t['days'])."d)<br>";
+                    }
+                    echo "</td>";
+                    echo "<td>".htmlspecialchars($r['category_count'])."</td>";
+                    echo "<td>".htmlspecialchars($r['task_total'])."</td>";
+                    echo "</tr>";
+                }
+                echo "</table>";
+                exit();
+            }
+        } catch(PDOException $e){
+            $error = 'workload.error.db';
+            $report = [];
+            $categoryReport = [];
+            $summaryCards = ['total_days'=>0,'member_count'=>0,'category_variety'=>0];
         }
     }
 }
