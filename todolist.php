@@ -562,7 +562,19 @@ window.addEventListener('DOMContentLoaded',()=>{
     const desiredLeft=Math.max(gap,Math.min(rect.left,maxLeft));
     suggestionBar.style.width=`${availableWidth}px`;
     suggestionBar.style.left=`${desiredLeft}px`;
-    suggestionBar.style.top=`${rect.bottom+gap}px`;
+    const maxHeight=Math.max(140,window.innerHeight-gap*2);
+    suggestionBar.style.maxHeight=`${maxHeight}px`;
+    const preferredHeight=suggestionBar.scrollHeight||0;
+    const spaceBelow=window.innerHeight-rect.bottom-gap;
+    const spaceAbove=rect.top-gap;
+    const placeAbove=preferredHeight>spaceBelow && spaceAbove>spaceBelow;
+    const constrainedHeight=Math.min(maxHeight,Math.max(120,placeAbove?spaceAbove:spaceBelow));
+    suggestionBar.style.maxHeight=`${constrainedHeight}px`;
+    const barHeight=suggestionBar.getBoundingClientRect().height||constrainedHeight;
+    const unclampedTop=placeAbove ? rect.top-barHeight-gap : rect.bottom+gap;
+    const minTop=gap;
+    const maxTop=window.innerHeight-barHeight-gap;
+    suggestionBar.style.top=`${Math.max(minTop,Math.min(unclampedTop,maxTop))}px`;
   }
 
   function showCommonSuggestionBar(input){
@@ -895,10 +907,20 @@ window.addEventListener('DOMContentLoaded',()=>{
     },undoDuration);
   }
   const multilineThreshold=48;
-  function shouldExpandMultiline(input){
+  function shouldExpandMultiline(input,{detectOverflow=false}={}){
     if(!input) return false;
     const value=String(input.value||'');
-    return value.length>multilineThreshold || value.includes('\n');
+    if(value.length>multilineThreshold || value.includes('\n')){
+      return true;
+    }
+    if(detectOverflow){
+      const client=input.clientHeight||0;
+      const scroll=input.scrollHeight||0;
+      if(scroll>client+1){
+        return true;
+      }
+    }
+    return false;
   }
   function expandMultiline(input){
     if(!input) return;
@@ -923,9 +945,9 @@ window.addEventListener('DOMContentLoaded',()=>{
       wrapper.classList.remove('is-multiline');
     }
   }
-  function adjustMultiline(input){
+  function adjustMultiline(input,{detectOverflow=false}={}){
     if(!input) return;
-    if(shouldExpandMultiline(input)){
+    if(shouldExpandMultiline(input,{detectOverflow})){
       expandMultiline(input);
     }
     if(input.dataset.multiline==='1'){
@@ -974,15 +996,18 @@ window.addEventListener('DOMContentLoaded',()=>{
       content.addEventListener('input',()=>{
         saveItem(li);
         highlightItem(content);
-        adjustMultiline(content);
+        adjustMultiline(content,{detectOverflow:true});
         if(document.activeElement===content){
           showCommonSuggestionBar(content);
         }
       });
-      content.addEventListener('focus',()=>{showCommonSuggestionBar(content);highlightItem(content);adjustMultiline(content);});
+      content.addEventListener('focus',()=>{showCommonSuggestionBar(content);highlightItem(content);adjustMultiline(content,{detectOverflow:true});});
       content.addEventListener('blur',()=>{scheduleHideSuggestionBar();collapseMultiline(content);});
     }else{
       content.setAttribute('readonly',true);
+    }
+    if(!enableEditing){
+      adjustMultiline(content,{detectOverflow:true});
     }
     li.querySelector('.item-done').addEventListener('change',()=>{saveItem(li);highlightItem(content);});
     if(enableEditing){
