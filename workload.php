@@ -4,10 +4,15 @@ $start = $_GET['start'] ?? '';
 $end = $_GET['end'] ?? '';
 $lang = $_GET['lang'] ?? 'zh';
 $selectedCategories = $_GET['categories'] ?? [];
+$selectedCategoriesState = $_GET['categories_state'] ?? '';
 if(!is_array($selectedCategories)){
     $selectedCategories = [$selectedCategories];
 }
 $selectedCategories = array_values(array_unique(array_filter(array_map('intval', $selectedCategories))));
+$selectedCategoriesFromState = array_values(array_unique(array_filter(array_map('intval', explode(',', $selectedCategoriesState)))));
+if(!$selectedCategories && $selectedCategoriesState !== ''){
+    $selectedCategories = $selectedCategoriesFromState;
+}
 $sortInput = $_GET['sort'] ?? 'total_desc';
 $sortKeys = array_values(array_filter(explode(',', $sortInput)));
 $report = [];
@@ -253,6 +258,7 @@ include 'header.php';
   </div>
   <input type="hidden" name="sort" id="sortInput" value="<?= htmlspecialchars($sortInput); ?>">
   <input type="hidden" name="lang" value="<?= htmlspecialchars($lang); ?>">
+  <input type="hidden" name="categories_state" id="categoriesState" value="<?= htmlspecialchars(implode(',', $selectedCategories)); ?>">
   <div class="col-md-12 d-flex flex-wrap gap-2 workload-toolbar">
     <button type="submit" class="btn btn-primary text-nowrap" data-i18n="workload.generate">Generate</button>
     <button type="button" class="btn btn-outline-secondary text-nowrap" id="thisMonthBtn" data-i18n="workload.quick.this_month">This Month</button>
@@ -409,6 +415,7 @@ const categorySummary = document.getElementById('categorySummary');
 const categoryOptions = Array.from(document.querySelectorAll('.category-option'));
 const categorySelectAll = document.getElementById('categorySelectAll');
 const langCode = document.documentElement.lang || 'zh';
+const categoryStateInput = document.getElementById('categoriesState');
 
 function refreshCategorySummary(){
   const t = translations[langCode] || translations['zh'];
@@ -435,6 +442,7 @@ function refreshCategorySummary(){
       categoryInputsContainer.appendChild(hidden);
     });
   }
+  categoryStateInput.value = selected.map(opt => opt.value).join(',');
 }
 
 categoryOptions.forEach(opt => {
