@@ -54,6 +54,7 @@ foreach($pending_affairs as $pending){
 <tr><th data-i18n="tasks.table_title">Title</th><th data-i18n="tasks.table_description">Description</th><th data-i18n="tasks.table_start">Start</th><th data-i18n="tasks.table_status">Status</th><th data-i18n="tasks.table_actions">Actions</th></tr>
 <?php foreach($tasks as $t): ?>
 <?php $hasPendingWorkload = !empty($pendingTaskMap[$t['id']]); ?>
+<?php $canSelfFill = $is_manager || $t['status']==='active'; ?>
 <tr<?= $hasPendingWorkload ? ' class="task-row-pending"' : ''; ?>>
   <td class="bold-target"><?= htmlspecialchars($t['title']); ?></td>
   <td><?= htmlspecialchars($t['description'] ?? ''); ?></td>
@@ -70,7 +71,11 @@ foreach($pending_affairs as $pending){
             data-i18n="tasks.action_edit">Edit</button>
     <?php endif; ?>
     <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_affairs">Affairs</a>
+    <?php if($canSelfFill): ?>
     <button type="button" class="btn btn-sm btn-info qr-btn" data-url="task_member_fill.php?task_id=<?= $t['id']; ?>" data-i18n="tasks.action_fill">Self Fill</button>
+    <?php else: ?>
+    <button type="button" class="btn btn-sm btn-info" disabled title="任务已暂停或结束，无法申报">Self Fill</button>
+    <?php endif; ?>
     <?php if($is_manager): ?>
     <a class="btn btn-sm btn-danger delete-task" href="task_delete.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_delete">Delete</a>
     <?php endif; ?>
