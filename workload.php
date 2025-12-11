@@ -25,7 +25,7 @@ try {
     $categoryLabelSql = $hasTaskCategory ? "COALESCE(NULLIF(t.category, ''), t.title)" : "t.title";
     $categoryLabelAlias = $hasTaskCategory ? 'task_category' : 'task_title_as_category';
 
-    $taskCatalogStmt = $pdo->query("SELECT id, title, {$categoryLabelSql} AS {$categoryLabelAlias} FROM tasks ORDER BY {$categoryLabelAlias} ASC, title ASC");
+    $taskCatalogStmt = $pdo->query("SELECT t.id, t.title, {$categoryLabelSql} AS {$categoryLabelAlias} FROM tasks t ORDER BY {$categoryLabelAlias} ASC, t.title ASC");
     $taskCatalog = $taskCatalogStmt->fetchAll();
 } catch(PDOException $e){
     $error = 'workload.error.db';
@@ -190,7 +190,7 @@ include 'header.php';
 ?>
 <h2 data-i18n="workload.title">Workload Report</h2>
 <?php if($error): ?><div class="alert alert-danger" data-i18n="<?= $error; ?>"></div><?php endif; ?>
-<form method="get" class="row g-3 mb-3 align-items-end" id="workloadForm">
+<form method="get" class="row g-3 mb-3 align-items-start" id="workloadForm">
   <div class="col-md-3">
     <label class="form-label" data-i18n="workload.label.start">Start Date</label>
     <input type="date" name="start" class="form-control" value="<?= htmlspecialchars($start); ?>" required>
