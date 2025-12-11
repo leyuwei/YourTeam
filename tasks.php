@@ -51,11 +51,12 @@ foreach($pending_affairs as $pending){
 </div>
 <?php endif; ?>
 <table class="table table-bordered">
-<tr><th data-i18n="tasks.table_title">Title</th><th data-i18n="tasks.table_start">Start</th><th data-i18n="tasks.table_status">Status</th><th data-i18n="tasks.table_actions">Actions</th></tr>
+<tr><th data-i18n="tasks.table_title">Title</th><th data-i18n="tasks.table_description">Description</th><th data-i18n="tasks.table_start">Start</th><th data-i18n="tasks.table_status">Status</th><th data-i18n="tasks.table_actions">Actions</th></tr>
 <?php foreach($tasks as $t): ?>
 <?php $hasPendingWorkload = !empty($pendingTaskMap[$t['id']]); ?>
 <tr<?= $hasPendingWorkload ? ' class="task-row-pending"' : ''; ?>>
   <td class="bold-target"><?= htmlspecialchars($t['title']); ?></td>
+  <td><?= htmlspecialchars($t['description'] ?? ''); ?></td>
   <td><?= htmlspecialchars($t['start_date']); ?></td>
   <td data-i18n="tasks.status.<?= htmlspecialchars($t['status']); ?>"><?= htmlspecialchars($t['status']); ?></td>
   <td>
