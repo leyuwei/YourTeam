@@ -190,6 +190,26 @@ include 'header.php';
 ?>
 <h2 data-i18n="workload.title">Workload Report</h2>
 <?php if($error): ?><div class="alert alert-danger" data-i18n="<?= $error; ?>"></div><?php endif; ?>
+<style>
+  .category-summary-box {
+    min-height: 38px;
+  }
+  .category-summary-box .badge {
+    font-size: 0.85rem;
+  }
+  .category-list-scroll {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .category-trigger {
+    width: 100%;
+  }
+  .workload-toolbar .btn,
+  .workload-toolbar .form-control,
+  .workload-toolbar .form-select {
+    white-space: nowrap;
+  }
+</style>
 <form method="get" class="row g-3 mb-3 align-items-start" id="workloadForm">
   <div class="col-md-3">
     <label class="form-label" data-i18n="workload.label.start">Start Date</label>
@@ -201,13 +221,12 @@ include 'header.php';
   </div>
   <div class="col-md-3">
     <label class="form-label" data-i18n="workload.label.category_filter">Task Categories</label>
-    <select name="categories[]" class="form-select" multiple size="4">
-      <?php foreach($taskCatalog as $task): ?>
-        <?php $label = $task[$categoryLabelAlias]; ?>
-        <option value="<?= $task['id']; ?>" <?= in_array((int)$task['id'],$selectedCategories)?'selected':''; ?>><?= htmlspecialchars($label ?: $task['title']); ?></option>
-      <?php endforeach; ?>
-    </select>
-    <div class="form-text" data-i18n="workload.label.category_hint">Hold Ctrl/Cmd to multi-select.</div>
+    <button type="button" class="btn btn-outline-primary category-trigger text-nowrap" data-bs-toggle="modal" data-bs-target="#categoryModal" data-i18n="workload.category.select">Select Categories</button>
+    <div class="category-summary-box mt-2">
+      <div id="categorySummary" class="text-muted small" data-i18n="workload.category.all">All categories included</div>
+      <div id="categoryBadges" class="d-flex flex-wrap gap-1 mt-1"></div>
+    </div>
+    <div id="categoryInputs"></div>
   </div>
   <div class="col-md-3">
     <label class="form-label" data-i18n="workload.sort.title">Sort Priority</label>
@@ -234,20 +253,49 @@ include 'header.php';
   </div>
   <input type="hidden" name="sort" id="sortInput" value="<?= htmlspecialchars($sortInput); ?>">
   <input type="hidden" name="lang" value="<?= htmlspecialchars($lang); ?>">
-  <div class="col-md-12 d-flex flex-wrap gap-2">
-    <button type="submit" class="btn btn-primary" data-i18n="workload.generate">Generate</button>
-    <button type="button" class="btn btn-outline-secondary" id="thisMonthBtn" data-i18n="workload.quick.this_month">This Month</button>
-    <button type="button" class="btn btn-outline-secondary" id="lastMonthBtn" data-i18n="workload.quick.last_month">Last Month</button>
+  <div class="col-md-12 d-flex flex-wrap gap-2 workload-toolbar">
+    <button type="submit" class="btn btn-primary text-nowrap" data-i18n="workload.generate">Generate</button>
+    <button type="button" class="btn btn-outline-secondary text-nowrap" id="thisMonthBtn" data-i18n="workload.quick.this_month">This Month</button>
+    <button type="button" class="btn btn-outline-secondary text-nowrap" id="lastMonthBtn" data-i18n="workload.quick.last_month">Last Month</button>
     <div class="d-flex align-items-center gap-2">
       <input type="month" class="form-control" id="monthPicker">
-      <button type="button" class="btn btn-outline-info" id="applyMonthBtn" data-i18n="workload.quick.pick_month">Apply</button>
+      <button type="button" class="btn btn-outline-info text-nowrap" id="applyMonthBtn" data-i18n="workload.quick.pick_month">Apply</button>
     </div>
     <?php if($report): ?>
-    <a class="btn btn-success" id="exportBtn" href="#" data-i18n="workload.export">Export to EXCEL</a>
-    <a class="btn btn-dark" id="exportTxtBtn" href="#" data-i18n="workload.export_txt">Export to TXT</a>
+    <a class="btn btn-success text-nowrap" id="exportBtn" href="#" data-i18n="workload.export">Export to EXCEL</a>
+    <a class="btn btn-dark text-nowrap" id="exportTxtBtn" href="#" data-i18n="workload.export_txt">Export to TXT</a>
     <?php endif; ?>
   </div>
 </form>
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" data-i18n="workload.category.modal_title">Choose Task Categories</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="categorySelectAll">
+          <label class="form-check-label" for="categorySelectAll" data-i18n="workload.category.select_all">Select all categories</label>
+        </div>
+        <div class="category-list-scroll border rounded p-2">
+          <?php foreach($taskCatalog as $task): ?>
+            <?php $label = $task[$categoryLabelAlias]; ?>
+            <div class="form-check mb-1">
+              <input class="form-check-input category-option" type="checkbox" value="<?= $task['id']; ?>" id="cat<?= $task['id']; ?>" data-label="<?= htmlspecialchars($label ?: $task['title']); ?>" <?= in_array((int)$task['id'],$selectedCategories)?'checked':''; ?>>
+              <label class="form-check-label" for="cat<?= $task['id']; ?>"><?= htmlspecialchars($label ?: $task['title']); ?></label>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary text-nowrap" data-bs-dismiss="modal" data-i18n="workload.category.cancel">Cancel</button>
+        <button type="button" class="btn btn-primary text-nowrap" id="saveCategories" data-i18n="workload.category.apply">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
 <?php if($report): ?>
 <div class="row g-3 mb-3">
   <div class="col-md-4">
@@ -353,6 +401,62 @@ function syncSortInput(){
 document.getElementById('primarySort').addEventListener('change', syncSortInput);
 document.getElementById('secondarySort').addEventListener('change', syncSortInput);
 syncSortInput();
+
+const categoryInputsContainer = document.getElementById('categoryInputs');
+const categoryBadges = document.getElementById('categoryBadges');
+const categorySummary = document.getElementById('categorySummary');
+const categoryOptions = Array.from(document.querySelectorAll('.category-option'));
+const categorySelectAll = document.getElementById('categorySelectAll');
+const langCode = document.documentElement.lang || 'zh';
+
+function refreshCategorySummary(){
+  const t = translations[langCode] || translations['zh'];
+  categoryInputsContainer.innerHTML = '';
+  categoryBadges.innerHTML = '';
+  const selected = categoryOptions.filter(opt => opt.checked);
+  const isAll = selected.length === 0 || selected.length === categoryOptions.length;
+  categorySelectAll.checked = isAll;
+  if(isAll){
+    categorySummary.textContent = t['workload.category.all'];
+  } else {
+    categorySummary.textContent = (t['workload.category.some'] || '').replace('%d', selected.length);
+  }
+  if(!isAll){
+    selected.forEach(opt => {
+      const badge = document.createElement('span');
+      badge.className = 'badge bg-light text-dark border';
+      badge.textContent = opt.dataset.label;
+      categoryBadges.appendChild(badge);
+      const hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'categories[]';
+      hidden.value = opt.value;
+      categoryInputsContainer.appendChild(hidden);
+    });
+  }
+}
+
+categoryOptions.forEach(opt => {
+  opt.addEventListener('change', () => {
+    const total = categoryOptions.length;
+    const selectedCount = categoryOptions.filter(o => o.checked).length;
+    categorySelectAll.checked = selectedCount === total;
+  });
+});
+
+categorySelectAll?.addEventListener('change', () => {
+  categoryOptions.forEach(opt => opt.checked = categorySelectAll.checked);
+});
+
+document.getElementById('saveCategories')?.addEventListener('click', () => {
+  refreshCategorySummary();
+  if(window.bootstrap){
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('categoryModal'));
+    modal.hide();
+  }
+});
+
+refreshCategorySummary();
 
 function buildExportUrl(base){
   const params = new URLSearchParams(new FormData(rangeForm));
