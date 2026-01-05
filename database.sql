@@ -314,3 +314,24 @@ CREATE TABLE IF NOT EXISTS askme_entries (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+CREATE TABLE `collect_templates` (
+  `id` int NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `description` text,
+  `status` enum('open','paused','ended','void') NOT NULL DEFAULT 'open',
+  `deadline` date DEFAULT NULL,
+  `fields_json` longtext NOT NULL,
+  `target_member_ids` longtext,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `collect_submissions` (
+  `id` int NOT NULL,
+  `template_id` int NOT NULL,
+  `member_id` int NOT NULL,
+  `data_json` longtext,
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
