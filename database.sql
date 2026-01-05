@@ -8,8 +8,8 @@ CREATE TABLE managers (
 );
 
 INSERT INTO managers (username,password) VALUES
-('manager1','$2y$12$sCJV4OxoRqqaBtDDLnd07OlvqIoO9L4/zSO9PwzgeZaFXqxoU5fcy'),
-('manager2','$2y$12$sCJV4OxoRqqaBtDDLnd07OlvqIoO9L4/zSO9PwzgeZaFXqxoU5fcy');
+('manager1','$2y$10$ssxfYeg9c/nGT384QwINpO0LFwrgs1k33I8wh.t73IVeH8GFHxen6'), # PWD is NewPass#2026!
+('manager2','$2y$10$ssxfYeg9c/nGT384QwINpO0LFwrgs1k33I8wh.t73IVeH8GFHxen6'); # PWD is NewPass#2026!
 
 CREATE TABLE members (
   id INT AUTO_INCREMENT PRIMARY KEY,
