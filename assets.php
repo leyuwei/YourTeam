@@ -1302,8 +1302,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 if (!$is_manager) {
                     $inboundId = (int)$existing['inbound_order_id'];
-                    $category = $existing['category'];
-                    $model = $existing['model'];
                 }
                 $update = $pdo->prepare('UPDATE assets SET inbound_order_id=?, asset_code=?, category=?, model=?, organization=?, remarks=?, current_office_id=?, current_seat_id=?, owner_member_id=?, owner_external_name=?, status=?, updated_at=NOW() WHERE id=?');
                 try {
@@ -1419,7 +1417,7 @@ if (!$is_manager && $member_id) {
     $params[] = 'pending';
     $params[] = 'lost';
 }
-$assetQuery .= ' ORDER BY io.arrival_date DESC, a.id DESC';
+$assetQuery .= ' ORDER BY a.created_at DESC, a.id DESC';
 $stmt = $pdo->prepare($assetQuery);
 $stmt->execute($params);
 $assets = $stmt->fetchAll();
@@ -1533,18 +1531,18 @@ function render_asset_table_header(bool $is_manager): void {
     <thead class="table-light">
       <tr>
         <?php if ($is_manager): ?>
-        <th data-i18n="assets.table.order_number">Order #</th>
+        <th class="asset-sortable" data-sort-key="order_number" data-sort-type="text" data-i18n="assets.table.order_number" data-i18n-title="assets.table.sort_hint" title="Click to sort">Order #</th>
         <?php endif; ?>
-        <th data-i18n="assets.table.asset_code">Asset Code</th>
-        <th data-i18n="assets.table.category">Category</th>
-        <th data-i18n="assets.table.model">Model</th>
-        <th data-i18n="assets.table.organization">Owning Unit</th>
-        <th data-i18n="assets.table.remarks">Remarks</th>
-        <th data-i18n="assets.table.location">Location</th>
-        <th data-i18n="assets.table.owner">Responsible</th>
-        <th data-i18n="assets.table.status">Status</th>
+        <th class="asset-sortable" data-sort-key="asset_code" data-sort-type="text" data-i18n="assets.table.asset_code" data-i18n-title="assets.table.sort_hint" title="Click to sort">Asset Code</th>
+        <th class="asset-sortable" data-sort-key="category" data-sort-type="text" data-i18n="assets.table.category" data-i18n-title="assets.table.sort_hint" title="Click to sort">Category</th>
+        <th class="asset-sortable" data-sort-key="model" data-sort-type="text" data-i18n="assets.table.model" data-i18n-title="assets.table.sort_hint" title="Click to sort">Model</th>
+        <th class="asset-sortable" data-sort-key="organization" data-sort-type="text" data-i18n="assets.table.organization" data-i18n-title="assets.table.sort_hint" title="Click to sort">Owning Unit</th>
+        <th class="asset-sortable" data-sort-key="remarks" data-sort-type="text" data-i18n="assets.table.remarks" data-i18n-title="assets.table.sort_hint" title="Click to sort">Remarks</th>
+        <th class="asset-sortable" data-sort-key="location" data-sort-type="text" data-i18n="assets.table.location" data-i18n-title="assets.table.sort_hint" title="Click to sort">Location</th>
+        <th class="asset-sortable" data-sort-key="owner" data-sort-type="text" data-i18n="assets.table.owner" data-i18n-title="assets.table.sort_hint" title="Click to sort">Responsible</th>
+        <th class="asset-sortable" data-sort-key="status" data-sort-type="text" data-i18n="assets.table.status" data-i18n-title="assets.table.sort_hint" title="Click to sort">Status</th>
         <th data-i18n="assets.table.image">Photo</th>
-        <th data-i18n="assets.table.updated_at">Updated</th>
+        <th class="asset-sortable" data-sort-key="updated_at" data-sort-type="date" data-i18n="assets.table.updated_at" data-i18n-title="assets.table.sort_hint" title="Click to sort">Updated</th>
         <th data-i18n="assets.table.actions">Actions</th>
       </tr>
     </thead>
@@ -2325,6 +2323,22 @@ include 'header.php';
   .asset-stats .stats-value {
     font-size: 1.5rem;
     font-weight: 600;
+  }
+  .asset-sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  .asset-sortable::after {
+    content: '↕';
+    font-size: 0.75rem;
+    margin-left: 0.35rem;
+    color: var(--app-muted-text);
+  }
+  .asset-sortable[data-sort-state="asc"]::after {
+    content: '↑';
+  }
+  .asset-sortable[data-sort-state="desc"]::after {
+    content: '↓';
   }
   .highlight-delete {
     animation: highlightFlash 1s ease-in-out 2;
@@ -3559,8 +3573,6 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
         }
         if (role === 'member' && assetInboundField && assetInboundField.tagName === 'SELECT') {
           assetInboundField.disabled = true;
-          document.getElementById('asset-category').readOnly = true;
-          document.getElementById('asset-model').readOnly = true;
           if (assetCodeSuffixInput) {
             assetCodeSuffixInput.readOnly = true;
           }
@@ -3700,6 +3712,96 @@ const assetSyncInitialMapping = <?= json_encode($assetSyncMapping, JSON_UNESCAPE
     targetRow.addEventListener('animationend', removeHighlight);
     setTimeout(removeHighlight, 1600);
   }
+
+  function parseSortableValue(cell, type) {
+    if (!cell) {
+      return type === 'number' || type === 'date' ? null : '';
+    }
+    const raw = (cell.getAttribute('data-sort-value') || cell.textContent || '').replace(/\s+/g, ' ').trim();
+    if (raw === '' || raw === '-') {
+      return type === 'number' || type === 'date' ? null : '';
+    }
+    if (type === 'number') {
+      const parsed = parseFloat(raw.replace(/,/g, ''));
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    if (type === 'date') {
+      const parsed = Date.parse(raw);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return raw.toLowerCase();
+  }
+
+  function updateSortHeaderTitle(header, state) {
+    const key = state === 'asc'
+      ? 'assets.table.sort_asc'
+      : state === 'desc'
+        ? 'assets.table.sort_desc'
+        : 'assets.table.sort_hint';
+    header.setAttribute('data-i18n-title', key);
+    header.setAttribute('title', translate(getLang(), key, header.getAttribute('title') || ''));
+  }
+
+  function setupAssetTableSorting() {
+    const tables = document.querySelectorAll('table[data-asset-inventory="1"]');
+    tables.forEach(table => {
+      const headers = Array.from(table.querySelectorAll('th.asset-sortable'));
+      const tbody = table.querySelector('tbody');
+      if (!headers.length || !tbody) {
+        return;
+      }
+      headers.forEach(header => {
+        updateSortHeaderTitle(header, '');
+        header.addEventListener('click', () => {
+          const rows = Array.from(tbody.querySelectorAll('tr.asset-row'));
+          if (!rows.length) {
+            return;
+          }
+          const currentState = header.getAttribute('data-sort-state');
+          const nextState = currentState === 'asc' ? 'desc' : 'asc';
+          headers.forEach(other => {
+            other.removeAttribute('data-sort-state');
+            updateSortHeaderTitle(other, '');
+          });
+          header.setAttribute('data-sort-state', nextState);
+          updateSortHeaderTitle(header, nextState);
+          const columnIndex = header.cellIndex;
+          const sortType = header.getAttribute('data-sort-type') || 'text';
+          const decorated = rows.map((row, index) => ({
+            row,
+            index,
+            value: parseSortableValue(row.cells[columnIndex], sortType)
+          }));
+          decorated.sort((a, b) => {
+            if (a.value === null && b.value === null) {
+              return a.index - b.index;
+            }
+            if (a.value === null) {
+              return 1;
+            }
+            if (b.value === null) {
+              return -1;
+            }
+            if (sortType === 'number' || sortType === 'date') {
+              const diff = a.value - b.value;
+              return diff === 0 ? a.index - b.index : diff;
+            }
+            const result = String(a.value).localeCompare(String(b.value), undefined, { numeric: true, sensitivity: 'base' });
+            return result === 0 ? a.index - b.index : result;
+          });
+          if (nextState === 'desc') {
+            decorated.reverse();
+          }
+          decorated.forEach(item => {
+            tbody.appendChild(item.row);
+          });
+          applyTranslationsSafe();
+        });
+      });
+    });
+  }
+
+  setupAssetTableSorting();
 
   const assetFocusTriggers = document.querySelectorAll('.asset-focus-trigger[data-asset-id]');
   assetFocusTriggers.forEach(trigger => {
