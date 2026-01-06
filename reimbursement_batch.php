@@ -1,7 +1,6 @@
 <?php
 include 'auth.php';
 include 'reimbursement_log.php';
-include 'header.php';
 $id = (int)($_GET['id'] ?? 0);
 $stmt = $pdo->prepare("SELECT b.*, m.name AS in_charge_name FROM reimbursement_batches b LEFT JOIN members m ON b.in_charge_member_id=m.id WHERE b.id=?");
 $stmt->execute([$id]);
@@ -224,6 +223,7 @@ if($is_manager){
     $logs=$logStmt->fetchAll();
 }
 ?>
+<?php include 'header.php'; ?>
 <div class="d-flex justify-content-between mb-3">
   <h2><?= htmlspecialchars($batch['title']); ?></h2>
   <?php if($is_manager || $batch['in_charge_member_id']==$member_id): ?>
