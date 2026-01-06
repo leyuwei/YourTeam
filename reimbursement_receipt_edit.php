@@ -116,73 +116,106 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     }
 }
 include 'header.php';
+$cancel_link = $rec['status']=='refused' ? 'reimbursements.php' : 'reimbursement_batch.php?id='.$rec['batch_id'];
 ?>
-<h2 data-i18n="reimburse.batch.edit">Edit Receipt</h2>
-<form method="post" enctype="multipart/form-data">
-  <?php if($rec['status']=='refused' && !$is_manager): ?>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="reimburse.batch.file">Receipt File</label>
-    <input type="file" name="receipt" class="form-control" required>
+<div class="modal fade" id="receiptEditModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" data-i18n="reimburse.batch.edit">Edit Receipt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" enctype="multipart/form-data" id="receiptEditForm">
+          <?php if($rec['status']=='refused' && !$is_manager): ?>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.file">Receipt File</label>
+            <input type="file" name="receipt" class="form-control" required>
+          </div>
+          <?php endif; ?>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.batch">Batch</label>
+            <select name="batch_id" class="form-select" required>
+              <?php foreach($open_batches as $b): ?>
+              <option value="<?= $b['id']; ?>" <?php if($b['id']==$rec['batch_id']) echo 'selected'; ?>><?= htmlspecialchars($b['title']); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.category">Category</label>
+            <select name="category" class="form-select" required>
+              <?php foreach($currentAllowed as $t): ?>
+              <option value="<?= $t; ?>" data-i18n="reimburse.category.<?= $t; ?>" <?php if($rec['category']==$t) echo 'selected'; ?>><?= $t; ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.description">Description</label>
+            <input type="text" name="description" class="form-control" value="<?= htmlspecialchars($rec['description']); ?>" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="reimburse.batch.price">Price</label>
+            <input type="number" step="0.01" name="price" class="form-control" value="<?= htmlspecialchars($rec['price']); ?>" required>
+          </div>
+          <?php if($error=='exceed'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.limit_exceed">Price exceeds limit</div><?php endif; ?>
+          <?php if($error=='desc'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.description_required">Description required</div><?php endif; ?>
+          <?php if($error=='file'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.file_required">File required</div><?php endif; ?>
+          <?php if($error=='manager'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.manager_no_upload">Managers cannot upload receipts</div><?php endif; ?>
+          <?php if($error=='type'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.type_not_allowed">Type not allowed</div><?php endif; ?>
+          <?php if($error=='prohibited'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.prohibited">Receipt contains prohibited content</div><?php endif; ?>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary" form="receiptEditForm" data-i18n="reimburse.batch.save">Save</button>
+        <a href="<?= htmlspecialchars($cancel_link); ?>" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.cancel">Cancel</a>
+      </div>
+    </div>
   </div>
-  <?php endif; ?>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="reimburse.batch.batch">Batch</label>
-    <select name="batch_id" class="form-select" required>
-      <?php foreach($open_batches as $b): ?>
-      <option value="<?= $b['id']; ?>" <?php if($b['id']==$rec['batch_id']) echo 'selected'; ?>><?= htmlspecialchars($b['title']); ?></option>
-      <?php endforeach; ?>
-    </select>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="reimburse.batch.category">Category</label>
-    <select name="category" class="form-select" required>
-      <?php foreach($currentAllowed as $t): ?>
-      <option value="<?= $t; ?>" data-i18n="reimburse.category.<?= $t; ?>" <?php if($rec['category']==$t) echo 'selected'; ?>><?= $t; ?></option>
-      <?php endforeach; ?>
-    </select>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="reimburse.batch.description">Description</label>
-    <input type="text" name="description" class="form-control" value="<?= htmlspecialchars($rec['description']); ?>" required>
-  </div>
-  <div class="mb-3">
-    <label class="form-label" data-i18n="reimburse.batch.price">Price</label>
-    <input type="number" step="0.01" name="price" class="form-control" value="<?= htmlspecialchars($rec['price']); ?>" required>
-  </div>
-  <?php if($error=='exceed'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.limit_exceed">Price exceeds limit</div><?php endif; ?>
-  <?php if($error=='desc'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.description_required">Description required</div><?php endif; ?>
-  <?php if($error=='file'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.file_required">File required</div><?php endif; ?>
-  <?php if($error=='manager'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.manager_no_upload">Managers cannot upload receipts</div><?php endif; ?>
-  <?php if($error=='type'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.type_not_allowed">Type not allowed</div><?php endif; ?>
-  <?php if($error=='prohibited'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.prohibited">Receipt contains prohibited content</div><?php endif; ?>
-  <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.save">Save</button>
-  <?php if($rec['status']=='refused'): ?>
-  <a href="reimbursements.php" class="btn btn-secondary" data-i18n="reimburse.batch.cancel">Cancel</a>
-  <?php else: ?>
-  <a href="reimbursement_batch.php?id=<?= $rec['batch_id']; ?>" class="btn btn-secondary" data-i18n="reimburse.batch.cancel">Cancel</a>
-  <?php endif; ?>
-</form>
+</div>
 <script>
 const batchTypes = <?php echo json_encode(array_column($open_batches,'allowed_types','id')); ?>;
-const allCats=['office','electronic','membership','book','trip'];
-const catSelect=document.querySelector('select[name="category"]');
-const batchSelect=document.querySelector('select[name="batch_id"]');
+const allCats = ['office','electronic','membership','book','trip'];
+const catSelect = document.querySelector('select[name="category"]');
+const batchSelect = document.querySelector('select[name="batch_id"]');
+const fallbackCategory = '<?php echo $rec['category']; ?>';
+const modalEl = document.getElementById('receiptEditModal');
+
+const getCategoryLabel = (type) => {
+  const lang = document.documentElement.lang || 'zh';
+  const dict = window.translations?.[lang] || window.translations?.zh || {};
+  return dict['reimburse.category.' + type] || type;
+};
+
 function updateCats(){
-  let allowed=batchTypes[batchSelect.value];
-  allowed=allowed?allowed.split(','):allCats;
-  catSelect.innerHTML='';
-  allowed.forEach(t=>{
-    const opt=document.createElement('option');
-    opt.value=t;
-    opt.setAttribute('data-i18n','reimburse.category.'+t);
-    opt.textContent=translations[document.documentElement.lang||'zh']['reimburse.category.'+t];
+  if(!catSelect || !batchSelect){
+    return;
+  }
+  let allowed = batchTypes[batchSelect.value];
+  allowed = allowed ? allowed.split(',') : allCats;
+  catSelect.innerHTML = '';
+  allowed.forEach((t) => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.setAttribute('data-i18n', 'reimburse.category.' + t);
+    opt.textContent = getCategoryLabel(t);
     catSelect.appendChild(opt);
   });
-  if(allowed.includes('<?php echo $rec['category']; ?>')){
-    catSelect.value='<?php echo $rec['category']; ?>';
+  if(allowed.includes(fallbackCategory)){
+    catSelect.value = fallbackCategory;
   }
 }
-batchSelect.addEventListener('change',updateCats);
-updateCats();
+
+if(batchSelect){
+  batchSelect.addEventListener('change', updateCats);
+  updateCats();
+}
+
+if(modalEl && typeof bootstrap !== 'undefined'){
+  const modal = new bootstrap.Modal(modalEl, {backdrop: 'static'});
+  modal.show();
+  modalEl.addEventListener('hidden.bs.modal', () => {
+    window.location.href = <?= json_encode($cancel_link); ?>;
+  });
+}
 </script>
 <?php include 'footer.php'; ?>
