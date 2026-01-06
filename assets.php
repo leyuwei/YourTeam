@@ -10,6 +10,17 @@ function add_asset_log(PDO $pdo, string $targetType, int $targetId, string $oper
     $stmt->execute([$targetType, $targetId, $operatorName, $operatorRole, $action, $details]);
 }
 
+function is_asset_code_duplicate_error(Throwable $e): bool {
+    if (!$e instanceof PDOException) {
+        return false;
+    }
+    if ((string)$e->getCode() !== '23000') {
+        return false;
+    }
+    $message = $e->getMessage();
+    return stripos($message, 'asset_code') !== false || stripos($message, 'duplicate') !== false;
+}
+
 function generate_asset_code(PDO $pdo, string $prefix = ''): string {
     $defaultPrefix = 'ASSET-';
     $prefixToUse = $prefix !== '' ? $prefix : $defaultPrefix;
@@ -955,7 +966,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->beginTransaction();
             try {
-                $insert = $pdo->prepare('INSERT INTO assets (inbound_order_id, asset_code, category, model, organization, remarks, current_office_id, current_seat_id, owner_member_id, owner_external_name, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+            $insert = $pdo->prepare('INSERT INTO assets (inbound_order_id, asset_code, category, model, organization, remarks, current_office_id, current_seat_id, owner_member_id, owner_external_name, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+            try {
                 $insert->execute([
                     $inboundId,
                     $assetCode,
@@ -969,11 +981,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $ownerExternalParam,
                     $status
                 ]);
-                $newAssetId = (int)$pdo->lastInsertId();
-                $pdo->commit();
             } catch (Throwable $inner) {
-                $pdo->rollBack();
+                if (is_asset_code_duplicate_error($inner)) {
+                    throw new RuntimeException('assets.messages.asset_code_exists');
+                }
                 throw $inner;
+            }
+            $newAssetId = (int)$pdo->lastInsertId();
+            $pdo->commit();
+        } catch (Throwable $inner) {
+            $pdo->rollBack();
+            throw $inner;
             }
 
             add_asset_log($pdo, 'asset', $newAssetId, $username, $_SESSION['role'], 'Asset synced', 'Code ' . $assetCode);
@@ -1204,6 +1222,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $ownerExternalName = null;
             }
+            if (!$is_manager) {
+                if ($ownerSelection === '__external__') {
+                    throw new RuntimeException('assets.messages.owner_restricted');
+                }
+                if ($ownerId !== null && (int)$ownerId !== (int)$member_id) {
+                    throw new RuntimeException('assets.messages.owner_restricted');
+                }
+            }
             $status = $_POST['status'] ?? 'pending';
             $allowedStatus = ['in_use', 'maintenance', 'pending', 'lost', 'retired'];
             if (!in_array($status, $allowedStatus, true)) {
@@ -1280,7 +1306,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $model = $existing['model'];
                 }
                 $update = $pdo->prepare('UPDATE assets SET inbound_order_id=?, asset_code=?, category=?, model=?, organization=?, remarks=?, current_office_id=?, current_seat_id=?, owner_member_id=?, owner_external_name=?, status=?, updated_at=NOW() WHERE id=?');
-                $update->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $ownerExternalName, $status, $id]);
+                try {
+                    $update->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $ownerExternalName, $status, $id]);
+                } catch (Throwable $inner) {
+                    if (is_asset_code_duplicate_error($inner)) {
+                        throw new RuntimeException('assets.messages.asset_code_exists');
+                    }
+                    throw $inner;
+                }
                 $newPath = handle_asset_image_upload($id, $existing['image_path'], $_FILES['image'] ?? [], $errors);
                 if ($errors) {
                     throw new RuntimeException($errors[0]);
@@ -1306,9 +1339,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 add_asset_log($pdo, 'asset', $id, $username, $_SESSION['role'], 'Asset updated', implode('; ', $changes));
                 $_SESSION['asset_flash'] = ['type' => 'success', 'key' => 'assets.messages.asset_updated', 'default' => 'Asset updated successfully'];
             } else {
-                if (!$is_manager) {
-                    throw new RuntimeException('assets.messages.permission_denied');
-                }
                 $assetCode = $usePrefix
                     ? ($suffixInput === '' ? '' : $assetCodePrefix . $suffixInput)
                     : $suffixInput;
@@ -1322,7 +1352,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 $insert = $pdo->prepare('INSERT INTO assets (inbound_order_id, asset_code, category, model, organization, remarks, current_office_id, current_seat_id, owner_member_id, owner_external_name, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
-                $insert->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $ownerExternalName, $status]);
+                try {
+                    $insert->execute([$inboundId, $assetCode, $category, $model, $organization, $remarksValue, $officeId, $seatId, $ownerId, $ownerExternalName, $status]);
+                } catch (Throwable $inner) {
+                    if (is_asset_code_duplicate_error($inner)) {
+                        throw new RuntimeException('assets.messages.asset_code_exists');
+                    }
+                    throw $inner;
+                }
                 $newId = (int)$pdo->lastInsertId();
                 $newPath = handle_asset_image_upload($newId, null, $_FILES['image'] ?? [], $errors);
                 if ($errors) {
@@ -1442,9 +1479,7 @@ if ($is_manager) {
     $statusStats = $statusStmt->fetchAll();
 }
 
-$inboundOptions = $is_manager
-    ? $pdo->query('SELECT id, order_number FROM asset_inbound_orders ORDER BY arrival_date DESC, id DESC')->fetchAll()
-    : [];
+$inboundOptions = $pdo->query('SELECT id, order_number FROM asset_inbound_orders ORDER BY arrival_date DESC, id DESC')->fetchAll();
 $members = $pdo->query('SELECT id, name FROM members ORDER BY name')->fetchAll();
 $offices = $pdo->query('SELECT id, name, location_description, region FROM offices ORDER BY name')->fetchAll();
 $seats = $pdo->query('SELECT id, office_id, label FROM office_seats ORDER BY label')->fetchAll();
@@ -1737,15 +1772,15 @@ include 'header.php';
 <div class="card mb-4">
   <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <h3 class="mb-0" data-i18n="assets.list.title">Asset Inventory</h3>
-    <?php if ($is_manager): ?>
     <div class="d-flex flex-wrap gap-2">
+      <?php if ($is_manager): ?>
       <?php if ($assetSyncReady): ?>
       <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#syncAllModal" data-i18n="assets.sync_all.button">Sync All</button>
       <?php endif; ?>
       <a href="assets_export.php" class="btn btn-outline-secondary" id="exportAssets" data-i18n="assets.export">Export to Excel</a>
+      <?php endif; ?>
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assetModal" data-mode="create" data-i18n="assets.add">New Asset</button>
     </div>
-    <?php endif; ?>
   </div>
   <div class="card-body p-0">
     <?php if ($is_manager): ?>
@@ -2122,16 +2157,12 @@ include 'header.php';
     <form class="modal-content" method="post" enctype="multipart/form-data" id="assetForm">
       <input type="hidden" name="action" value="save_asset">
       <input type="hidden" name="id" id="asset-id">
-      <?php if (!$is_manager): ?>
-      <input type="hidden" name="inbound_order_id" id="asset-inbound">
-      <?php endif; ?>
       <div class="modal-header">
         <h5 class="modal-title" id="assetModalLabel" data-i18n="assets.add">New Asset</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="row g-3">
-          <?php if ($is_manager): ?>
           <div class="col-md-4">
             <label class="form-label" data-i18n="assets.form.inbound">Inbound Order</label>
             <select class="form-select" name="inbound_order_id" id="asset-inbound" required>
@@ -2141,7 +2172,6 @@ include 'header.php';
               <?php endforeach; ?>
             </select>
           </div>
-          <?php endif; ?>
           <div class="col-md-4">
             <label class="form-label" data-i18n="assets.form.asset_code">Asset Code</label>
             <div class="input-group">
@@ -2216,15 +2246,25 @@ include 'header.php';
             <label class="form-label" data-i18n="assets.form.owner">Person in Charge</label>
             <select class="form-select" name="owner_id" id="asset-owner">
               <option value="" data-i18n="assets.form.none">None</option>
+              <?php if ($is_manager): ?>
               <?php foreach ($members as $member): ?>
               <option value="<?= (int)$member['id']; ?>"><?= htmlspecialchars($member['name']); ?></option>
               <?php endforeach; ?>
               <option value="__external__" data-i18n="assets.form.owner_other">Others</option>
+              <?php else: ?>
+              <?php if ($member_id): ?>
+              <option value="<?= (int)$member_id; ?>"><?= htmlspecialchars($username); ?></option>
+              <?php endif; ?>
+              <?php endif; ?>
             </select>
+            <?php if ($is_manager): ?>
             <div class="mt-2 d-none" id="asset-owner-custom-wrapper">
               <input type="text" class="form-control" name="owner_external_name" id="asset-owner-custom" maxlength="150" data-i18n-placeholder="assets.form.owner_other_placeholder" placeholder="Enter responsible person">
               <div class="form-text" data-i18n="assets.form.owner_other_hint">Enter the responsible person's name if they are not listed.</div>
             </div>
+            <?php else: ?>
+            <div class="form-text" data-i18n="assets.form.owner_member_hint">Members can assign assets only to themselves or leave them unassigned.</div>
+            <?php endif; ?>
           </div>
           <div class="col-md-6">
             <label class="form-label" data-i18n="assets.form.image">Asset Photo</label>
