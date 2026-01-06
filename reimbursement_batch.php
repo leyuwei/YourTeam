@@ -12,15 +12,91 @@ if(!$batch){
     exit;
 }
 $allowedTypes = $batch['allowed_types'] ? explode(',', $batch['allowed_types']) : ['office','electronic','membership','book','trip'];
+$open_batches = $pdo->query("SELECT id,title,price_limit,allowed_types FROM reimbursement_batches WHERE status='open' ORDER BY deadline ASC")->fetchAll();
 $is_manager = ($_SESSION['role'] === 'manager');
 $member_id = $_SESSION['member_id'] ?? null;
 $can_edit_notice = ($is_manager || $batch['in_charge_member_id']==$member_id);
 $deadline_passed = (strtotime($batch['deadline']) < strtotime(date('Y-m-d')));
 $batch_locked = ($batch['status'] !== 'open');
 $error = '';
+$edit_error = '';
+$edit_state = null;
 
 if($_SERVER['REQUEST_METHOD']==='POST'){
-    if(isset($_POST['update_notice']) && $can_edit_notice){
+    if(isset($_POST['edit_receipt'])){
+        $edit_receipt_id = (int)($_POST['receipt_id'] ?? 0);
+        $target_batch_id = (int)($_POST['batch_id'] ?? 0);
+        $category = trim($_POST['category'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $price = $_POST['price'] !== '' ? (float)($_POST['price'] ?? 0) : 0;
+        $edit_state = [
+            'receipt_id' => $edit_receipt_id,
+            'batch_id' => $target_batch_id,
+            'category' => $category,
+            'description' => $description,
+            'price' => $price,
+        ];
+        $recStmt = $pdo->prepare("SELECT r.*, b.status AS batch_status FROM reimbursement_receipts r JOIN reimbursement_batches b ON r.batch_id=b.id WHERE r.id=?");
+        $recStmt->execute([$edit_receipt_id]);
+        $rec = $recStmt->fetch();
+        if(!$rec || (!$is_manager && $rec['member_id'] != $member_id)){
+            $edit_error = 'permission';
+        } elseif(!($rec['status']=='submitted' && $rec['batch_status']=='open')){
+            $edit_error = 'locked';
+        } else {
+            $batchStmt = $pdo->prepare("SELECT title, price_limit, allowed_types FROM reimbursement_batches WHERE id=? AND status='open'");
+            $batchStmt->execute([$target_batch_id]);
+            $targetBatch = $batchStmt->fetch();
+            if(!$targetBatch){
+                $edit_error = 'batch';
+            } else {
+                $allowedCats = $targetBatch['allowed_types'] ? explode(',', $targetBatch['allowed_types']) : ['office','electronic','membership','book','trip'];
+                if($description===''){
+                    $edit_error = 'desc';
+                } elseif(!in_array($category, $allowedCats)){
+                    $edit_error = 'type';
+                } else {
+                    $totalStmt = $pdo->prepare("SELECT COALESCE(SUM(price),0) FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND id<>? AND status<>'refused'");
+                    $totalStmt->execute([$target_batch_id, $rec['member_id'], $edit_receipt_id]);
+                    $currentTotal = (float)$totalStmt->fetchColumn();
+                    if(!$is_manager && $targetBatch['price_limit'] !== null && $currentTotal + $price > $targetBatch['price_limit']){
+                        $edit_error = 'exceed';
+                    } else {
+                        $memberInfo = $pdo->prepare("SELECT name,campus_id FROM members WHERE id=?");
+                        $memberInfo->execute([$rec['member_id']]);
+                        $mi = $memberInfo->fetch();
+                        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM reimbursement_receipts WHERE batch_id=? AND member_id=? AND id<>? AND status<>'refused'");
+                        $countStmt->execute([$target_batch_id, $rec['member_id'], $edit_receipt_id]);
+                        $index = $countStmt->fetchColumn() + 1;
+                        $base = $mi['name'].'-'.$mi['campus_id'].'-'.$targetBatch['title'].'-'.$index;
+                        $orig = $rec['original_filename'];
+                        $stored = $rec['stored_filename'];
+                        $ext = pathinfo($stored, PATHINFO_EXTENSION);
+                        $storedBase = pathinfo($stored, PATHINFO_FILENAME);
+                        if($target_batch_id != $rec['batch_id'] || strpos($storedBase, $base . '-') !== 0){
+                            $newname = $base . '-' . mt_rand(1000,9999) . '-' . time() . '.' . $ext;
+                            $src = __DIR__.'/reimburse_uploads/'.$rec['batch_id'].'/'.$stored;
+                            $dir = __DIR__.'/reimburse_uploads/'.$target_batch_id;
+                            if(!is_dir($dir)) mkdir($dir,0777,true);
+                            rename($src, $dir.'/'.$newname);
+                            $stored = $newname;
+                        }
+                        $stmt = $pdo->prepare("UPDATE reimbursement_receipts SET batch_id=?, original_filename=?, stored_filename=?, category=?, description=?, price=?, status='submitted' WHERE id=?");
+                        $stmt->execute([$target_batch_id, $orig, $stored, $category, $description, $price, $edit_receipt_id]);
+                        $changes = [];
+                        if($rec['batch_id'] != $target_batch_id) $changes[] = 'batch';
+                        if($rec['category'] != $category) $changes[] = 'category';
+                        if($rec['description'] != $description) $changes[] = 'description';
+                        if($rec['price'] != $price) $changes[] = 'price';
+                        $msg = 'Receipt '.$edit_receipt_id.' updated'.($changes ? ': '.implode(', ', $changes) : '');
+                        add_batch_log($pdo, $target_batch_id, $_SESSION['username'], $msg);
+                        header('Location: reimbursement_batch.php?id='.$target_batch_id);
+                        exit;
+                    }
+                }
+            }
+        }
+    } elseif(isset($_POST['update_notice']) && $can_edit_notice){
         $notice_en = trim($_POST['notice_en'] ?? '');
         $notice_zh = trim($_POST['notice_zh'] ?? '');
         $pdo->prepare("UPDATE reimbursement_batches SET notice_en=?, notice_zh=? WHERE id=?")->execute([$notice_en, $notice_zh, $id]);
@@ -121,6 +197,10 @@ if($is_manager || $batch['in_charge_member_id']==$member_id){
     $stmt->execute([$id,$member_id]);
 }
 $receipts = $stmt->fetchAll();
+$auto_edit_receipt_id = (int)($_GET['edit_receipt_id'] ?? 0);
+if($auto_edit_receipt_id && !$edit_state){
+    $edit_state = ['receipt_id' => $auto_edit_receipt_id];
+}
 $logs = [];
 $totalLogs = 0;
 $logPage = 1;
@@ -257,7 +337,18 @@ html[lang="zh"] .notice-text[data-lang="zh"]{display:block;}
     <a class="btn btn-sm btn-warning" href="reimbursement_receipt_refuse.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.refuse" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_refuse']);">Refuse</a>
     <?php endif; ?>
     <?php if($is_manager || ($r['member_id']==$member_id && $r['status']=='submitted' && !$batch_locked)): ?>
-    <a class="btn btn-sm btn-secondary" href="reimbursement_receipt_edit.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.edit">Edit</a>
+    <button
+      type="button"
+      class="btn btn-sm btn-secondary"
+      data-bs-toggle="modal"
+      data-bs-target="#receiptEditModal"
+      data-receipt-id="<?= $r['id']; ?>"
+      data-batch-id="<?= $r['batch_id']; ?>"
+      data-category="<?= htmlspecialchars($r['category'], ENT_QUOTES); ?>"
+      data-description="<?= htmlspecialchars($r['description'], ENT_QUOTES); ?>"
+      data-price="<?= htmlspecialchars($r['price'], ENT_QUOTES); ?>"
+      data-i18n="reimburse.batch.edit"
+    >Edit</button>
     <?php endif; ?>
     <?php if($is_manager || ($r['member_id']==$member_id && $r['status']=='submitted' && !$batch_locked)): ?>
     <a class="btn btn-sm btn-danger" href="reimbursement_receipt_delete.php?id=<?= $r['id']; ?>&batch_id=<?= $id; ?>" data-i18n="reimburse.batch.delete" onclick="return doubleConfirm(translations[document.documentElement.lang||'zh']['reimburse.batch.confirm_delete']);">Delete</a>
@@ -266,6 +357,54 @@ html[lang="zh"] .notice-text[data-lang="zh"]{display:block;}
 </tr>
 <?php endforeach; ?>
 </table>
+<div class="modal fade" id="receiptEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <form method="post" class="modal-content" id="receiptEditForm">
+      <input type="hidden" name="edit_receipt" value="1">
+      <input type="hidden" name="receipt_id" id="editReceiptId" value="">
+      <div class="modal-header">
+        <h5 class="modal-title" data-i18n="reimburse.batch.edit">Edit</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.batch">Batch</label>
+          <select name="batch_id" class="form-select" id="editBatchSelect" required>
+            <?php foreach($open_batches as $b): ?>
+            <option value="<?= $b['id']; ?>"><?= htmlspecialchars($b['title']); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.category">Category</label>
+          <select name="category" class="form-select" id="editCategorySelect" required>
+            <?php foreach($allowedTypes as $t): ?>
+            <option value="<?= $t; ?>" data-i18n="reimburse.category.<?= $t; ?>"><?= $t; ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.description">Description</label>
+          <input type="text" name="description" class="form-control" id="editDescription" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" data-i18n="reimburse.batch.price">Price</label>
+          <input type="number" step="0.01" name="price" class="form-control" id="editPrice" required>
+        </div>
+        <?php if($edit_error=='exceed'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.limit_exceed">Price exceeds limit</div><?php endif; ?>
+        <?php if($edit_error=='desc'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.description_required">Description required</div><?php endif; ?>
+        <?php if($edit_error=='type'): ?><div class="alert alert-danger" data-i18n="reimburse.batch.type_not_allowed">Type not allowed</div><?php endif; ?>
+        <?php if($edit_error=='batch'): ?><div class="alert alert-danger">Batch not available</div><?php endif; ?>
+        <?php if($edit_error=='permission'): ?><div class="alert alert-danger">No permission</div><?php endif; ?>
+        <?php if($edit_error=='locked'): ?><div class="alert alert-warning">Cannot edit this receipt</div><?php endif; ?>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary" data-i18n="reimburse.batch.save">Save</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="reimburse.batch.cancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 <?php if($is_manager || $batch['in_charge_member_id']==$member_id): ?>
 <h4 data-i18n="reimburse.batch.total_member">Total by Member</h4>
 <table class="table table-bordered">
@@ -356,6 +495,101 @@ document.addEventListener('DOMContentLoaded',()=>{
         document.querySelector('select[name="category"]').value=data.category;
       }
     });
+  }
+  const editModalEl = document.getElementById('receiptEditModal');
+  const editBatchSelect = document.getElementById('editBatchSelect');
+  const editCategorySelect = document.getElementById('editCategorySelect');
+  const editDescription = document.getElementById('editDescription');
+  const editPrice = document.getElementById('editPrice');
+  const editReceiptId = document.getElementById('editReceiptId');
+  const batchTypes = <?php echo json_encode(array_column($open_batches,'allowed_types','id')); ?>;
+  const allCats = ['office','electronic','membership','book','trip'];
+  const editState = <?php echo json_encode($edit_state); ?>;
+  const getCategoryLabel = (type) => {
+    const lang = document.documentElement.lang || 'zh';
+    const dict = window.translations?.[lang] || window.translations?.zh || {};
+    return dict['reimburse.category.' + type] || type;
+  };
+  const updateEditCats = (preferred) => {
+    if(!editBatchSelect || !editCategorySelect){
+      return;
+    }
+    let allowed = batchTypes[editBatchSelect.value];
+    allowed = allowed ? allowed.split(',') : allCats;
+    editCategorySelect.innerHTML = '';
+    allowed.forEach((t) => {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.setAttribute('data-i18n', 'reimburse.category.' + t);
+      opt.textContent = getCategoryLabel(t);
+      editCategorySelect.appendChild(opt);
+    });
+    if(preferred && allowed.includes(preferred)){
+      editCategorySelect.value = preferred;
+    }
+  };
+  const populateEditForm = (payload) => {
+    if(!payload){
+      return;
+    }
+    if(payload.receipt_id){
+      editReceiptId.value = payload.receipt_id;
+    }
+    if(payload.batch_id){
+      editBatchSelect.value = payload.batch_id;
+    }
+    if(payload.description !== undefined){
+      editDescription.value = payload.description;
+    }
+    if(payload.price !== undefined){
+      editPrice.value = payload.price;
+    }
+    updateEditCats(payload.category);
+  };
+  if(editBatchSelect){
+    editBatchSelect.addEventListener('change', () => {
+      updateEditCats(editCategorySelect.value);
+    });
+  }
+  if(editModalEl){
+    editModalEl.addEventListener('show.bs.modal', (event) => {
+      const trigger = event.relatedTarget;
+      if(trigger){
+        populateEditForm({
+          receipt_id: trigger.dataset.receiptId,
+          batch_id: trigger.dataset.batchId,
+          category: trigger.dataset.category,
+          description: trigger.dataset.description,
+          price: trigger.dataset.price
+        });
+      } else {
+        populateEditForm(editState);
+      }
+    });
+    if(editState){
+      const hasPrefill = Object.prototype.hasOwnProperty.call(editState, 'description')
+        || Object.prototype.hasOwnProperty.call(editState, 'category')
+        || Object.prototype.hasOwnProperty.call(editState, 'batch_id')
+        || Object.prototype.hasOwnProperty.call(editState, 'price');
+      if(!hasPrefill && editState.receipt_id){
+        const trigger = document.querySelector(`[data-receipt-id="${editState.receipt_id}"]`);
+        if(trigger){
+          const modal = new bootstrap.Modal(editModalEl);
+          modal.show();
+          populateEditForm({
+            receipt_id: trigger.dataset.receiptId,
+            batch_id: trigger.dataset.batchId,
+            category: trigger.dataset.category,
+            description: trigger.dataset.description,
+            price: trigger.dataset.price
+          });
+        }
+      } else if(hasPrefill){
+        const modal = new bootstrap.Modal(editModalEl);
+        modal.show();
+        populateEditForm(editState);
+      }
+    }
   }
   const lockBtn=document.getElementById('lockBtn');
   const confirmLock=document.getElementById('confirmLock');
