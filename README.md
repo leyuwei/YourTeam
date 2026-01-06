@@ -47,6 +47,48 @@
 4. **创建虚拟主机**指向项目目录（如 `/var/www/yourteam`），并确保 Apache 对上传目录拥有读写权限。
 5. **配置 PHP**：根据需要在 `php.ini` 中调整时区、文件上传等参数。
 
+### 安装与配置 phpMyAdmin
+1. **安装 phpMyAdmin**（Ubuntu 示例）：
+   ```bash
+   sudo apt install phpmyadmin
+   ```
+   安装过程中请选择 `apache2`，并根据提示配置数据库（dbconfig-common）。如安装向导未自动配置，可参考后续“手动创建”部分。
+2. **让 Apache 识别 phpMyAdmin**：
+   - Ubuntu/Debian 通常会自动创建配置文件并启用：
+     ```bash
+     sudo a2enconf phpmyadmin
+     sudo systemctl reload apache2
+     ```
+   - 若访问 `http://<服务器>/phpmyadmin` 仍 404，可检查 `/etc/apache2/conf-available/phpmyadmin.conf` 是否包含：
+     ```
+     Alias /phpmyadmin /usr/share/phpmyadmin
+     ```
+     然后执行 `sudo systemctl reload apache2`。
+3. **安装时账号创建异常的手动修复**（未创建 phpmyadmin 控制账户或表）：
+   ```bash
+   sudo mysql -u root -p
+   ```
+   在 MySQL 中执行：
+   ```sql
+   CREATE DATABASE phpmyadmin;
+   CREATE USER 'phpmyadmin'@'localhost' IDENTIFIED BY 'strong-password';
+   GRANT ALL PRIVILEGES ON phpmyadmin.* TO 'phpmyadmin'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+   导入必须表：
+   ```bash
+   sudo mysql -u root -p phpmyadmin < /usr/share/phpmyadmin/sql/create_tables.sql
+   ```
+   并在 `/etc/phpmyadmin/config.inc.php` 中设置控制用户：
+   ```php
+   $cfg['Servers'][$i]['controluser'] = 'phpmyadmin';
+   $cfg['Servers'][$i]['controlpass'] = 'strong-password';
+   ```
+   完成后重载 Apache：
+   ```bash
+   sudo systemctl reload apache2
+   ```
+
 ### 安装步骤
 1. 将代码部署到 Web 服务器（例如 `/var/www/yourteam`）。
 2. 导入数据库结构：
@@ -55,6 +97,9 @@
    ```
 3. 如有需要，修改 `config.php` 中的数据库配置。
 4. 访问 `login.php` 登录系统。
+
+### 管理员默认密码
+- **manager 账号默认密码**：`NewPass#2026!`
 
 ### 自定义团队名称
 在 `team_name.js` 中设置组织名称，例如：
@@ -138,6 +183,48 @@ A responsive web app for managing research team members, projects, tasks, and wo
 4. **Create a virtual host** pointing to the project directory (e.g. `/var/www/yourteam`) and ensure Apache can read/write uploads.
 5. **Configure PHP** in `php.ini` as needed (timezone, upload limits, etc.).
 
+### Install & Configure phpMyAdmin
+1. **Install phpMyAdmin** (Ubuntu example):
+   ```bash
+   sudo apt install phpmyadmin
+   ```
+   During setup, select `apache2` and enable dbconfig-common when prompted. If the wizard fails to configure the DB, follow the manual steps below.
+2. **Make Apache recognize phpMyAdmin**:
+   - Ubuntu/Debian usually enables this automatically:
+     ```bash
+     sudo a2enconf phpmyadmin
+     sudo systemctl reload apache2
+     ```
+   - If `http://<server>/phpmyadmin` still returns 404, ensure `/etc/apache2/conf-available/phpmyadmin.conf` contains:
+     ```
+     Alias /phpmyadmin /usr/share/phpmyadmin
+     ```
+     Then reload Apache with `sudo systemctl reload apache2`.
+3. **Manual fix when phpMyAdmin account/tables were not created**:
+   ```bash
+   sudo mysql -u root -p
+   ```
+   Run in MySQL:
+   ```sql
+   CREATE DATABASE phpmyadmin;
+   CREATE USER 'phpmyadmin'@'localhost' IDENTIFIED BY 'strong-password';
+   GRANT ALL PRIVILEGES ON phpmyadmin.* TO 'phpmyadmin'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+   Import required tables:
+   ```bash
+   sudo mysql -u root -p phpmyadmin < /usr/share/phpmyadmin/sql/create_tables.sql
+   ```
+   Set control user in `/etc/phpmyadmin/config.inc.php`:
+   ```php
+   $cfg['Servers'][$i]['controluser'] = 'phpmyadmin';
+   $cfg['Servers'][$i]['controlpass'] = 'strong-password';
+   ```
+   Reload Apache:
+   ```bash
+   sudo systemctl reload apache2
+   ```
+
 ### Installation
 1. Deploy the code to your web server (e.g. `/var/www/yourteam`).
 2. Import the database schema:
@@ -146,6 +233,9 @@ A responsive web app for managing research team members, projects, tasks, and wo
    ```
 3. Edit `config.php` for database credentials if needed.
 4. Visit `login.php` to sign in.
+
+### Manager Default Password
+- **Default password for the manager account**: `NewPass#2026!`
 
 ### Customize Team Name
 Set your organization name in `team_name.js`. Example:
