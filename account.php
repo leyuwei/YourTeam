@@ -4,6 +4,8 @@ require_once 'auth_manager.php';
 $password_msg = '';
 $add_msg = '';
 $delete_msg = '';
+$data_msg = '';
+$data_msg_type = 'info';
 
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     if($_POST['action'] === 'change_password'){
@@ -52,6 +54,62 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                 } else {
                     $delete_msg = 'account.msg.manager_delete_error';
                 }
+            }
+        }
+    } elseif($_POST['action'] === 'import_data'){
+        $confirm = $_POST['confirm_overwrite'] ?? '';
+        if($confirm !== 'yes'){
+            $data_msg = 'account.data.import_confirm_required';
+            $data_msg_type = 'warning';
+        } elseif(!isset($_FILES['data_zip']) || $_FILES['data_zip']['error'] !== UPLOAD_ERR_OK){
+            $data_msg = 'account.data.import_upload_error';
+            $data_msg_type = 'danger';
+        } else {
+            require_once 'data_transfer.php';
+            set_time_limit(0);
+            $uploadFolders = [
+                'asset_uploads',
+                'regulation_uploads',
+                'reimburse_uploads',
+                'office_layouts',
+                'collect_uploads',
+            ];
+            $tempDir = sys_get_temp_dir() . '/team_import_' . bin2hex(random_bytes(8));
+            mkdir($tempDir, 0777, true);
+            $zip = new ZipArchive();
+            if($zip->open($_FILES['data_zip']['tmp_name']) === true){
+                safe_extract_zip($zip, $tempDir);
+                $zip->close();
+                $sqlPath = $tempDir . '/database.sql';
+                if(!file_exists($sqlPath)){
+                    $data_msg = 'account.data.import_missing_sql';
+                    $data_msg_type = 'danger';
+                } else {
+                    try{
+                        $sql = file_get_contents($sqlPath);
+                        import_database_dump($pdo, $sql);
+                        foreach($uploadFolders as $folder){
+                            $source = $tempDir . '/' . $folder;
+                            $destination = __DIR__ . '/' . $folder;
+                            if(is_dir($destination)){
+                                remove_directory($destination);
+                            }
+                            if(is_dir($source)){
+                                copy_directory($source, $destination);
+                            }
+                        }
+                        $data_msg = 'account.data.import_success';
+                        $data_msg_type = 'success';
+                    } catch(Throwable $e){
+                        $data_msg = 'account.data.import_error';
+                        $data_msg_type = 'danger';
+                    }
+                }
+                remove_directory($tempDir);
+            } else {
+                $data_msg = 'account.data.import_invalid_zip';
+                $data_msg_type = 'danger';
+                remove_directory($tempDir);
             }
         }
     }
@@ -168,6 +226,65 @@ include 'header.php';
       </li>
       <?php endforeach; endif; ?>
     </ul>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mt-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <h3 class="card-title h5 mb-1" data-i18n="account.data.title">数据迁移</h3>
+        <p class="text-muted mb-2" data-i18n="account.data.subtitle">快速导出与导入站点数据，便于迁移或备份。</p>
+      </div>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#dataTransferModal" data-i18n="account.data.open_modal">导入/导出</button>
+    </div>
+    <?php if($data_msg): ?>
+      <div class="alert alert-<?= htmlspecialchars($data_msg_type); ?> mb-0" data-i18n="<?= $data_msg; ?>"></div>
+    <?php endif; ?>
+  </div>
+</div>
+
+<div class="modal fade" id="dataTransferModal" tabindex="-1" aria-labelledby="dataTransferModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="dataTransferModalLabel" data-i18n="account.data.modal_title">数据迁移</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <div class="p-3 border rounded-3 h-100">
+              <h6 class="mb-2" data-i18n="account.data.export_title">一键导出</h6>
+              <p class="text-muted small mb-3" data-i18n="account.data.export_hint">将数据库与所有上传文件打包为 ZIP 下载。</p>
+              <a href="data_export.php" class="btn btn-primary" data-i18n="account.data.export_button">导出数据</a>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 border rounded-3 h-100">
+              <h6 class="mb-2" data-i18n="account.data.import_title">一键导入</h6>
+              <p class="text-muted small mb-2" data-i18n="account.data.import_hint">请上传导出的 ZIP 包以恢复数据库及上传内容。</p>
+              <div class="alert alert-warning py-2 small" role="alert">
+                <div data-i18n="account.data.import_warning_primary">导入会覆盖当前数据库与上传文件，建议先导出备份。</div>
+                <div data-i18n="account.data.import_warning_secondary">导入过程中请勿关闭页面，以免造成数据不完整。</div>
+              </div>
+              <form method="post" enctype="multipart/form-data" onsubmit="return confirm((translations?.[localStorage.getItem('lang')||'zh']?.['account.data.import_confirm']) || '确定要导入并覆盖现有数据吗？');">
+                <input type="hidden" name="action" value="import_data">
+                <div class="mb-3">
+                  <label class="form-label" data-i18n="account.data.import_file_label">选择 ZIP 文件</label>
+                  <input type="file" name="data_zip" class="form-control" accept=".zip" required>
+                </div>
+                <div class="form-check mb-3">
+                  <input class="form-check-input" type="checkbox" name="confirm_overwrite" value="yes" id="confirmOverwrite" required>
+                  <label class="form-check-label" for="confirmOverwrite" data-i18n="account.data.import_checkbox">我已了解该操作将覆盖当前数据</label>
+                </div>
+                <button type="submit" class="btn btn-danger" data-i18n="account.data.import_button">导入并覆盖</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 <?php include 'footer.php'; ?>
