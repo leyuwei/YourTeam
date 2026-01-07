@@ -56,6 +56,28 @@ unset($r);
 
 $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_join FROM members WHERE status='in_work' ORDER BY name")
     ->fetchAll();
+$projectGroupsRaw = $pdo->query("SELECT p.id, p.title, GROUP_CONCAT(DISTINCT m.id ORDER BY l.sort_order SEPARATOR ',') AS member_ids
+    FROM projects p
+    LEFT JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL
+    LEFT JOIN members m ON l.member_id=m.id AND m.status='in_work'
+    GROUP BY p.id
+    ORDER BY p.sort_order")->fetchAll();
+$directionGroupsRaw = $pdo->query("SELECT d.id, d.title, GROUP_CONCAT(DISTINCT m.id ORDER BY dm.sort_order SEPARATOR ',') AS member_ids
+    FROM research_directions d
+    LEFT JOIN direction_members dm ON d.id=dm.direction_id
+    LEFT JOIN members m ON dm.member_id=m.id AND m.status='in_work'
+    GROUP BY d.id
+    ORDER BY d.sort_order")->fetchAll();
+$projectGroups = [];
+foreach ($projectGroupsRaw as $p) {
+    $ids = array_filter(array_map('intval', array_filter(explode(',', $p['member_ids'] ?? ''))));
+    $projectGroups[] = ['id' => $p['id'], 'title' => $p['title'], 'members' => array_values(array_unique($ids))];
+}
+$directionGroups = [];
+foreach ($directionGroupsRaw as $d) {
+    $ids = array_filter(array_map('intval', array_filter(explode(',', $d['member_ids'] ?? ''))));
+    $directionGroups[] = ['id' => $d['id'], 'title' => $d['title'], 'members' => array_values(array_unique($ids))];
+}
 ?>
 <div id="notification-page" class="d-flex justify-content-between mb-3" data-edit-id="<?= htmlspecialchars($_GET['edit'] ?? '') ?>">
   <h2 data-i18n="notifications.title">Notifications</h2>
@@ -142,6 +164,39 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="form-label mb-0" data-i18n="notification_edit.label_members">Target Members</label>
               <button type="button" id="select-all" class="btn btn-sm btn-outline-secondary" data-i18n="notification_edit.select_all">Select All</button>
+            </div>
+            <div class="quick-select-panel mb-3">
+              <div class="d-flex flex-wrap align-items-end gap-2">
+                <div class="flex-grow-1">
+                  <label class="form-label small" for="notificationProjectSelect" data-i18n="notification_edit.quick_select_project">By Project</label>
+                  <select class="form-select form-select-sm" id="notificationProjectSelect">
+                    <option value="" data-i18n="notification_edit.quick_select_placeholder">Select</option>
+                    <?php foreach($projectGroups as $p): ?>
+                      <option value="<?= $p['id']; ?>"><?= htmlspecialchars($p['title']); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-outline-secondary" id="notificationProjectAdd" data-i18n="notification_edit.quick_select_add">Select</button>
+                  <button type="button" class="btn btn-outline-secondary" id="notificationProjectRemove" data-i18n="notification_edit.quick_select_remove">Remove</button>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap align-items-end gap-2 mt-2">
+                <div class="flex-grow-1">
+                  <label class="form-label small" for="notificationDirectionSelect" data-i18n="notification_edit.quick_select_direction">By Direction</label>
+                  <select class="form-select form-select-sm" id="notificationDirectionSelect">
+                    <option value="" data-i18n="notification_edit.quick_select_placeholder">Select</option>
+                    <?php foreach($directionGroups as $d): ?>
+                      <option value="<?= $d['id']; ?>"><?= htmlspecialchars($d['title']); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-outline-secondary" id="notificationDirectionAdd" data-i18n="notification_edit.quick_select_add">Select</button>
+                  <button type="button" class="btn btn-outline-secondary" id="notificationDirectionRemove" data-i18n="notification_edit.quick_select_remove">Remove</button>
+                </div>
+              </div>
+              <div class="text-muted small mt-2" data-i18n="notification_edit.quick_select_hint">Quickly select members by project or research direction.</div>
             </div>
             <div class="target-select-grid">
               <?php foreach($memberList as $m): ?>
@@ -246,6 +301,8 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
   .target-select-card:hover { transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,0.06); }
   .target-select-card input { margin-right:0.35rem; }
   .target-select-meta { font-size:0.85rem; color:var(--bs-gray-600); }
+  .quick-select-panel { background:var(--app-surface-bg); border:1px dashed var(--app-table-border); border-radius:0.75rem; padding:0.6rem 0.75rem; }
+  .quick-select-panel .form-label { margin-bottom:0.15rem; }
 </style>
 
 <div class="d-flex justify-content-between mb-3">
@@ -306,6 +363,8 @@ $memberList = $pdo->query("SELECT id,name,department,degree_pursuing,year_of_joi
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
+const notificationMemberGroups = <?= json_encode(['projects' => $projectGroups, 'directions' => $directionGroups], JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>;
+
 document.addEventListener('DOMContentLoaded', function(){
   const withDoubleConfirm = (message) => {
     if (typeof doubleConfirm === 'function') {
@@ -392,10 +451,38 @@ document.addEventListener('DOMContentLoaded', function(){
   const beginField = form?.querySelector('input[name="valid_begin_date"]');
   const endField = form?.querySelector('input[name="valid_end_date"]');
   const memberCheckboxes = () => Array.from(form?.querySelectorAll('.member-checkbox') || []);
+  const projectSelect = document.getElementById('notificationProjectSelect');
+  const directionSelect = document.getElementById('notificationDirectionSelect');
+  const projectAddBtn = document.getElementById('notificationProjectAdd');
+  const projectRemoveBtn = document.getElementById('notificationProjectRemove');
+  const directionAddBtn = document.getElementById('notificationDirectionAdd');
+  const directionRemoveBtn = document.getElementById('notificationDirectionRemove');
+  const groupData = notificationMemberGroups || {projects: [], directions: []};
 
   const setMemberSelections = (ids = []) => {
     const idSet = new Set(ids.map(String));
     memberCheckboxes().forEach(cb => { cb.checked = idSet.has(cb.value); });
+  };
+
+  const resetQuickSelects = () => {
+    if (projectSelect) projectSelect.value = '';
+    if (directionSelect) directionSelect.value = '';
+  };
+
+  const applyGroupSelection = (ids = [], mode = 'add') => {
+    if (!ids.length) return;
+    const idSet = new Set(ids.map(String));
+    memberCheckboxes().forEach(cb => {
+      if (idSet.has(cb.value)) {
+        cb.checked = mode === 'add' ? true : mode === 'remove' ? false : cb.checked;
+      }
+    });
+  };
+
+  const findGroupMembers = (type, id) => {
+    const list = Array.isArray(groupData?.[type]) ? groupData[type] : [];
+    const group = list.find(item => String(item.id) === String(id));
+    return Array.isArray(group?.members) ? group.members : [];
   };
 
   const openCreateModal = () => {
@@ -406,6 +493,7 @@ document.addEventListener('DOMContentLoaded', function(){
     titleEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.title_add'] || 'Add Notification';
     submitEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.save'] || 'Save';
     setMemberSelections([]);
+    resetQuickSelects();
   };
 
   modalEl?.addEventListener('hidden.bs.modal', openCreateModal);
@@ -470,6 +558,7 @@ document.addEventListener('DOMContentLoaded', function(){
       setMemberSelections(members);
       titleEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.title_edit'] || 'Edit Notification';
       submitEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.save'] || 'Save';
+      resetQuickSelects();
       modal.show();
     });
   });
@@ -485,6 +574,26 @@ document.addEventListener('DOMContentLoaded', function(){
     const boxes=document.querySelectorAll('.member-checkbox');
     const allChecked=Array.from(boxes).every(cb=>cb.checked);
     boxes.forEach(cb=>cb.checked=!allChecked);
+  });
+
+  projectAddBtn?.addEventListener('click', () => {
+    if (!projectSelect?.value) return;
+    applyGroupSelection(findGroupMembers('projects', projectSelect.value), 'add');
+  });
+
+  projectRemoveBtn?.addEventListener('click', () => {
+    if (!projectSelect?.value) return;
+    applyGroupSelection(findGroupMembers('projects', projectSelect.value), 'remove');
+  });
+
+  directionAddBtn?.addEventListener('click', () => {
+    if (!directionSelect?.value) return;
+    applyGroupSelection(findGroupMembers('directions', directionSelect.value), 'add');
+  });
+
+  directionRemoveBtn?.addEventListener('click', () => {
+    if (!directionSelect?.value) return;
+    applyGroupSelection(findGroupMembers('directions', directionSelect.value), 'remove');
   });
 
   const expiredToggle=document.getElementById('toggleExpiredNotifications');

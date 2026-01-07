@@ -226,6 +226,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
 
 $templates = $pdo->query("SELECT * FROM collect_templates ORDER BY (status IN ('ended','void')), COALESCE(deadline,'9999-12-31') ASC, updated_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 $members = $pdo->query("SELECT id,name,status,department,degree_pursuing,year_of_join FROM members ORDER BY status='in_work' DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
+$projectGroups = [];
+$directionGroups = [];
+if ($is_manager) {
+    $projectGroupsRaw = $pdo->query("SELECT p.id, p.title, GROUP_CONCAT(DISTINCT m.id ORDER BY l.sort_order SEPARATOR ',') AS member_ids
+        FROM projects p
+        LEFT JOIN project_member_log l ON p.id=l.project_id AND l.exit_time IS NULL
+        LEFT JOIN members m ON l.member_id=m.id AND m.status='in_work'
+        GROUP BY p.id
+        ORDER BY p.sort_order")->fetchAll(PDO::FETCH_ASSOC);
+    $directionGroupsRaw = $pdo->query("SELECT d.id, d.title, GROUP_CONCAT(DISTINCT m.id ORDER BY dm.sort_order SEPARATOR ',') AS member_ids
+        FROM research_directions d
+        LEFT JOIN direction_members dm ON d.id=dm.direction_id
+        LEFT JOIN members m ON dm.member_id=m.id AND m.status='in_work'
+        GROUP BY d.id
+        ORDER BY d.sort_order")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($projectGroupsRaw as $p) {
+        $ids = array_filter(array_map('intval', array_filter(explode(',', $p['member_ids'] ?? ''))));
+        $projectGroups[] = ['id' => $p['id'], 'title' => $p['title'], 'members' => array_values(array_unique($ids))];
+    }
+    foreach ($directionGroupsRaw as $d) {
+        $ids = array_filter(array_map('intval', array_filter(explode(',', $d['member_ids'] ?? ''))));
+        $directionGroups[] = ['id' => $d['id'], 'title' => $d['title'], 'members' => array_values(array_unique($ids))];
+    }
+}
 
 $templateSubmissions = [];
 $submissionStmt = $pdo->query("SELECT cs.*, m.name FROM collect_submissions cs LEFT JOIN members m ON cs.member_id=m.id");
@@ -241,6 +265,8 @@ include 'header.php';
   .target-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.5rem; max-height:280px; overflow:auto; padding:0.25rem; background:var(--app-table-striped-bg); border-radius:0.5rem; }
   .target-card { border:1px solid var(--app-table-border); border-radius:0.5rem; padding:0.5rem 0.6rem; background:var(--app-surface-bg); box-shadow:0 2px 6px rgba(0,0,0,0.04); }
   .target-card input { margin-right:0.35rem; }
+  .quick-select-panel { background:var(--app-surface-bg); border:1px dashed var(--app-table-border); border-radius:0.65rem; padding:0.6rem 0.75rem; }
+  .quick-select-panel .form-label { margin-bottom:0.15rem; }
   .collect-field-row { border:1px dashed var(--app-table-border); padding:0.75rem; border-radius:0.5rem; background:var(--app-table-striped-bg); }
   .collect-field-row + .collect-field-row { margin-top:0.5rem; }
   .archived-section { display:none; }
@@ -517,6 +543,39 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
                 <button type="button" class="btn btn-outline-secondary" id="targetInvert" data-i18n="collect.targets_invert">Invert</button>
               </div>
             </div>
+            <div class="quick-select-panel mb-3">
+              <div class="d-flex flex-wrap align-items-end gap-2">
+                <div class="flex-grow-1">
+                  <label class="form-label small" for="collectProjectSelect" data-i18n="collect.quick_select_project">By Project</label>
+                  <select class="form-select form-select-sm" id="collectProjectSelect">
+                    <option value="" data-i18n="collect.quick_select_placeholder">Select</option>
+                    <?php foreach($projectGroups as $p): ?>
+                      <option value="<?= $p['id']; ?>"><?= htmlspecialchars($p['title']); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-outline-secondary" id="collectProjectAdd" data-i18n="collect.quick_select_add">Select</button>
+                  <button type="button" class="btn btn-outline-secondary" id="collectProjectRemove" data-i18n="collect.quick_select_remove">Remove</button>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap align-items-end gap-2 mt-2">
+                <div class="flex-grow-1">
+                  <label class="form-label small" for="collectDirectionSelect" data-i18n="collect.quick_select_direction">By Direction</label>
+                  <select class="form-select form-select-sm" id="collectDirectionSelect">
+                    <option value="" data-i18n="collect.quick_select_placeholder">Select</option>
+                    <?php foreach($directionGroups as $d): ?>
+                      <option value="<?= $d['id']; ?>"><?= htmlspecialchars($d['title']); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-outline-secondary" id="collectDirectionAdd" data-i18n="collect.quick_select_add">Select</button>
+                  <button type="button" class="btn btn-outline-secondary" id="collectDirectionRemove" data-i18n="collect.quick_select_remove">Remove</button>
+                </div>
+              </div>
+              <div class="text-muted small mt-2" data-i18n="collect.quick_select_hint">Quickly select members by project or research direction.</div>
+            </div>
             <div class="target-grid">
               <?php foreach($members as $m): if($m['status']!=='in_work') continue; ?>
                 <label class="target-card">
@@ -549,6 +608,8 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
 <?php endif; ?>
 
 <script>
+const collectMemberGroups = <?= json_encode(['projects' => $projectGroups, 'directions' => $directionGroups], JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>;
+
 function getCollectTranslations() {
   if (typeof window !== 'undefined' && window.translations) {
     return window.translations;
@@ -566,6 +627,13 @@ window.addEventListener('load', () => {
   const archivedSection = document.querySelector('.archived-section');
   const targetSelectAllBtn = document.getElementById('targetSelectAll');
   const targetInvertBtn = document.getElementById('targetInvert');
+  const projectSelect = document.getElementById('collectProjectSelect');
+  const directionSelect = document.getElementById('collectDirectionSelect');
+  const projectAddBtn = document.getElementById('collectProjectAdd');
+  const projectRemoveBtn = document.getElementById('collectProjectRemove');
+  const directionAddBtn = document.getElementById('collectDirectionAdd');
+  const directionRemoveBtn = document.getElementById('collectDirectionRemove');
+  const groupData = collectMemberGroups || {projects: [], directions: []};
 
   function createFieldRow(field){
     const wrapper = document.createElement('div');
@@ -640,11 +708,53 @@ window.addEventListener('load', () => {
   targetSelectAllBtn?.addEventListener('click', ()=>selectTargets('all'));
   targetInvertBtn?.addEventListener('click', ()=>selectTargets('invert'));
 
+  const resetQuickSelects = () => {
+    if (projectSelect) projectSelect.value = '';
+    if (directionSelect) directionSelect.value = '';
+  };
+
+  const applyGroupSelection = (ids = [], mode = 'add') => {
+    if (!ids.length) return;
+    const idSet = new Set(ids.map(String));
+    document.querySelectorAll('input[name="targets[]"]').forEach(cb => {
+      if (idSet.has(cb.value)) {
+        cb.checked = mode === 'add' ? true : mode === 'remove' ? false : cb.checked;
+      }
+    });
+  };
+
+  const findGroupMembers = (type, id) => {
+    const list = Array.isArray(groupData?.[type]) ? groupData[type] : [];
+    const group = list.find(item => String(item.id) === String(id));
+    return Array.isArray(group?.members) ? group.members : [];
+  };
+
+  projectAddBtn?.addEventListener('click', () => {
+    if (!projectSelect?.value) return;
+    applyGroupSelection(findGroupMembers('projects', projectSelect.value), 'add');
+  });
+
+  projectRemoveBtn?.addEventListener('click', () => {
+    if (!projectSelect?.value) return;
+    applyGroupSelection(findGroupMembers('projects', projectSelect.value), 'remove');
+  });
+
+  directionAddBtn?.addEventListener('click', () => {
+    if (!directionSelect?.value) return;
+    applyGroupSelection(findGroupMembers('directions', directionSelect.value), 'add');
+  });
+
+  directionRemoveBtn?.addEventListener('click', () => {
+    if (!directionSelect?.value) return;
+    applyGroupSelection(findGroupMembers('directions', directionSelect.value), 'remove');
+  });
+
   if(templateModal){
     templateModal.addEventListener('show.bs.modal', event => {
       const button = event.relatedTarget;
       fieldsContainer.innerHTML='';
       document.querySelectorAll('input[name="targets[]"]').forEach(cb=>cb.checked=false);
+      resetQuickSelects();
       if(button?.dataset.mode==='add'){
         templateForm.reset();
         document.getElementById('templateId').value='';
