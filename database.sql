@@ -54,8 +54,9 @@ CREATE TABLE publish_attributes (
   sort_order INT DEFAULT 0,
   name_en VARCHAR(100) NOT NULL DEFAULT '',
   name_zh VARCHAR(100) NOT NULL DEFAULT '',
-  attribute_type ENUM('text','textarea','file','date') NOT NULL DEFAULT 'text',
-  default_value TEXT
+  attribute_type ENUM('text','textarea','file','date','select') NOT NULL DEFAULT 'text',
+  default_value TEXT,
+  options TEXT
 );
 
 CREATE TABLE publish_entries (
@@ -75,12 +76,12 @@ CREATE TABLE publish_values (
   FOREIGN KEY (attribute_id) REFERENCES publish_attributes(id) ON DELETE CASCADE
 );
 
-INSERT INTO publish_attributes (sort_order, name_en, name_zh, attribute_type, default_value) VALUES
-(0, 'Type', '成果类型', 'text', ''),
-(1, 'Name', '成果名称', 'text', ''),
-(2, 'Description', '成果描述', 'textarea', ''),
-(3, 'File', '成果文件', 'file', ''),
-(4, 'Publish Date', '发布时间', 'date', '');
+INSERT INTO publish_attributes (sort_order, name_en, name_zh, attribute_type, default_value, options) VALUES
+(0, 'Type', '成果类型', 'text', '', ''),
+(1, 'Name', '成果名称', 'text', '', ''),
+(2, 'Description', '成果描述', 'textarea', '', ''),
+(3, 'File', '成果文件', 'file', '', ''),
+(4, 'Publish Date', '发布时间', 'date', '', '');
 
 CREATE TABLE projects (
   id INT AUTO_INCREMENT PRIMARY KEY,

@@ -32,7 +32,7 @@ if (!is_array($attributes)) {
     exit;
 }
 
-$allowedTypes = ['text', 'textarea', 'file', 'date'];
+$allowedTypes = ['text', 'textarea', 'file', 'date', 'select'];
 
 try {
     $pdo->beginTransaction();
@@ -41,8 +41,8 @@ try {
     $seenIds = [];
     $position = 0;
 
-    $updateStmt = $pdo->prepare('UPDATE publish_attributes SET sort_order = ?, name_en = ?, name_zh = ?, attribute_type = ?, default_value = ? WHERE id = ?');
-    $insertStmt = $pdo->prepare('INSERT INTO publish_attributes (sort_order, name_en, name_zh, attribute_type, default_value) VALUES (?, ?, ?, ?, ?)');
+    $updateStmt = $pdo->prepare('UPDATE publish_attributes SET sort_order = ?, name_en = ?, name_zh = ?, attribute_type = ?, default_value = ?, options = ? WHERE id = ?');
+    $insertStmt = $pdo->prepare('INSERT INTO publish_attributes (sort_order, name_en, name_zh, attribute_type, default_value, options) VALUES (?, ?, ?, ?, ?, ?)');
 
     foreach ($attributes as $attribute) {
         if (!is_array($attribute)) {
@@ -53,16 +53,17 @@ try {
         $nameZh = trim((string)($attribute['name_zh'] ?? ''));
         $attributeType = in_array($attribute['attribute_type'] ?? '', $allowedTypes, true) ? $attribute['attribute_type'] : 'text';
         $defaultValue = $attributeType === 'file' ? '' : (string)($attribute['default_value'] ?? '');
+        $options = $attributeType === 'select' ? (string)($attribute['options'] ?? '') : '';
 
         if ($nameEn === '' && $nameZh === '') {
             throw new RuntimeException('Attribute name cannot be empty.');
         }
 
         if ($id) {
-            $updateStmt->execute([$position, $nameEn, $nameZh, $attributeType, $defaultValue, $id]);
+            $updateStmt->execute([$position, $nameEn, $nameZh, $attributeType, $defaultValue, $options, $id]);
             $seenIds[] = $id;
         } else {
-            $insertStmt->execute([$position, $nameEn, $nameZh, $attributeType, $defaultValue]);
+            $insertStmt->execute([$position, $nameEn, $nameZh, $attributeType, $defaultValue, $options]);
             $id = (int)$pdo->lastInsertId();
             $seenIds[] = $id;
             $assignStmt = $pdo->prepare('INSERT INTO publish_values (entry_id, attribute_id, value) SELECT id, ?, ? FROM publish_entries');

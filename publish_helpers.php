@@ -4,9 +4,9 @@
  */
 function getPublishAttributes(PDO $pdo): array
 {
-    $stmt = $pdo->query('SELECT id, sort_order, name_en, name_zh, attribute_type, default_value FROM publish_attributes ORDER BY sort_order, id');
+    $stmt = $pdo->query('SELECT id, sort_order, name_en, name_zh, attribute_type, default_value, options FROM publish_attributes ORDER BY sort_order, id');
     $attributes = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
-    $allowedTypes = ['text', 'textarea', 'file', 'date'];
+    $allowedTypes = ['text', 'textarea', 'file', 'date', 'select'];
     foreach ($attributes as &$attr) {
         $attr['id'] = (int)($attr['id'] ?? 0);
         $attr['sort_order'] = (int)($attr['sort_order'] ?? 0);
@@ -15,6 +15,7 @@ function getPublishAttributes(PDO $pdo): array
         $type = (string)($attr['attribute_type'] ?? 'text');
         $attr['attribute_type'] = in_array($type, $allowedTypes, true) ? $type : 'text';
         $attr['default_value'] = (string)($attr['default_value'] ?? '');
+        $attr['options'] = (string)($attr['options'] ?? '');
     }
     unset($attr);
     return $attributes;
@@ -63,7 +64,7 @@ function preparePublishValues(int $entryId, array $attributes, array $postedValu
     $entryId = (int)$entryId;
     $normalizedUploads = normalizePublishUploads($uploadedValues);
     $result = [];
-    $allowedTypes = ['text', 'textarea', 'file', 'date'];
+    $allowedTypes = ['text', 'textarea', 'file', 'date', 'select'];
 
     foreach ($attributes as $attribute) {
         $attributeId = (int)($attribute['id'] ?? 0);
@@ -133,7 +134,7 @@ function ensurePublishValues(PDO $pdo, int $entryId, array $submittedValues, arr
     if ($entryId <= 0) {
         return;
     }
-    $allowedTypes = ['text', 'textarea', 'file', 'date'];
+    $allowedTypes = ['text', 'textarea', 'file', 'date', 'select'];
     $insertStmt = $pdo->prepare('INSERT INTO publish_values (entry_id, attribute_id, value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)');
     foreach ($attributes as $attribute) {
         $attributeId = (int)($attribute['id'] ?? 0);
@@ -143,6 +144,12 @@ function ensurePublishValues(PDO $pdo, int $entryId, array $submittedValues, arr
         $attributeType = in_array($attribute['attribute_type'] ?? '', $allowedTypes, true) ? $attribute['attribute_type'] : 'text';
         $defaultValue = $attributeType === 'file' ? '' : (string)($attribute['default_value'] ?? '');
         $value = $submittedValues[$attributeId] ?? $defaultValue;
+        if ($attributeType === 'select' && ($value === '' || $value === null)) {
+            $options = array_values(array_filter(array_map('trim', explode(',', (string)($attribute['options'] ?? '')))));
+            if (!empty($options)) {
+                $value = $options[0];
+            }
+        }
         if (is_array($value)) {
             $value = '';
         }

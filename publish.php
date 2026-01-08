@@ -218,6 +218,8 @@ include 'header.php';
               $nameZh = trim((string)$attr['name_zh']);
               $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : '');
               $defaultValue = $attrType === 'file' ? '' : (string)($attr['default_value'] ?? '');
+              $optionsRaw = (string)($attr['options'] ?? '');
+              $optionsList = array_values(array_filter(array_map('trim', explode(',', $optionsRaw))));
             ?>
               <div class="col-md-6" data-publish-wrapper>
                 <label class="form-label" data-publish-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-publish-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($display); ?></label>
@@ -225,6 +227,12 @@ include 'header.php';
                   <textarea class="form-control" name="publish_attrs[<?= $attrId; ?>]" rows="3" data-publish-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>"></textarea>
                 <?php elseif ($attrType === 'date'): ?>
                   <input type="date" class="form-control" name="publish_attrs[<?= $attrId; ?>]" value="" data-publish-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                <?php elseif ($attrType === 'select'): ?>
+                  <select class="form-select" name="publish_attrs[<?= $attrId; ?>]" data-publish-field data-attribute-id="<?= $attrId; ?>" data-default-value="<?= htmlspecialchars($defaultValue, ENT_QUOTES); ?>" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                    <?php foreach ($optionsList as $optionValue): ?>
+                      <option value="<?= htmlspecialchars($optionValue, ENT_QUOTES); ?>"><?= htmlspecialchars($optionValue, ENT_QUOTES); ?></option>
+                    <?php endforeach; ?>
+                  </select>
                 <?php elseif ($attrType === 'file'): ?>
                   <input type="file" class="form-control" name="publish_attrs[<?= $attrId; ?>]" data-publish-field data-attribute-id="<?= $attrId; ?>" data-default-value="" data-attribute-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.7z,.tar,.gz">
                   <div class="form-text" data-i18n="publish.form.file_hint">Upload supporting files or screenshots.</div>
@@ -362,7 +370,7 @@ include 'header.php';
             updateFileInfo(input, '', false, false);
           } else {
             const defaultValue = input.dataset.defaultValue ?? '';
-            if(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement){
+            if(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement || input instanceof HTMLSelectElement){
               input.value = defaultValue;
             }
           }
@@ -404,7 +412,7 @@ include 'header.php';
               input.value = '';
               setClearFlag(wrapper, false);
               updateFileInfo(input, value, false, false);
-            } else if(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement){
+            } else if(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement || input instanceof HTMLSelectElement){
               input.value = value ?? '';
             }
           });
@@ -448,7 +456,8 @@ include 'header.php';
         name_zh: attr.name_zh ?? '',
         name_en: attr.name_en ?? '',
         attribute_type: attr.attribute_type ?? 'text',
-        default_value: attr.default_value ?? ''
+        default_value: attr.default_value ?? '',
+        options: attr.options ?? ''
       })) : [];
       let workingAttributes = cloneAttributes(window.publishAttributes || []);
       const getLang = () => document.documentElement.lang || 'zh';
@@ -493,6 +502,7 @@ include 'header.php';
           wrapper.dataset.index=String(index);
           const type = String(attr.attribute_type ?? 'text');
           const hideDefault = type === 'file';
+          const showOptions = type === 'select';
           wrapper.innerHTML=`<div class="row g-3 align-items-end">
   <div class="col-md-3">
     <label class="form-label" data-i18n="publish.attributes.field.name_zh">中文名称</label>
@@ -508,12 +518,18 @@ include 'header.php';
       <option value="text" ${type === 'text' ? 'selected' : ''} data-i18n="publish.attributes.type.text">文本</option>
       <option value="textarea" ${type === 'textarea' ? 'selected' : ''} data-i18n="publish.attributes.type.textarea">多行文本</option>
       <option value="date" ${type === 'date' ? 'selected' : ''} data-i18n="publish.attributes.type.date">日期</option>
+      <option value="select" ${type === 'select' ? 'selected' : ''} data-i18n="publish.attributes.type.select">下拉选项</option>
       <option value="file" ${type === 'file' ? 'selected' : ''} data-i18n="publish.attributes.type.file">文件</option>
     </select>
   </div>
   <div data-default-wrapper class="col-md-3${hideDefault ? ' d-none' : ''}">
     <label class="form-label" data-i18n="publish.attributes.field.default_value">默认值</label>
     <input type="text" class="form-control" data-field="default_value" value="${escapeHtml(hideDefault ? '' : attr.default_value)}">
+  </div>
+  <div data-options-wrapper class="col-md-6${showOptions ? '' : ' d-none'}">
+    <label class="form-label" data-i18n="publish.attributes.field.options">可选项</label>
+    <input type="text" class="form-control" data-field="options" value="${escapeHtml(attr.options)}" data-i18n-placeholder="publish.attributes.field.options_placeholder" placeholder="Option A, Option B">
+    <div class="form-text" data-i18n="publish.attributes.field.options_hint">用逗号分隔多个可选项。</div>
   </div>
   <div class="col-12 d-flex justify-content-end mt-2">
     <button type="button" class="btn btn-sm btn-outline-danger publish-attr-delete" data-index="${index}" data-i18n="publish.attributes.delete">删除</button>
@@ -573,6 +589,7 @@ include 'header.php';
         workingAttributes[index][field] = target.value;
         if(field === 'attribute_type'){
           workingAttributes[index].default_value = target.value === 'file' ? '' : (workingAttributes[index].default_value ?? '');
+          workingAttributes[index].options = target.value === 'select' ? (workingAttributes[index].options ?? '') : '';
           const defaultWrapper = row.querySelector('[data-default-wrapper]');
           if(defaultWrapper){
             if(target.value === 'file'){
@@ -581,9 +598,21 @@ include 'header.php';
               defaultWrapper.classList.remove('d-none');
             }
           }
+          const optionsWrapper = row.querySelector('[data-options-wrapper]');
+          if(optionsWrapper){
+            if(target.value === 'select'){
+              optionsWrapper.classList.remove('d-none');
+            } else {
+              optionsWrapper.classList.add('d-none');
+            }
+          }
           const defaultInput = row.querySelector('[data-field="default_value"]');
           if(defaultInput instanceof HTMLInputElement && target.value === 'file'){
             defaultInput.value = '';
+          }
+          const optionsInput = row.querySelector('[data-field="options"]');
+          if(optionsInput instanceof HTMLInputElement && target.value !== 'select'){
+            optionsInput.value = '';
           }
         }
       });
@@ -607,7 +636,8 @@ include 'header.php';
             name_zh: String(attr.name_zh ?? '').trim(),
             name_en: String(attr.name_en ?? '').trim(),
             attribute_type: attr.attribute_type ?? 'text',
-            default_value: String(attr.default_value ?? '')
+            default_value: String(attr.default_value ?? ''),
+            options: String(attr.options ?? '')
           };
         });
         const validCount = payload.filter(item => item.name_zh !== '' || item.name_en !== '').length;
