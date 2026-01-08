@@ -89,7 +89,7 @@ include 'header.php';
   </div>
   <div class="d-flex flex-wrap gap-2">
     <?php if ($isManager): ?>
-      <a class="btn btn-outline-secondary" href="publish_download.php" data-i18n="publish.download_all">Download All Files</a>
+      <button type="button" class="btn btn-outline-secondary" id="downloadPublishBtn" data-download-url="publish_download.php" data-i18n="publish.download_all">Download All Files</button>
       <a class="btn btn-outline-secondary" href="publish_export.php" data-i18n="publish.export">Export to Excel</a>
       <button type="button" class="btn btn-outline-primary" id="editPublishAttributesBtn" data-i18n="publish.attributes.edit">Edit Attributes</button>
     <?php endif; ?>
@@ -247,29 +247,46 @@ include 'header.php';
 </div>
 <?php endif; ?>
 
+<div class="modal fade" id="publishDownloadModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" data-i18n="publish.download.empty_title">No files available</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" data-i18n="publish.download.empty_body">No achievement files are available to download yet.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" data-i18n="publish.download.empty_confirm">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   window.publishAttributes = <?= json_encode($attributes, JSON_UNESCAPED_UNICODE); ?>;
-  (function(){
+  document.addEventListener('DOMContentLoaded', function(){
     const publishModalElement = document.getElementById('publishModal');
     const publishForm = document.getElementById('publishForm');
     const addPublishBtn = document.getElementById('addPublishBtn');
     const modalTitle = document.getElementById('publishModalTitle');
     const isManager = <?= $isManager ? 'true' : 'false'; ?>;
-    if(publishModalElement && publishForm){
-      if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
-        console.warn('Bootstrap modal is not available.');
-        return;
-      }
+    function translateWithFallback(key, fallback){
+      const lang = document.documentElement.lang || 'zh';
+      return (translations?.[lang] && translations[lang][key]) || fallback;
+    }
+    function translate(key){
+      return translateWithFallback(key, key);
+    }
+    const canUseBootstrap = typeof bootstrap !== 'undefined' && bootstrap.Modal;
+    if(!canUseBootstrap){
+      console.warn('Bootstrap modal is not available.');
+    }
+    if(publishModalElement && publishForm && canUseBootstrap){
       const publishModal = new bootstrap.Modal(publishModalElement);
       const fieldInputs = Array.from(publishForm.querySelectorAll('[data-publish-field]'));
       const memberSelect = publishForm.querySelector('#publishMemberSelect');
-      function translateWithFallback(key, fallback){
-        const lang = document.documentElement.lang || 'zh';
-        return (translations?.[lang] && translations[lang][key]) || fallback;
-      }
-      function translate(key){
-        return translateWithFallback(key, key);
-      }
       function setClearFlag(wrapper, enabled){
         const clearField = wrapper ? wrapper.querySelector('[data-publish-clear-flag]') : null;
         if (clearField) {
@@ -400,7 +417,7 @@ include 'header.php';
     const attrForm = document.getElementById('publishAttributesForm');
     const attrList = document.getElementById('publishAttributesList');
     const addAttrBtn = document.getElementById('addPublishAttribute');
-    if(editAttrBtn && attrModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal){
+    if(editAttrBtn && attrModalEl && canUseBootstrap){
       const attrModal = new bootstrap.Modal(attrModalEl);
       const cloneAttributes = (list) => Array.isArray(list) ? list.map(attr => ({
         id: attr.id ?? null,
@@ -589,8 +606,46 @@ include 'header.php';
         });
       });
     }
+    const downloadBtn = document.getElementById('downloadPublishBtn');
+    const downloadModalEl = document.getElementById('publishDownloadModal');
+    const downloadModal = (downloadModalEl && canUseBootstrap)
+      ? new bootstrap.Modal(downloadModalEl)
+      : null;
+    const downloadErrorMessage = () => translateWithFallback('publish.download.error', '下载失败，请稍后重试。');
+    if(downloadBtn){
+      downloadBtn.addEventListener('click', function(){
+        const url = downloadBtn.getAttribute('data-download-url') || 'publish_download.php';
+        fetch(url).then(response => {
+          if(response.ok){
+            return response.blob().then(blob => {
+              const contentDisposition = response.headers.get('Content-Disposition') || '';
+              const matches = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+              const filename = matches ? matches[1] : 'publish_files.zip';
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = filename;
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              URL.revokeObjectURL(link.href);
+            });
+          }
+          if(response.status === 404 && downloadModal){
+            downloadModal.show();
+            return null;
+          }
+          throw new Error('download_failed');
+        }).catch(() => {
+          if(downloadModal){
+            alert(downloadErrorMessage());
+          } else {
+            alert(downloadErrorMessage());
+          }
+        });
+      });
+    }
     <?php endif; ?>
-  })();
+  });
 </script>
 
 <?php include 'footer.php'; ?>
