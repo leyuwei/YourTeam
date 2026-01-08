@@ -131,6 +131,7 @@ include 'header.php';
   <table class="table table-bordered align-middle">
     <thead>
       <tr>
+        <th data-i18n="publish.table.index">#</th>
         <?php if ($isManager): ?>
           <th data-i18n="publish.table.member">Member</th>
         <?php endif; ?>
@@ -145,6 +146,7 @@ include 'header.php';
         <th data-i18n="publish.table.actions">Actions</th>
       </tr>
       <tr class="publish-filter-row">
+        <th></th>
         <?php if ($isManager): ?>
           <th></th>
         <?php endif; ?>
@@ -184,7 +186,7 @@ include 'header.php';
     <tbody>
       <?php if (empty($entries)): ?>
         <tr>
-          <td colspan="<?= count($attributes) + ($isManager ? 3 : 2); ?>" class="text-center text-muted" data-i18n="publish.empty">No achievements yet.</td>
+          <td colspan="<?= count($attributes) + ($isManager ? 4 : 3); ?>" class="text-center text-muted" data-i18n="publish.empty">No achievements yet.</td>
         </tr>
       <?php else: ?>
         <?php foreach ($entries as $entry):
@@ -200,6 +202,7 @@ include 'header.php';
           $rowDisplayJson = htmlspecialchars(json_encode($displayValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
         ?>
           <tr data-publish-values="<?= $rowDisplayJson; ?>">
+            <td class="publish-index text-muted"></td>
             <?php if ($isManager): ?>
               <td><?= htmlspecialchars($entry['member_name'] ?? '', ENT_QUOTES); ?></td>
             <?php endif; ?>
@@ -236,7 +239,7 @@ include 'header.php';
           </tr>
         <?php endforeach; ?>
         <tr id="publishFilterEmpty" class="d-none">
-          <td colspan="<?= count($attributes) + ($isManager ? 3 : 2); ?>" class="text-center text-muted" data-i18n="publish.filtered_empty">No matching achievements.</td>
+          <td colspan="<?= count($attributes) + ($isManager ? 4 : 3); ?>" class="text-center text-muted" data-i18n="publish.filtered_empty">No matching achievements.</td>
         </tr>
       <?php endif; ?>
     </tbody>
@@ -529,6 +532,19 @@ include 'header.php';
       publishRowValuesCache.set(row, values);
       return values;
     }
+    function updatePublishRowNumbers(){
+      let index = 1;
+      publishRows.forEach(function(row){
+        if(row.style.display === 'none'){
+          return;
+        }
+        const indexCell = row.querySelector('.publish-index');
+        if(indexCell){
+          indexCell.textContent = String(index);
+        }
+        index += 1;
+      });
+    }
     function applyPublishFilters(){
       if(!publishTbody || !publishRows.length){
         return;
@@ -572,6 +588,7 @@ include 'header.php';
           visibleCount += 1;
         }
       });
+      updatePublishRowNumbers();
       if(publishEmptyRow){
         publishEmptyRow.classList.toggle('d-none', visibleCount !== 0);
       }
