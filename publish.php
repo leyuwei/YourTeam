@@ -8,6 +8,25 @@ $isManager = $role === 'manager';
 $sessionMemberId = (int)($_SESSION['member_id'] ?? 0);
 $attributes = getPublishAttributes($pdo);
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['publish_action'] ?? '') === 'delete') {
+    $entryId = isset($_POST['entry_id']) && $_POST['entry_id'] !== ''
+        ? (int)$_POST['entry_id']
+        : 0;
+
+    if ($entryId > 0) {
+        if ($isManager) {
+            $deleteStmt = $pdo->prepare('DELETE FROM publish_entries WHERE id = ?');
+            $deleteStmt->execute([$entryId]);
+        } else {
+            $deleteStmt = $pdo->prepare('DELETE FROM publish_entries WHERE id = ? AND member_id = ?');
+            $deleteStmt->execute([$entryId, $sessionMemberId]);
+        }
+    }
+
+    header('Location: publish.php');
+    exit();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['publish_action'] ?? '') === 'save') {
     $entryId = isset($_POST['entry_id']) && $_POST['entry_id'] !== ''
         ? (int)$_POST['entry_id']
@@ -154,6 +173,11 @@ include 'header.php';
                       data-member-id="<?= (int)($entry['member_id'] ?? 0); ?>"
                       data-values="<?= $rowValueJson; ?>"
                       data-i18n="publish.edit">Edit</button>
+              <form method="post" class="d-inline" onsubmit="return doubleConfirm(translations[document.documentElement.lang||'zh']['publish.confirm_delete']);">
+                <input type="hidden" name="publish_action" value="delete">
+                <input type="hidden" name="entry_id" value="<?= $entryId; ?>">
+                <button type="submit" class="btn btn-sm btn-outline-danger" data-i18n="publish.delete">Delete</button>
+              </form>
             </td>
           </tr>
         <?php endforeach; ?>
