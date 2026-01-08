@@ -49,6 +49,40 @@ CREATE TABLE member_extra_values (
   FOREIGN KEY (attribute_id) REFERENCES member_extra_attributes(id) ON DELETE CASCADE
 );
 
+CREATE TABLE publish_attributes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sort_order INT DEFAULT 0,
+  name_en VARCHAR(100) NOT NULL DEFAULT '',
+  name_zh VARCHAR(100) NOT NULL DEFAULT '',
+  attribute_type ENUM('text','textarea','file','date','select') NOT NULL DEFAULT 'text',
+  default_value TEXT,
+  options TEXT
+);
+
+CREATE TABLE publish_entries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  member_id INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE TABLE publish_values (
+  entry_id INT NOT NULL,
+  attribute_id INT NOT NULL,
+  value TEXT,
+  PRIMARY KEY (entry_id, attribute_id),
+  FOREIGN KEY (entry_id) REFERENCES publish_entries(id) ON DELETE CASCADE,
+  FOREIGN KEY (attribute_id) REFERENCES publish_attributes(id) ON DELETE CASCADE
+);
+
+INSERT INTO publish_attributes (sort_order, name_en, name_zh, attribute_type, default_value, options) VALUES
+(0, 'Type', '成果类型', 'text', '', ''),
+(1, 'Name', '成果名称', 'text', '', ''),
+(2, 'Description', '成果描述', 'textarea', '', ''),
+(3, 'File', '成果文件', 'file', '', ''),
+(4, 'Publish Date', '发布时间', 'date', '', '');
+
 CREATE TABLE projects (
   id INT AUTO_INCREMENT PRIMARY KEY,
   sort_order INT DEFAULT 0,
