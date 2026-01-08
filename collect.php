@@ -43,12 +43,17 @@ function delete_submission_files($templateId, $data) {
     }
 }
 
-if ($is_manager && isset($_GET['download'])) {
+if (isset($_GET['download'])) {
     $templateId = intval($_GET['download']);
     $stmt = $pdo->prepare("SELECT * FROM collect_templates WHERE id=?");
     $stmt->execute([$templateId]);
     $template = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($template) {
+        $canDownload = $is_manager || !empty($template['allow_user_download']);
+        if (!$canDownload) {
+            header('Location: collect.php');
+            exit;
+        }
         $fields = decode_json_or($template['fields_json']);
         $fieldOrder = array_map(fn($f) => $f['id'], $fields);
         $fieldLabels = [];
@@ -118,16 +123,17 @@ if ($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ??
     $description = trim($_POST['description'] ?? '');
     $status = $_POST['status'] ?? 'open';
     $deadline = $_POST['deadline'] ?: null;
+    $allowUserDownload = !empty($_POST['allow_user_download']) ? 1 : 0;
     $fieldsJson = $_POST['fields_json'] ?? '[]';
     $targets = $_POST['targets'] ?? [];
     $targetJson = json_encode(array_map('intval', $targets));
     $now = date('Y-m-d H:i:s');
     if ($id) {
-        $stmt = $pdo->prepare("UPDATE collect_templates SET name=?, description=?, status=?, deadline=?, fields_json=?, target_member_ids=?, updated_at=? WHERE id=?");
-        $stmt->execute([$name, $description, $status, $deadline, $fieldsJson, $targetJson, $now, $id]);
+        $stmt = $pdo->prepare("UPDATE collect_templates SET name=?, description=?, status=?, deadline=?, allow_user_download=?, fields_json=?, target_member_ids=?, updated_at=? WHERE id=?");
+        $stmt->execute([$name, $description, $status, $deadline, $allowUserDownload, $fieldsJson, $targetJson, $now, $id]);
     } else {
-        $stmt = $pdo->prepare("INSERT INTO collect_templates (name, description, status, deadline, fields_json, target_member_ids, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)");
-        $stmt->execute([$name, $description, $status, $deadline, $fieldsJson, $targetJson, $now, $now]);
+        $stmt = $pdo->prepare("INSERT INTO collect_templates (name, description, status, deadline, allow_user_download, fields_json, target_member_ids, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([$name, $description, $status, $deadline, $allowUserDownload, $fieldsJson, $targetJson, $now, $now]);
     }
     header('Location: collect.php');
     exit;
@@ -338,6 +344,8 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
               <input type="hidden" name="id" value="<?= $t['id']; ?>">
               <button class="btn btn-sm btn-danger" data-i18n="collect.template_card.delete">Delete</button>
             </form>
+          <?php endif; ?>
+          <?php if($is_manager || !empty($t['allow_user_download'])): ?>
             <a class="btn btn-sm btn-outline-primary" href="collect.php?download=<?= $t['id']; ?>" data-i18n="collect.download_zip">Download ZIP</a>
           <?php endif; ?>
           <?php if($t['status']==='open' && (empty($targets) || in_array($member_id,$targets))): ?>
@@ -530,6 +538,13 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
             <div class="col-md-4">
               <label class="form-label" data-i18n="collect.deadline">Deadline</label>
               <input type="date" class="form-control" name="deadline" id="templateDeadline">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" data-i18n="collect.allow_download">Allow Download</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="allow_user_download" id="templateAllowDownload" value="1">
+                <label class="form-check-label" for="templateAllowDownload" data-i18n="collect.allow_download_hint">Let users download submissions</label>
+              </div>
             </div>
           </div>
           <div class="mb-3">
@@ -767,6 +782,7 @@ window.addEventListener('load', () => {
         document.getElementById('templateDescription').value = data.description || '';
         document.getElementById('templateStatus').value = data.status;
         document.getElementById('templateDeadline').value = data.deadline || '';
+        document.getElementById('templateAllowDownload').checked = !!Number(data.allow_user_download || 0);
         const targets = JSON.parse(data.target_member_ids || '[]');
         document.querySelectorAll('input[name="targets[]"]').forEach(cb=>cb.checked = targets.includes(parseInt(cb.value)));
         const fields = JSON.parse(data.fields_json || '[]');

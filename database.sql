@@ -355,6 +355,7 @@ CREATE TABLE `collect_templates` (
   `description` text,
   `status` enum('open','paused','ended','void') NOT NULL DEFAULT 'open',
   `deadline` date DEFAULT NULL,
+  `allow_user_download` tinyint(1) NOT NULL DEFAULT 0,
   `fields_json` longtext NOT NULL,
   `target_member_ids` longtext,
   `created_at` datetime DEFAULT NULL,
