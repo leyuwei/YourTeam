@@ -116,6 +116,17 @@ include 'header.php';
   </div>
 </div>
 
+<style>
+  .publish-sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  .publish-sort-indicator {
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+  }
+</style>
+
 <div class="table-responsive">
   <table class="table table-bordered align-middle">
     <thead>
@@ -128,10 +139,46 @@ include 'header.php';
           $nameZh = trim((string)$attr['name_zh']);
           $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : '');
         ?>
-          <th data-attr-id="<?= (int)$attr['id']; ?>" data-publish-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-publish-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($display); ?></th>
+          <th class="publish-sortable" role="button" tabindex="0" data-attr-id="<?= (int)$attr['id']; ?>" data-publish-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-publish-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($display); ?><span class="publish-sort-indicator" aria-hidden="true"></span></th>
         <?php endforeach; ?>
         <th data-i18n="publish.table.updated">Updated</th>
         <th data-i18n="publish.table.actions">Actions</th>
+      </tr>
+      <tr class="publish-filter-row">
+        <?php if ($isManager): ?>
+          <th></th>
+        <?php endif; ?>
+        <?php foreach ($attributes as $attr):
+          $attrId = (int)$attr['id'];
+          $attrType = $attr['attribute_type'] ?? 'text';
+          $optionsRaw = (string)($attr['options'] ?? '');
+          $optionsList = array_values(array_filter(array_map('trim', explode(',', $optionsRaw))));
+        ?>
+          <th>
+            <?php if ($attrType === 'select'): ?>
+              <select class="form-select form-select-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                <option value="" data-i18n="publish.filter.all">All</option>
+                <?php foreach ($optionsList as $optionValue): ?>
+                  <option value="<?= htmlspecialchars($optionValue, ENT_QUOTES); ?>"><?= htmlspecialchars($optionValue, ENT_QUOTES); ?></option>
+                <?php endforeach; ?>
+              </select>
+            <?php elseif ($attrType === 'date'): ?>
+              <input type="date" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+            <?php elseif ($attrType === 'file'): ?>
+              <select class="form-select form-select-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                <option value="" data-i18n="publish.filter.all">All</option>
+                <option value="has" data-i18n="publish.filter.has_file">Has file</option>
+                <option value="empty" data-i18n="publish.filter.no_file">No file</option>
+              </select>
+            <?php else: ?>
+              <input type="text" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-i18n-placeholder="publish.filter.placeholder" placeholder="Filter">
+            <?php endif; ?>
+          </th>
+        <?php endforeach; ?>
+        <th></th>
+        <th>
+          <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="publishClearFilters" data-i18n="publish.filter.clear">Clear Filters</button>
+        </th>
       </tr>
     </thead>
     <tbody>
@@ -143,16 +190,23 @@ include 'header.php';
         <?php foreach ($entries as $entry):
           $entryId = (int)($entry['id'] ?? 0);
           $rowValues = $valuesMap[$entryId] ?? [];
+          $displayValues = [];
+          foreach ($attributes as $attr) {
+            $attrId = (int)$attr['id'];
+            $attrType = $attr['attribute_type'] ?? 'text';
+            $displayValues[$attrId] = (string)($rowValues[$attrId] ?? ($attrType === 'file' ? '' : (string)($attr['default_value'] ?? '')));
+          }
           $rowValueJson = htmlspecialchars(json_encode($rowValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+          $rowDisplayJson = htmlspecialchars(json_encode($displayValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
         ?>
-          <tr>
+          <tr data-publish-values="<?= $rowDisplayJson; ?>">
             <?php if ($isManager): ?>
               <td><?= htmlspecialchars($entry['member_name'] ?? '', ENT_QUOTES); ?></td>
             <?php endif; ?>
             <?php foreach ($attributes as $attr):
               $attrId = (int)$attr['id'];
               $attrType = $attr['attribute_type'] ?? 'text';
-              $value = (string)($rowValues[$attrId] ?? ($attrType === 'file' ? '' : (string)($attr['default_value'] ?? '')));
+              $value = (string)($displayValues[$attrId] ?? '');
             ?>
               <td>
                 <?php if ($attrType === 'file'): ?>
@@ -181,6 +235,9 @@ include 'header.php';
             </td>
           </tr>
         <?php endforeach; ?>
+        <tr id="publishFilterEmpty" class="d-none">
+          <td colspan="<?= count($attributes) + ($isManager ? 3 : 2); ?>" class="text-center text-muted" data-i18n="publish.filtered_empty">No matching achievements.</td>
+        </tr>
       <?php endif; ?>
     </tbody>
   </table>
@@ -443,6 +500,180 @@ include 'header.php';
         });
       });
     }
+    const publishTable = document.querySelector('.table');
+    const publishTbody = publishTable?.querySelector('tbody') || null;
+    const publishRows = publishTbody ? Array.from(publishTbody.querySelectorAll('tr[data-publish-values]')) : [];
+    const publishFilterInputs = Array.from(document.querySelectorAll('[data-publish-filter]'));
+    const publishClearFiltersBtn = document.getElementById('publishClearFilters');
+    const publishEmptyRow = document.getElementById('publishFilterEmpty');
+    const publishRowValuesCache = new WeakMap();
+    const attributeTypeMap = new Map();
+    (window.publishAttributes || []).forEach(function(attr){
+      const id = String(attr.id ?? '');
+      if(id){
+        attributeTypeMap.set(id, String(attr.attribute_type ?? 'text'));
+      }
+    });
+    function getRowValues(row){
+      if(publishRowValuesCache.has(row)){
+        return publishRowValuesCache.get(row);
+      }
+      let values = {};
+      if(row?.dataset?.publishValues){
+        try {
+          values = JSON.parse(row.dataset.publishValues);
+        } catch (err) {
+          values = {};
+        }
+      }
+      publishRowValuesCache.set(row, values);
+      return values;
+    }
+    function applyPublishFilters(){
+      if(!publishTbody || !publishRows.length){
+        return;
+      }
+      let visibleCount = 0;
+      publishRows.forEach(function(row){
+        const values = getRowValues(row);
+        let matches = true;
+        for(const input of publishFilterInputs){
+          const attrId = input.dataset.filterId;
+          if(!attrId){
+            continue;
+          }
+          const filterValue = String(input.value ?? '').trim();
+          if(filterValue === ''){
+            continue;
+          }
+          const filterType = input.dataset.filterType || attributeTypeMap.get(String(attrId)) || 'text';
+          const value = String(values?.[attrId] ?? '');
+          if(filterType === 'file'){
+            if(filterValue === 'has' && value === ''){
+              matches = false;
+              break;
+            }
+            if(filterValue === 'empty' && value !== ''){
+              matches = false;
+              break;
+            }
+          } else if(filterType === 'select' || filterType === 'date'){
+            if(value !== filterValue){
+              matches = false;
+              break;
+            }
+          } else if(!value.toLowerCase().includes(filterValue.toLowerCase())){
+            matches = false;
+            break;
+          }
+        }
+        row.style.display = matches ? '' : 'none';
+        if(matches){
+          visibleCount += 1;
+        }
+      });
+      if(publishEmptyRow){
+        publishEmptyRow.classList.toggle('d-none', visibleCount !== 0);
+      }
+    }
+    function buildFilterParams(){
+      const params = new URLSearchParams();
+      publishFilterInputs.forEach(function(input){
+        const attrId = input.dataset.filterId;
+        if(!attrId){
+          return;
+        }
+        const filterValue = String(input.value ?? '').trim();
+        if(filterValue === ''){
+          return;
+        }
+        params.append(`filters[${attrId}]`, filterValue);
+      });
+      return params;
+    }
+    publishFilterInputs.forEach(function(input){
+      input.addEventListener('input', applyPublishFilters);
+      input.addEventListener('change', applyPublishFilters);
+    });
+    publishClearFiltersBtn?.addEventListener('click', function(){
+      publishFilterInputs.forEach(function(input){
+        if(input instanceof HTMLSelectElement || input instanceof HTMLInputElement){
+          input.value = '';
+        }
+      });
+      applyPublishFilters();
+    });
+    const publishSortHeaders = Array.from(document.querySelectorAll('th[data-attr-id]'));
+    const publishSortState = { attrId: null, direction: 'asc' };
+    const sortIndicatorText = (direction) => direction === 'asc' ? '▲' : '▼';
+    function updateSortIndicators(){
+      publishSortHeaders.forEach(function(header){
+        const indicator = header.querySelector('.publish-sort-indicator');
+        if(!indicator){
+          return;
+        }
+        if(header.dataset.attrId === publishSortState.attrId){
+          indicator.textContent = sortIndicatorText(publishSortState.direction);
+        } else {
+          indicator.textContent = '';
+        }
+      });
+    }
+    function compareValues(aValue, bValue, type){
+      const aText = String(aValue ?? '');
+      const bText = String(bValue ?? '');
+      if(type === 'date'){
+        const aTime = Date.parse(aText);
+        const bTime = Date.parse(bText);
+        if(!Number.isNaN(aTime) && !Number.isNaN(bTime)){
+          return aTime - bTime;
+        }
+      }
+      return aText.localeCompare(bText, undefined, { numeric: true, sensitivity: 'base' });
+    }
+    function sortPublishRows(attrId){
+      if(!publishTbody || !publishRows.length){
+        return;
+      }
+      if(publishSortState.attrId === attrId){
+        publishSortState.direction = publishSortState.direction === 'asc' ? 'desc' : 'asc';
+      } else {
+        publishSortState.attrId = attrId;
+        publishSortState.direction = 'asc';
+      }
+      const type = attributeTypeMap.get(String(attrId)) || 'text';
+      const direction = publishSortState.direction === 'asc' ? 1 : -1;
+      publishRows.sort(function(a, b){
+        const valuesA = getRowValues(a);
+        const valuesB = getRowValues(b);
+        const result = compareValues(valuesA?.[attrId] ?? '', valuesB?.[attrId] ?? '', type);
+        return result * direction;
+      });
+      publishRows.forEach(function(row){
+        publishTbody.appendChild(row);
+      });
+      if(publishEmptyRow){
+        publishTbody.appendChild(publishEmptyRow);
+      }
+      updateSortIndicators();
+      applyPublishFilters();
+    }
+    publishSortHeaders.forEach(function(header){
+      const attrId = header.dataset.attrId;
+      if(!attrId){
+        return;
+      }
+      header.addEventListener('click', function(){
+        sortPublishRows(attrId);
+      });
+      header.addEventListener('keydown', function(event){
+        if(event.key === 'Enter' || event.key === ' '){
+          event.preventDefault();
+          sortPublishRows(attrId);
+        }
+      });
+    });
+    applyPublishFilters();
     <?php if ($isManager): ?>
     const editAttrBtn = document.getElementById('editPublishAttributesBtn');
     const attrModalEl = document.getElementById('publishAttributesModal');
@@ -668,8 +899,13 @@ include 'header.php';
     const downloadErrorMessage = () => translateWithFallback('publish.download.error', '下载失败，请稍后重试。');
     if(downloadBtn){
       downloadBtn.addEventListener('click', function(){
-        const url = downloadBtn.getAttribute('data-download-url') || 'publish_download.php';
-        fetch(url).then(response => {
+        const baseUrl = downloadBtn.getAttribute('data-download-url') || 'publish_download.php';
+        const url = new URL(baseUrl, window.location.href);
+        const params = buildFilterParams();
+        params.forEach(function(value, key){
+          url.searchParams.append(key, value);
+        });
+        fetch(url.toString()).then(response => {
           if(response.ok){
             return response.blob().then(blob => {
               const contentDisposition = response.headers.get('Content-Disposition') || '';
