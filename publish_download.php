@@ -9,10 +9,16 @@ if (($_SESSION['role'] ?? '') !== 'manager') {
 }
 
 $attributes = getPublishAttributes($pdo);
+$attributeMap = [];
 $fileAttributeIds = [];
 foreach ($attributes as $attr) {
+    $attrId = (int)($attr['id'] ?? 0);
+    if ($attrId <= 0) {
+        continue;
+    }
+    $attributeMap[$attrId] = $attr;
     if (($attr['attribute_type'] ?? '') === 'file') {
-        $fileAttributeIds[] = (int)$attr['id'];
+        $fileAttributeIds[] = $attrId;
     }
 }
 
@@ -26,6 +32,61 @@ $entries = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 $entryIds = array_column($entries, 'id');
 $valuesMap = getPublishValues($pdo, $entryIds);
 
+$rawFilters = $_GET['filters'] ?? [];
+$activeFilters = [];
+if (is_array($rawFilters)) {
+    foreach ($rawFilters as $filterId => $filterValue) {
+        $attrId = (int)$filterId;
+        if ($attrId <= 0 || !isset($attributeMap[$attrId])) {
+            continue;
+        }
+        if (is_array($filterValue)) {
+            continue;
+        }
+        $filterValue = trim((string)$filterValue);
+        if ($filterValue === '') {
+            continue;
+        }
+        $activeFilters[$attrId] = $filterValue;
+    }
+}
+
+$filteredEntries = [];
+if (!empty($activeFilters)) {
+    foreach ($entries as $entry) {
+        $entryId = (int)($entry['id'] ?? 0);
+        $matches = true;
+        foreach ($activeFilters as $attrId => $filterValue) {
+            $attr = $attributeMap[$attrId];
+            $attrType = $attr['attribute_type'] ?? 'text';
+            $value = (string)($valuesMap[$entryId][$attrId] ?? ($attrType === 'file' ? '' : (string)($attr['default_value'] ?? '')));
+            if ($attrType === 'file') {
+                if ($filterValue === 'has' && $value === '') {
+                    $matches = false;
+                    break;
+                }
+                if ($filterValue === 'empty' && $value !== '') {
+                    $matches = false;
+                    break;
+                }
+            } elseif ($attrType === 'select' || $attrType === 'date') {
+                if ($value !== $filterValue) {
+                    $matches = false;
+                    break;
+                }
+            } elseif (stripos($value, $filterValue) === false) {
+                $matches = false;
+                break;
+            }
+        }
+        if ($matches) {
+            $filteredEntries[] = $entry;
+        }
+    }
+} else {
+    $filteredEntries = $entries;
+}
+
 $zip = new ZipArchive();
 $tmpFile = tempnam(sys_get_temp_dir(), 'publish_zip_');
 if ($tmpFile === false || $zip->open($tmpFile, ZipArchive::OVERWRITE) !== true) {
@@ -34,7 +95,7 @@ if ($tmpFile === false || $zip->open($tmpFile, ZipArchive::OVERWRITE) !== true) 
 }
 
 $added = false;
-foreach ($entries as $entry) {
+foreach ($filteredEntries as $entry) {
     $entryId = (int)($entry['id'] ?? 0);
     $memberName = trim((string)($entry['member_name'] ?? ''));
     $memberFolder = $memberName !== '' ? $memberName : ('member_' . ($entry['member_id'] ?? ''));
