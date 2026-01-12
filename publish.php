@@ -7,6 +7,28 @@ $role = $_SESSION['role'] ?? '';
 $isManager = $role === 'manager';
 $sessionMemberId = (int)($_SESSION['member_id'] ?? 0);
 $attributes = getPublishAttributes($pdo);
+$allowMemberViewAll = false;
+try {
+    $settingsStmt = $pdo->query('SELECT allow_member_view_all FROM publish_settings WHERE id = 1');
+    $settingsRow = $settingsStmt ? $settingsStmt->fetch(PDO::FETCH_ASSOC) : null;
+    $allowMemberViewAll = !empty($settingsRow) && (int)$settingsRow['allow_member_view_all'] === 1;
+} catch (Throwable $e) {
+    $allowMemberViewAll = false;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['publish_action'] ?? '') === 'update_visibility') {
+    if ($isManager) {
+        $allow = isset($_POST['allow_member_view_all']) ? 1 : 0;
+        try {
+            $updateStmt = $pdo->prepare('INSERT INTO publish_settings (id, allow_member_view_all) VALUES (1, ?) ON DUPLICATE KEY UPDATE allow_member_view_all = VALUES(allow_member_view_all)');
+            $updateStmt->execute([$allow]);
+        } catch (Throwable $e) {
+            // Keep default fallback without breaking the page.
+        }
+    }
+    header('Location: publish.php');
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['publish_action'] ?? '') === 'delete') {
     $entryId = isset($_POST['entry_id']) && $_POST['entry_id'] !== ''
@@ -84,11 +106,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['publish_action'] ?? '') ==
     exit();
 }
 
+$showMemberColumn = $isManager || $allowMemberViewAll;
+
 if ($isManager) {
     $stmt = $pdo->query('SELECT e.*, m.name AS member_name FROM publish_entries e JOIN members m ON e.member_id = m.id ORDER BY e.updated_at DESC, e.id DESC');
     $entries = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     $memberStmt = $pdo->query('SELECT id, name FROM members ORDER BY sort_order, id');
     $members = $memberStmt ? $memberStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+} elseif ($allowMemberViewAll) {
+    $stmt = $pdo->query('SELECT e.*, m.name AS member_name FROM publish_entries e JOIN members m ON e.member_id = m.id ORDER BY e.updated_at DESC, e.id DESC');
+    $entries = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+    $members = [];
 } else {
     $stmt = $pdo->prepare('SELECT e.* FROM publish_entries e WHERE e.member_id = ? ORDER BY e.updated_at DESC, e.id DESC');
     $stmt->execute([$sessionMemberId]);
@@ -116,6 +144,22 @@ include 'header.php';
   </div>
 </div>
 
+<?php if ($isManager): ?>
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div>
+      <h6 class="mb-1" data-i18n="publish.visibility.title">成员可见性</h6>
+      <p class="text-muted mb-0" data-i18n="publish.visibility.hint">控制一般成员是否能查看其他成员的成果。</p>
+    </div>
+    <form method="post" class="form-check form-switch m-0">
+      <input type="hidden" name="publish_action" value="update_visibility">
+      <input class="form-check-input" type="checkbox" role="switch" id="publishVisibilitySwitch" name="allow_member_view_all" value="1" <?= $allowMemberViewAll ? 'checked' : ''; ?> onchange="this.form.submit()">
+      <label class="form-check-label" for="publishVisibilitySwitch" data-i18n="publish.visibility.switch">允许成员查看全部成果</label>
+    </form>
+  </div>
+</div>
+<?php endif; ?>
+
 <style>
   .publish-sortable {
     cursor: pointer;
@@ -132,7 +176,7 @@ include 'header.php';
     <thead>
       <tr>
         <th data-i18n="publish.table.index">#</th>
-        <?php if ($isManager): ?>
+        <?php if ($showMemberColumn): ?>
           <th data-i18n="publish.table.member">Member</th>
         <?php endif; ?>
         <?php foreach ($attributes as $attr):
@@ -147,7 +191,7 @@ include 'header.php';
       </tr>
       <tr class="publish-filter-row">
         <th></th>
-        <?php if ($isManager): ?>
+        <?php if ($showMemberColumn): ?>
           <th></th>
         <?php endif; ?>
         <?php foreach ($attributes as $attr):
@@ -165,7 +209,22 @@ include 'header.php';
                 <?php endforeach; ?>
               </select>
             <?php elseif ($attrType === 'date'): ?>
-              <input type="date" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+              <div class="publish-date-filter" data-publish-date-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                <div class="d-flex gap-1">
+                  <input type="date" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-date-role="start" data-i18n-placeholder="publish.filter.date_from" placeholder="From">
+                  <input type="date" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-date-role="end" data-i18n-placeholder="publish.filter.date_to" placeholder="To">
+                </div>
+                <div class="d-flex gap-1 mt-1">
+                  <input type="number" class="form-control form-control-sm" min="2000" max="2100" data-date-role="year" data-i18n-placeholder="publish.filter.year" placeholder="Year">
+                  <select class="form-select form-select-sm" data-date-role="quarter" aria-label="Quarter">
+                    <option value="" data-i18n="publish.filter.quarter">Quarter</option>
+                    <option value="1" data-i18n="publish.filter.quarter_q1">Q1</option>
+                    <option value="2" data-i18n="publish.filter.quarter_q2">Q2</option>
+                    <option value="3" data-i18n="publish.filter.quarter_q3">Q3</option>
+                    <option value="4" data-i18n="publish.filter.quarter_q4">Q4</option>
+                  </select>
+                </div>
+              </div>
             <?php elseif ($attrType === 'file'): ?>
               <select class="form-select form-select-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
                 <option value="" data-i18n="publish.filter.all">All</option>
@@ -186,11 +245,12 @@ include 'header.php';
     <tbody>
       <?php if (empty($entries)): ?>
         <tr>
-          <td colspan="<?= count($attributes) + ($isManager ? 4 : 3); ?>" class="text-center text-muted" data-i18n="publish.empty">No achievements yet.</td>
+          <td colspan="<?= count($attributes) + ($showMemberColumn ? 4 : 3); ?>" class="text-center text-muted" data-i18n="publish.empty">No achievements yet.</td>
         </tr>
       <?php else: ?>
         <?php foreach ($entries as $entry):
           $entryId = (int)($entry['id'] ?? 0);
+          $canEditEntry = $isManager || (int)($entry['member_id'] ?? 0) === $sessionMemberId;
           $rowValues = $valuesMap[$entryId] ?? [];
           $displayValues = [];
           foreach ($attributes as $attr) {
@@ -203,7 +263,7 @@ include 'header.php';
         ?>
           <tr data-publish-values="<?= $rowDisplayJson; ?>">
             <td class="publish-index text-muted"></td>
-            <?php if ($isManager): ?>
+            <?php if ($showMemberColumn): ?>
               <td><?= htmlspecialchars($entry['member_name'] ?? '', ENT_QUOTES); ?></td>
             <?php endif; ?>
             <?php foreach ($attributes as $attr):
@@ -225,21 +285,25 @@ include 'header.php';
             <?php endforeach; ?>
             <td><?= htmlspecialchars($entry['updated_at'] ?? '', ENT_QUOTES); ?></td>
             <td>
-              <button type="button" class="btn btn-sm btn-outline-primary publish-edit-btn"
-                      data-id="<?= $entryId; ?>"
-                      data-member-id="<?= (int)($entry['member_id'] ?? 0); ?>"
-                      data-values="<?= $rowValueJson; ?>"
-                      data-i18n="publish.edit">Edit</button>
-              <form method="post" class="d-inline" onsubmit="return doubleConfirm(translations[document.documentElement.lang||'zh']['publish.confirm_delete']);">
-                <input type="hidden" name="publish_action" value="delete">
-                <input type="hidden" name="entry_id" value="<?= $entryId; ?>">
-                <button type="submit" class="btn btn-sm btn-outline-danger" data-i18n="publish.delete">Delete</button>
-              </form>
+              <?php if ($canEditEntry): ?>
+                <button type="button" class="btn btn-sm btn-outline-primary publish-edit-btn"
+                        data-id="<?= $entryId; ?>"
+                        data-member-id="<?= (int)($entry['member_id'] ?? 0); ?>"
+                        data-values="<?= $rowValueJson; ?>"
+                        data-i18n="publish.edit">Edit</button>
+                <form method="post" class="d-inline" onsubmit="return doubleConfirm(translations[document.documentElement.lang||'zh']['publish.confirm_delete']);">
+                  <input type="hidden" name="publish_action" value="delete">
+                  <input type="hidden" name="entry_id" value="<?= $entryId; ?>">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" data-i18n="publish.delete">Delete</button>
+                </form>
+              <?php else: ?>
+                <span class="text-muted small" data-i18n="publish.view_only">View only</span>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; ?>
         <tr id="publishFilterEmpty" class="d-none">
-          <td colspan="<?= count($attributes) + ($isManager ? 4 : 3); ?>" class="text-center text-muted" data-i18n="publish.filtered_empty">No matching achievements.</td>
+          <td colspan="<?= count($attributes) + ($showMemberColumn ? 4 : 3); ?>" class="text-center text-muted" data-i18n="publish.filtered_empty">No matching achievements.</td>
         </tr>
       <?php endif; ?>
     </tbody>
@@ -507,6 +571,7 @@ include 'header.php';
     const publishTbody = publishTable?.querySelector('tbody') || null;
     const publishRows = publishTbody ? Array.from(publishTbody.querySelectorAll('tr[data-publish-values]')) : [];
     const publishFilterInputs = Array.from(document.querySelectorAll('[data-publish-filter]'));
+    const publishDateFilters = Array.from(document.querySelectorAll('[data-publish-date-filter]'));
     const publishClearFiltersBtn = document.getElementById('publishClearFilters');
     const publishEmptyRow = document.getElementById('publishFilterEmpty');
     const publishRowValuesCache = new WeakMap();
@@ -545,10 +610,33 @@ include 'header.php';
         index += 1;
       });
     }
+    function parseDateValue(value){
+      const timestamp = Date.parse(String(value ?? ''));
+      return Number.isNaN(timestamp) ? null : timestamp;
+    }
+    function collectDateRanges(){
+      const ranges = new Map();
+      publishDateFilters.forEach(function(container){
+        const attrId = container.dataset.filterId;
+        if(!attrId){
+          return;
+        }
+        const startInput = container.querySelector('[data-date-role="start"]');
+        const endInput = container.querySelector('[data-date-role="end"]');
+        const startValue = String(startInput?.value ?? '').trim();
+        const endValue = String(endInput?.value ?? '').trim();
+        if(startValue === '' && endValue === ''){
+          return;
+        }
+        ranges.set(String(attrId), { start: startValue, end: endValue });
+      });
+      return ranges;
+    }
     function applyPublishFilters(){
       if(!publishTbody || !publishRows.length){
         return;
       }
+      const dateRanges = collectDateRanges();
       let visibleCount = 0;
       publishRows.forEach(function(row){
         const values = getRowValues(row);
@@ -563,6 +651,9 @@ include 'header.php';
             continue;
           }
           const filterType = input.dataset.filterType || attributeTypeMap.get(String(attrId)) || 'text';
+          if(filterType === 'date'){
+            continue;
+          }
           const value = String(values?.[attrId] ?? '');
           if(filterType === 'file'){
             if(filterValue === 'has' && value === ''){
@@ -581,6 +672,34 @@ include 'header.php';
           } else if(!value.toLowerCase().includes(filterValue.toLowerCase())){
             matches = false;
             break;
+          }
+        }
+        if(matches && dateRanges.size > 0){
+          for(const [attrId, range] of dateRanges.entries()){
+            const value = String(values?.[attrId] ?? '');
+            if(value === ''){
+              matches = false;
+              break;
+            }
+            const valueTime = parseDateValue(value);
+            if(valueTime === null){
+              matches = false;
+              break;
+            }
+            if(range.start){
+              const startTime = parseDateValue(range.start);
+              if(startTime !== null && valueTime < startTime){
+                matches = false;
+                break;
+              }
+            }
+            if(range.end){
+              const endTime = parseDateValue(range.end);
+              if(endTime !== null && valueTime > (endTime + 86400000 - 1)){
+                matches = false;
+                break;
+              }
+            }
           }
         }
         row.style.display = matches ? '' : 'none';
@@ -612,10 +731,45 @@ include 'header.php';
       input.addEventListener('input', applyPublishFilters);
       input.addEventListener('change', applyPublishFilters);
     });
+    publishDateFilters.forEach(function(container){
+      const yearInput = container.querySelector('[data-date-role="year"]');
+      const quarterSelect = container.querySelector('[data-date-role="quarter"]');
+      const startInput = container.querySelector('[data-date-role="start"]');
+      const endInput = container.querySelector('[data-date-role="end"]');
+      const applyQuarter = function(){
+        const year = parseInt(String(yearInput?.value ?? ''), 10);
+        const quarter = parseInt(String(quarterSelect?.value ?? ''), 10);
+        if(!year || !quarter || quarter < 1 || quarter > 4){
+          return;
+        }
+        const startMonth = (quarter - 1) * 3;
+        const startDate = new Date(year, startMonth, 1);
+        const endDate = new Date(year, startMonth + 3, 0);
+        if(startInput){
+          startInput.value = startDate.toISOString().slice(0, 10);
+        }
+        if(endInput){
+          endInput.value = endDate.toISOString().slice(0, 10);
+        }
+        applyPublishFilters();
+      };
+      yearInput?.addEventListener('input', applyQuarter);
+      quarterSelect?.addEventListener('change', applyQuarter);
+    });
     publishClearFiltersBtn?.addEventListener('click', function(){
       publishFilterInputs.forEach(function(input){
         if(input instanceof HTMLSelectElement || input instanceof HTMLInputElement){
           input.value = '';
+        }
+      });
+      publishDateFilters.forEach(function(container){
+        const yearInput = container.querySelector('[data-date-role="year"]');
+        const quarterSelect = container.querySelector('[data-date-role="quarter"]');
+        if(yearInput){
+          yearInput.value = '';
+        }
+        if(quarterSelect){
+          quarterSelect.value = '';
         }
       });
       applyPublishFilters();
