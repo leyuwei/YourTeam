@@ -127,6 +127,155 @@ if ($isManager) {
 $entryIds = array_column($entries, 'id');
 $valuesMap = getPublishValues($pdo, $entryIds);
 
+if (!$isManager && $allowMemberViewAll) {
+    $ownEntries = [];
+    $otherEntries = [];
+    foreach ($entries as $entry) {
+        if ((int)($entry['member_id'] ?? 0) === $sessionMemberId) {
+            $ownEntries[] = $entry;
+        } else {
+            $otherEntries[] = $entry;
+        }
+    }
+}
+
+function renderPublishTable(array $entries, array $attributes, array $valuesMap, bool $showMemberColumn, bool $isManager, int $sessionMemberId, string $titleKey = '', string $titleFallback = ''): void
+{
+    $colspan = count($attributes) + ($showMemberColumn ? 4 : 3);
+    if ($titleKey !== '') {
+        echo '<h5 class="mb-2" data-i18n="' . htmlspecialchars($titleKey, ENT_QUOTES) . '">' . htmlspecialchars($titleFallback, ENT_QUOTES) . '</h5>';
+    }
+    ?>
+    <div class="table-responsive mb-4" data-publish-table>
+      <table class="table table-bordered align-middle">
+        <thead>
+          <tr>
+            <th data-i18n="publish.table.index">#</th>
+            <?php if ($showMemberColumn): ?>
+              <th data-i18n="publish.table.member">Member</th>
+            <?php endif; ?>
+            <?php foreach ($attributes as $attr):
+              $nameEn = trim((string)$attr['name_en']);
+              $nameZh = trim((string)$attr['name_zh']);
+              $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : '');
+            ?>
+              <th class="publish-sortable" role="button" tabindex="0" data-attr-id="<?= (int)$attr['id']; ?>" data-publish-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-publish-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($display); ?><span class="publish-sort-indicator" aria-hidden="true"></span></th>
+            <?php endforeach; ?>
+            <th data-i18n="publish.table.updated">Updated</th>
+            <th data-i18n="publish.table.actions">Actions</th>
+          </tr>
+          <tr class="publish-filter-row">
+            <th></th>
+            <?php if ($showMemberColumn): ?>
+              <th></th>
+            <?php endif; ?>
+            <?php foreach ($attributes as $attr):
+              $attrId = (int)$attr['id'];
+              $attrType = $attr['attribute_type'] ?? 'text';
+              $optionsRaw = (string)($attr['options'] ?? '');
+              $optionsList = array_values(array_filter(array_map('trim', explode(',', $optionsRaw))));
+            ?>
+              <th>
+                <?php if ($attrType === 'select'): ?>
+                  <select class="form-select form-select-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                    <option value="" data-i18n="publish.filter.all">All</option>
+                    <?php foreach ($optionsList as $optionValue): ?>
+                      <option value="<?= htmlspecialchars($optionValue, ENT_QUOTES); ?>"><?= htmlspecialchars($optionValue, ENT_QUOTES); ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                <?php elseif ($attrType === 'date'): ?>
+                  <div class="publish-date-filter d-flex align-items-center gap-1" data-publish-date-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                    <input type="date" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-date-role="start" data-i18n-placeholder="publish.filter.date_from" placeholder="From">
+                    <span class="text-muted small publish-date-separator" data-i18n="publish.filter.range_separator">—</span>
+                    <input type="date" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-date-role="end" data-i18n-placeholder="publish.filter.date_to" placeholder="To">
+                  </div>
+                <?php elseif ($attrType === 'file'): ?>
+                  <select class="form-select form-select-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
+                    <option value="" data-i18n="publish.filter.all">All</option>
+                    <option value="has" data-i18n="publish.filter.has_file">Has file</option>
+                    <option value="empty" data-i18n="publish.filter.no_file">No file</option>
+                  </select>
+                <?php else: ?>
+                  <input type="text" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-i18n-placeholder="publish.filter.placeholder" placeholder="Filter">
+                <?php endif; ?>
+              </th>
+            <?php endforeach; ?>
+            <th></th>
+            <th>
+              <button type="button" class="btn btn-sm btn-outline-secondary w-100" data-publish-clear data-i18n="publish.filter.clear">Clear Filters</button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (empty($entries)): ?>
+            <tr>
+              <td colspan="<?= $colspan; ?>" class="text-center text-muted" data-i18n="publish.empty">No achievements yet.</td>
+            </tr>
+          <?php else: ?>
+            <?php foreach ($entries as $entry):
+              $entryId = (int)($entry['id'] ?? 0);
+              $canEditEntry = $isManager || (int)($entry['member_id'] ?? 0) === $sessionMemberId;
+              $rowValues = $valuesMap[$entryId] ?? [];
+              $displayValues = [];
+              foreach ($attributes as $attr) {
+                $attrId = (int)$attr['id'];
+                $attrType = $attr['attribute_type'] ?? 'text';
+                $displayValues[$attrId] = (string)($rowValues[$attrId] ?? ($attrType === 'file' ? '' : (string)($attr['default_value'] ?? '')));
+              }
+              $rowValueJson = htmlspecialchars(json_encode($rowValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+              $rowDisplayJson = htmlspecialchars(json_encode($displayValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+            ?>
+              <tr data-publish-values="<?= $rowDisplayJson; ?>">
+                <td class="publish-index text-muted"></td>
+                <?php if ($showMemberColumn): ?>
+                  <td><?= htmlspecialchars($entry['member_name'] ?? '', ENT_QUOTES); ?></td>
+                <?php endif; ?>
+                <?php foreach ($attributes as $attr):
+                  $attrId = (int)$attr['id'];
+                  $attrType = $attr['attribute_type'] ?? 'text';
+                  $value = (string)($displayValues[$attrId] ?? '');
+                ?>
+                  <td>
+                    <?php if ($attrType === 'file'): ?>
+                      <?php if ($value === ''): ?>
+                        <span class="text-muted" data-i18n="publish.no_file">No file</span>
+                      <?php else: ?>
+                        <a href="<?= htmlspecialchars($value, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="text-decoration-none" data-i18n="publish.view_file">View file</a>
+                      <?php endif; ?>
+                    <?php else: ?>
+                      <?= htmlspecialchars($value, ENT_QUOTES); ?>
+                    <?php endif; ?>
+                  </td>
+                <?php endforeach; ?>
+                <td><?= htmlspecialchars($entry['updated_at'] ?? '', ENT_QUOTES); ?></td>
+                <td>
+                  <?php if ($canEditEntry): ?>
+                    <button type="button" class="btn btn-sm btn-outline-primary publish-edit-btn"
+                            data-id="<?= $entryId; ?>"
+                            data-member-id="<?= (int)($entry['member_id'] ?? 0); ?>"
+                            data-values="<?= $rowValueJson; ?>"
+                            data-i18n="publish.edit">Edit</button>
+                    <form method="post" class="d-inline" onsubmit="return doubleConfirm(translations[document.documentElement.lang||'zh']['publish.confirm_delete']);">
+                      <input type="hidden" name="publish_action" value="delete">
+                      <input type="hidden" name="entry_id" value="<?= $entryId; ?>">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" data-i18n="publish.delete">Delete</button>
+                    </form>
+                  <?php else: ?>
+                    <span class="text-muted small" data-i18n="publish.view_only">View only</span>
+                  <?php endif; ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+            <tr data-publish-empty class="d-none">
+              <td colspan="<?= $colspan; ?>" class="text-center text-muted" data-i18n="publish.filtered_empty">No matching achievements.</td>
+            </tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+    <?php
+}
+
 include 'header.php';
 ?>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -171,144 +320,12 @@ include 'header.php';
   }
 </style>
 
-<div class="table-responsive">
-  <table class="table table-bordered align-middle">
-    <thead>
-      <tr>
-        <th data-i18n="publish.table.index">#</th>
-        <?php if ($showMemberColumn): ?>
-          <th data-i18n="publish.table.member">Member</th>
-        <?php endif; ?>
-        <?php foreach ($attributes as $attr):
-          $nameEn = trim((string)$attr['name_en']);
-          $nameZh = trim((string)$attr['name_zh']);
-          $display = $nameZh !== '' ? $nameZh : ($nameEn !== '' ? $nameEn : '');
-        ?>
-          <th class="publish-sortable" role="button" tabindex="0" data-attr-id="<?= (int)$attr['id']; ?>" data-publish-name-zh="<?= htmlspecialchars($nameZh, ENT_QUOTES); ?>" data-publish-name-en="<?= htmlspecialchars($nameEn, ENT_QUOTES); ?>"><?= htmlspecialchars($display); ?><span class="publish-sort-indicator" aria-hidden="true"></span></th>
-        <?php endforeach; ?>
-        <th data-i18n="publish.table.updated">Updated</th>
-        <th data-i18n="publish.table.actions">Actions</th>
-      </tr>
-      <tr class="publish-filter-row">
-        <th></th>
-        <?php if ($showMemberColumn): ?>
-          <th></th>
-        <?php endif; ?>
-        <?php foreach ($attributes as $attr):
-          $attrId = (int)$attr['id'];
-          $attrType = $attr['attribute_type'] ?? 'text';
-          $optionsRaw = (string)($attr['options'] ?? '');
-          $optionsList = array_values(array_filter(array_map('trim', explode(',', $optionsRaw))));
-        ?>
-          <th>
-            <?php if ($attrType === 'select'): ?>
-              <select class="form-select form-select-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
-                <option value="" data-i18n="publish.filter.all">All</option>
-                <?php foreach ($optionsList as $optionValue): ?>
-                  <option value="<?= htmlspecialchars($optionValue, ENT_QUOTES); ?>"><?= htmlspecialchars($optionValue, ENT_QUOTES); ?></option>
-                <?php endforeach; ?>
-              </select>
-            <?php elseif ($attrType === 'date'): ?>
-              <div class="publish-date-filter" data-publish-date-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
-                <div class="d-flex gap-1">
-                  <input type="date" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-date-role="start" data-i18n-placeholder="publish.filter.date_from" placeholder="From">
-                  <input type="date" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-date-role="end" data-i18n-placeholder="publish.filter.date_to" placeholder="To">
-                </div>
-                <div class="d-flex gap-1 mt-1">
-                  <input type="number" class="form-control form-control-sm" min="2000" max="2100" data-date-role="year" data-i18n-placeholder="publish.filter.year" placeholder="Year">
-                  <select class="form-select form-select-sm" data-date-role="quarter" aria-label="Quarter">
-                    <option value="" data-i18n="publish.filter.quarter">Quarter</option>
-                    <option value="1" data-i18n="publish.filter.quarter_q1">Q1</option>
-                    <option value="2" data-i18n="publish.filter.quarter_q2">Q2</option>
-                    <option value="3" data-i18n="publish.filter.quarter_q3">Q3</option>
-                    <option value="4" data-i18n="publish.filter.quarter_q4">Q4</option>
-                  </select>
-                </div>
-              </div>
-            <?php elseif ($attrType === 'file'): ?>
-              <select class="form-select form-select-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>">
-                <option value="" data-i18n="publish.filter.all">All</option>
-                <option value="has" data-i18n="publish.filter.has_file">Has file</option>
-                <option value="empty" data-i18n="publish.filter.no_file">No file</option>
-              </select>
-            <?php else: ?>
-              <input type="text" class="form-control form-control-sm" data-publish-filter data-filter-id="<?= $attrId; ?>" data-filter-type="<?= htmlspecialchars($attrType, ENT_QUOTES); ?>" data-i18n-placeholder="publish.filter.placeholder" placeholder="Filter">
-            <?php endif; ?>
-          </th>
-        <?php endforeach; ?>
-        <th></th>
-        <th>
-          <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="publishClearFilters" data-i18n="publish.filter.clear">Clear Filters</button>
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if (empty($entries)): ?>
-        <tr>
-          <td colspan="<?= count($attributes) + ($showMemberColumn ? 4 : 3); ?>" class="text-center text-muted" data-i18n="publish.empty">No achievements yet.</td>
-        </tr>
-      <?php else: ?>
-        <?php foreach ($entries as $entry):
-          $entryId = (int)($entry['id'] ?? 0);
-          $canEditEntry = $isManager || (int)($entry['member_id'] ?? 0) === $sessionMemberId;
-          $rowValues = $valuesMap[$entryId] ?? [];
-          $displayValues = [];
-          foreach ($attributes as $attr) {
-            $attrId = (int)$attr['id'];
-            $attrType = $attr['attribute_type'] ?? 'text';
-            $displayValues[$attrId] = (string)($rowValues[$attrId] ?? ($attrType === 'file' ? '' : (string)($attr['default_value'] ?? '')));
-          }
-          $rowValueJson = htmlspecialchars(json_encode($rowValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
-          $rowDisplayJson = htmlspecialchars(json_encode($displayValues, JSON_UNESCAPED_UNICODE), ENT_QUOTES);
-        ?>
-          <tr data-publish-values="<?= $rowDisplayJson; ?>">
-            <td class="publish-index text-muted"></td>
-            <?php if ($showMemberColumn): ?>
-              <td><?= htmlspecialchars($entry['member_name'] ?? '', ENT_QUOTES); ?></td>
-            <?php endif; ?>
-            <?php foreach ($attributes as $attr):
-              $attrId = (int)$attr['id'];
-              $attrType = $attr['attribute_type'] ?? 'text';
-              $value = (string)($displayValues[$attrId] ?? '');
-            ?>
-              <td>
-                <?php if ($attrType === 'file'): ?>
-                  <?php if ($value === ''): ?>
-                    <span class="text-muted" data-i18n="publish.no_file">No file</span>
-                  <?php else: ?>
-                    <a href="<?= htmlspecialchars($value, ENT_QUOTES); ?>" target="_blank" rel="noopener" class="text-decoration-none" data-i18n="publish.view_file">View file</a>
-                  <?php endif; ?>
-                <?php else: ?>
-                  <?= htmlspecialchars($value, ENT_QUOTES); ?>
-                <?php endif; ?>
-              </td>
-            <?php endforeach; ?>
-            <td><?= htmlspecialchars($entry['updated_at'] ?? '', ENT_QUOTES); ?></td>
-            <td>
-              <?php if ($canEditEntry): ?>
-                <button type="button" class="btn btn-sm btn-outline-primary publish-edit-btn"
-                        data-id="<?= $entryId; ?>"
-                        data-member-id="<?= (int)($entry['member_id'] ?? 0); ?>"
-                        data-values="<?= $rowValueJson; ?>"
-                        data-i18n="publish.edit">Edit</button>
-                <form method="post" class="d-inline" onsubmit="return doubleConfirm(translations[document.documentElement.lang||'zh']['publish.confirm_delete']);">
-                  <input type="hidden" name="publish_action" value="delete">
-                  <input type="hidden" name="entry_id" value="<?= $entryId; ?>">
-                  <button type="submit" class="btn btn-sm btn-outline-danger" data-i18n="publish.delete">Delete</button>
-                </form>
-              <?php else: ?>
-                <span class="text-muted small" data-i18n="publish.view_only">View only</span>
-              <?php endif; ?>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-        <tr id="publishFilterEmpty" class="d-none">
-          <td colspan="<?= count($attributes) + ($showMemberColumn ? 4 : 3); ?>" class="text-center text-muted" data-i18n="publish.filtered_empty">No matching achievements.</td>
-        </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</div>
+<?php if (!$isManager && $allowMemberViewAll): ?>
+  <?php renderPublishTable($ownEntries, $attributes, $valuesMap, false, $isManager, $sessionMemberId, 'publish.section.mine', 'My achievements'); ?>
+  <?php renderPublishTable($otherEntries, $attributes, $valuesMap, true, $isManager, $sessionMemberId, 'publish.section.others', 'Other members\' achievements'); ?>
+<?php else: ?>
+  <?php renderPublishTable($entries, $attributes, $valuesMap, $showMemberColumn, $isManager, $sessionMemberId); ?>
+<?php endif; ?>
 
 <div class="modal fade" id="publishModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -567,14 +584,7 @@ include 'header.php';
         });
       });
     }
-    const publishTable = document.querySelector('.table');
-    const publishTbody = publishTable?.querySelector('tbody') || null;
-    const publishRows = publishTbody ? Array.from(publishTbody.querySelectorAll('tr[data-publish-values]')) : [];
-    const publishFilterInputs = Array.from(document.querySelectorAll('[data-publish-filter]'));
-    const publishDateFilters = Array.from(document.querySelectorAll('[data-publish-date-filter]'));
-    const publishClearFiltersBtn = document.getElementById('publishClearFilters');
-    const publishEmptyRow = document.getElementById('publishFilterEmpty');
-    const publishRowValuesCache = new WeakMap();
+    const publishTables = Array.from(document.querySelectorAll('[data-publish-table]'));
     const attributeTypeMap = new Map();
     (window.publishAttributes || []).forEach(function(attr){
       const id = String(attr.id ?? '');
@@ -582,213 +592,9 @@ include 'header.php';
         attributeTypeMap.set(id, String(attr.attribute_type ?? 'text'));
       }
     });
-    function getRowValues(row){
-      if(publishRowValuesCache.has(row)){
-        return publishRowValuesCache.get(row);
-      }
-      let values = {};
-      if(row?.dataset?.publishValues){
-        try {
-          values = JSON.parse(row.dataset.publishValues);
-        } catch (err) {
-          values = {};
-        }
-      }
-      publishRowValuesCache.set(row, values);
-      return values;
-    }
-    function updatePublishRowNumbers(){
-      let index = 1;
-      publishRows.forEach(function(row){
-        if(row.style.display === 'none'){
-          return;
-        }
-        const indexCell = row.querySelector('.publish-index');
-        if(indexCell){
-          indexCell.textContent = String(index);
-        }
-        index += 1;
-      });
-    }
     function parseDateValue(value){
       const timestamp = Date.parse(String(value ?? ''));
       return Number.isNaN(timestamp) ? null : timestamp;
-    }
-    function collectDateRanges(){
-      const ranges = new Map();
-      publishDateFilters.forEach(function(container){
-        const attrId = container.dataset.filterId;
-        if(!attrId){
-          return;
-        }
-        const startInput = container.querySelector('[data-date-role="start"]');
-        const endInput = container.querySelector('[data-date-role="end"]');
-        const startValue = String(startInput?.value ?? '').trim();
-        const endValue = String(endInput?.value ?? '').trim();
-        if(startValue === '' && endValue === ''){
-          return;
-        }
-        ranges.set(String(attrId), { start: startValue, end: endValue });
-      });
-      return ranges;
-    }
-    function applyPublishFilters(){
-      if(!publishTbody || !publishRows.length){
-        return;
-      }
-      const dateRanges = collectDateRanges();
-      let visibleCount = 0;
-      publishRows.forEach(function(row){
-        const values = getRowValues(row);
-        let matches = true;
-        for(const input of publishFilterInputs){
-          const attrId = input.dataset.filterId;
-          if(!attrId){
-            continue;
-          }
-          const filterValue = String(input.value ?? '').trim();
-          if(filterValue === ''){
-            continue;
-          }
-          const filterType = input.dataset.filterType || attributeTypeMap.get(String(attrId)) || 'text';
-          if(filterType === 'date'){
-            continue;
-          }
-          const value = String(values?.[attrId] ?? '');
-          if(filterType === 'file'){
-            if(filterValue === 'has' && value === ''){
-              matches = false;
-              break;
-            }
-            if(filterValue === 'empty' && value !== ''){
-              matches = false;
-              break;
-            }
-          } else if(filterType === 'select' || filterType === 'date'){
-            if(value !== filterValue){
-              matches = false;
-              break;
-            }
-          } else if(!value.toLowerCase().includes(filterValue.toLowerCase())){
-            matches = false;
-            break;
-          }
-        }
-        if(matches && dateRanges.size > 0){
-          for(const [attrId, range] of dateRanges.entries()){
-            const value = String(values?.[attrId] ?? '');
-            if(value === ''){
-              matches = false;
-              break;
-            }
-            const valueTime = parseDateValue(value);
-            if(valueTime === null){
-              matches = false;
-              break;
-            }
-            if(range.start){
-              const startTime = parseDateValue(range.start);
-              if(startTime !== null && valueTime < startTime){
-                matches = false;
-                break;
-              }
-            }
-            if(range.end){
-              const endTime = parseDateValue(range.end);
-              if(endTime !== null && valueTime > (endTime + 86400000 - 1)){
-                matches = false;
-                break;
-              }
-            }
-          }
-        }
-        row.style.display = matches ? '' : 'none';
-        if(matches){
-          visibleCount += 1;
-        }
-      });
-      updatePublishRowNumbers();
-      if(publishEmptyRow){
-        publishEmptyRow.classList.toggle('d-none', visibleCount !== 0);
-      }
-    }
-    function buildFilterParams(){
-      const params = new URLSearchParams();
-      publishFilterInputs.forEach(function(input){
-        const attrId = input.dataset.filterId;
-        if(!attrId){
-          return;
-        }
-        const filterValue = String(input.value ?? '').trim();
-        if(filterValue === ''){
-          return;
-        }
-        params.append(`filters[${attrId}]`, filterValue);
-      });
-      return params;
-    }
-    publishFilterInputs.forEach(function(input){
-      input.addEventListener('input', applyPublishFilters);
-      input.addEventListener('change', applyPublishFilters);
-    });
-    publishDateFilters.forEach(function(container){
-      const yearInput = container.querySelector('[data-date-role="year"]');
-      const quarterSelect = container.querySelector('[data-date-role="quarter"]');
-      const startInput = container.querySelector('[data-date-role="start"]');
-      const endInput = container.querySelector('[data-date-role="end"]');
-      const applyQuarter = function(){
-        const year = parseInt(String(yearInput?.value ?? ''), 10);
-        const quarter = parseInt(String(quarterSelect?.value ?? ''), 10);
-        if(!year || !quarter || quarter < 1 || quarter > 4){
-          return;
-        }
-        const startMonth = (quarter - 1) * 3;
-        const startDate = new Date(year, startMonth, 1);
-        const endDate = new Date(year, startMonth + 3, 0);
-        if(startInput){
-          startInput.value = startDate.toISOString().slice(0, 10);
-        }
-        if(endInput){
-          endInput.value = endDate.toISOString().slice(0, 10);
-        }
-        applyPublishFilters();
-      };
-      yearInput?.addEventListener('input', applyQuarter);
-      quarterSelect?.addEventListener('change', applyQuarter);
-    });
-    publishClearFiltersBtn?.addEventListener('click', function(){
-      publishFilterInputs.forEach(function(input){
-        if(input instanceof HTMLSelectElement || input instanceof HTMLInputElement){
-          input.value = '';
-        }
-      });
-      publishDateFilters.forEach(function(container){
-        const yearInput = container.querySelector('[data-date-role="year"]');
-        const quarterSelect = container.querySelector('[data-date-role="quarter"]');
-        if(yearInput){
-          yearInput.value = '';
-        }
-        if(quarterSelect){
-          quarterSelect.value = '';
-        }
-      });
-      applyPublishFilters();
-    });
-    const publishSortHeaders = Array.from(document.querySelectorAll('th[data-attr-id]'));
-    const publishSortState = { attrId: null, direction: 'asc' };
-    const sortIndicatorText = (direction) => direction === 'asc' ? '▲' : '▼';
-    function updateSortIndicators(){
-      publishSortHeaders.forEach(function(header){
-        const indicator = header.querySelector('.publish-sort-indicator');
-        if(!indicator){
-          return;
-        }
-        if(header.dataset.attrId === publishSortState.attrId){
-          indicator.textContent = sortIndicatorText(publishSortState.direction);
-        } else {
-          indicator.textContent = '';
-        }
-      });
     }
     function compareValues(aValue, bValue, type){
       const aText = String(aValue ?? '');
@@ -802,49 +608,217 @@ include 'header.php';
       }
       return aText.localeCompare(bText, undefined, { numeric: true, sensitivity: 'base' });
     }
-    function sortPublishRows(attrId){
-      if(!publishTbody || !publishRows.length){
+    function setupPublishTable(wrapper){
+      const publishTable = wrapper.querySelector('table');
+      const publishTbody = publishTable?.querySelector('tbody') || null;
+      const publishRows = publishTbody ? Array.from(publishTbody.querySelectorAll('tr[data-publish-values]')) : [];
+      const publishFilterInputs = Array.from(wrapper.querySelectorAll('[data-publish-filter]'));
+      const publishDateFilters = Array.from(wrapper.querySelectorAll('[data-publish-date-filter]'));
+      const publishClearFiltersBtn = wrapper.querySelector('[data-publish-clear]');
+      const publishEmptyRow = wrapper.querySelector('[data-publish-empty]');
+      const publishRowValuesCache = new WeakMap();
+      if(!publishTbody){
         return;
       }
-      if(publishSortState.attrId === attrId){
-        publishSortState.direction = publishSortState.direction === 'asc' ? 'desc' : 'asc';
-      } else {
-        publishSortState.attrId = attrId;
-        publishSortState.direction = 'asc';
+      function getRowValues(row){
+        if(publishRowValuesCache.has(row)){
+          return publishRowValuesCache.get(row);
+        }
+        let values = {};
+        if(row?.dataset?.publishValues){
+          try {
+            values = JSON.parse(row.dataset.publishValues);
+          } catch (err) {
+            values = {};
+          }
+        }
+        publishRowValuesCache.set(row, values);
+        return values;
       }
-      const type = attributeTypeMap.get(String(attrId)) || 'text';
-      const direction = publishSortState.direction === 'asc' ? 1 : -1;
-      publishRows.sort(function(a, b){
-        const valuesA = getRowValues(a);
-        const valuesB = getRowValues(b);
-        const result = compareValues(valuesA?.[attrId] ?? '', valuesB?.[attrId] ?? '', type);
-        return result * direction;
-      });
-      publishRows.forEach(function(row){
-        publishTbody.appendChild(row);
-      });
-      if(publishEmptyRow){
-        publishTbody.appendChild(publishEmptyRow);
+      function updatePublishRowNumbers(){
+        let index = 1;
+        publishRows.forEach(function(row){
+          if(row.style.display === 'none'){
+            return;
+          }
+          const indexCell = row.querySelector('.publish-index');
+          if(indexCell){
+            indexCell.textContent = String(index);
+          }
+          index += 1;
+        });
       }
-      updateSortIndicators();
+      function collectDateRanges(){
+        const ranges = new Map();
+        publishDateFilters.forEach(function(container){
+          const attrId = container.dataset.filterId;
+          if(!attrId){
+            return;
+          }
+          const startInput = container.querySelector('[data-date-role="start"]');
+          const endInput = container.querySelector('[data-date-role="end"]');
+          const startValue = String(startInput?.value ?? '').trim();
+          const endValue = String(endInput?.value ?? '').trim();
+          if(startValue === '' && endValue === ''){
+            return;
+          }
+          ranges.set(String(attrId), { start: startValue, end: endValue });
+        });
+        return ranges;
+      }
+      function applyPublishFilters(){
+        if(!publishRows.length){
+          return;
+        }
+        const dateRanges = collectDateRanges();
+        let visibleCount = 0;
+        publishRows.forEach(function(row){
+          const values = getRowValues(row);
+          let matches = true;
+          for(const input of publishFilterInputs){
+            const attrId = input.dataset.filterId;
+            if(!attrId){
+              continue;
+            }
+            const filterValue = String(input.value ?? '').trim();
+            if(filterValue === ''){
+              continue;
+            }
+            const filterType = input.dataset.filterType || attributeTypeMap.get(String(attrId)) || 'text';
+            if(filterType === 'date'){
+              continue;
+            }
+            const value = String(values?.[attrId] ?? '');
+            if(filterType === 'file'){
+              if(filterValue === 'has' && value === ''){
+                matches = false;
+                break;
+              }
+              if(filterValue === 'empty' && value !== ''){
+                matches = false;
+                break;
+              }
+            } else if(filterType === 'select' || filterType === 'date'){
+              if(value !== filterValue){
+                matches = false;
+                break;
+              }
+            } else if(!value.toLowerCase().includes(filterValue.toLowerCase())){
+              matches = false;
+              break;
+            }
+          }
+          if(matches && dateRanges.size > 0){
+            for(const [attrId, range] of dateRanges.entries()){
+              const value = String(values?.[attrId] ?? '');
+              if(value === ''){
+                matches = false;
+                break;
+              }
+              const valueTime = parseDateValue(value);
+              if(valueTime === null){
+                matches = false;
+                break;
+              }
+              if(range.start){
+                const startTime = parseDateValue(range.start);
+                if(startTime !== null && valueTime < startTime){
+                  matches = false;
+                  break;
+                }
+              }
+              if(range.end){
+                const endTime = parseDateValue(range.end);
+                if(endTime !== null && valueTime > (endTime + 86400000 - 1)){
+                  matches = false;
+                  break;
+                }
+              }
+            }
+          }
+          row.style.display = matches ? '' : 'none';
+          if(matches){
+            visibleCount += 1;
+          }
+        });
+        updatePublishRowNumbers();
+        if(publishEmptyRow){
+          publishEmptyRow.classList.toggle('d-none', visibleCount !== 0);
+        }
+      }
+      publishFilterInputs.forEach(function(input){
+        input.addEventListener('input', applyPublishFilters);
+        input.addEventListener('change', applyPublishFilters);
+      });
+      publishClearFiltersBtn?.addEventListener('click', function(){
+        publishFilterInputs.forEach(function(input){
+          if(input instanceof HTMLSelectElement || input instanceof HTMLInputElement){
+            input.value = '';
+          }
+        });
+        applyPublishFilters();
+      });
+      const publishSortHeaders = Array.from(wrapper.querySelectorAll('th[data-attr-id]'));
+      const publishSortState = { attrId: null, direction: 'asc' };
+      const sortIndicatorText = (direction) => direction === 'asc' ? '▲' : '▼';
+      function updateSortIndicators(){
+        publishSortHeaders.forEach(function(header){
+          const indicator = header.querySelector('.publish-sort-indicator');
+          if(!indicator){
+            return;
+          }
+          if(header.dataset.attrId === publishSortState.attrId){
+            indicator.textContent = sortIndicatorText(publishSortState.direction);
+          } else {
+            indicator.textContent = '';
+          }
+        });
+      }
+      function sortPublishRows(attrId){
+        if(!publishRows.length){
+          return;
+        }
+        if(publishSortState.attrId === attrId){
+          publishSortState.direction = publishSortState.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+          publishSortState.attrId = attrId;
+          publishSortState.direction = 'asc';
+        }
+        const type = attributeTypeMap.get(String(attrId)) || 'text';
+        const direction = publishSortState.direction === 'asc' ? 1 : -1;
+        publishRows.sort(function(a, b){
+          const valuesA = getRowValues(a);
+          const valuesB = getRowValues(b);
+          const result = compareValues(valuesA?.[attrId] ?? '', valuesB?.[attrId] ?? '', type);
+          return result * direction;
+        });
+        publishRows.forEach(function(row){
+          publishTbody.appendChild(row);
+        });
+        if(publishEmptyRow){
+          publishTbody.appendChild(publishEmptyRow);
+        }
+        updateSortIndicators();
+        applyPublishFilters();
+      }
+      publishSortHeaders.forEach(function(header){
+        const attrId = header.dataset.attrId;
+        if(!attrId){
+          return;
+        }
+        header.addEventListener('click', function(){
+          sortPublishRows(attrId);
+        });
+        header.addEventListener('keydown', function(event){
+          if(event.key === 'Enter' || event.key === ' '){
+            event.preventDefault();
+            sortPublishRows(attrId);
+          }
+        });
+      });
       applyPublishFilters();
     }
-    publishSortHeaders.forEach(function(header){
-      const attrId = header.dataset.attrId;
-      if(!attrId){
-        return;
-      }
-      header.addEventListener('click', function(){
-        sortPublishRows(attrId);
-      });
-      header.addEventListener('keydown', function(event){
-        if(event.key === 'Enter' || event.key === ' '){
-          event.preventDefault();
-          sortPublishRows(attrId);
-        }
-      });
-    });
-    applyPublishFilters();
+    publishTables.forEach(setupPublishTable);
     <?php if ($isManager): ?>
     const editAttrBtn = document.getElementById('editPublishAttributesBtn');
     const attrModalEl = document.getElementById('publishAttributesModal');
