@@ -76,6 +76,15 @@ CREATE TABLE publish_values (
   FOREIGN KEY (attribute_id) REFERENCES publish_attributes(id) ON DELETE CASCADE
 );
 
+CREATE TABLE publish_settings (
+  id INT PRIMARY KEY,
+  allow_member_view_all TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO publish_settings (id, allow_member_view_all) VALUES
+(1, 0);
+
 INSERT INTO publish_attributes (sort_order, name_en, name_zh, attribute_type, default_value, options) VALUES
 (0, 'Type', '成果类型', 'text', '', ''),
 (1, 'Name', '成果名称', 'text', '', ''),

@@ -10,6 +10,7 @@ $uploadFolders = [
     'reimburse_uploads',
     'office_layouts',
     'collect_uploads',
+    'publish_uploads',
 ];
 
 $zipPath = tempnam(sys_get_temp_dir(), 'team_export_');

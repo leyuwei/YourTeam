@@ -73,6 +73,7 @@ if($_SERVER['REQUEST_METHOD'] === 'POST'){
                 'reimburse_uploads',
                 'office_layouts',
                 'collect_uploads',
+                'publish_uploads',
             ];
             $tempDir = sys_get_temp_dir() . '/team_import_' . bin2hex(random_bytes(8));
             mkdir($tempDir, 0777, true);
