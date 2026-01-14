@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import SwiftUI
 
 final class TodoStore: ObservableObject {
     @Published private(set) var items: [TodoItem] = []
