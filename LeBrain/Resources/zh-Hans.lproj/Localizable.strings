@@ -1,0 +1,47 @@
+"app.name" = "乐脑花";
+"login.title" = "欢迎使用乐脑花";
+"login.subtitle" = "先配置服务器地址，再登录进入待办空间。";
+"login.role" = "角色";
+"login.account" = "账号";
+"login.username" = "用户名";
+"login.password" = "密码";
+"login.helper.title" = "仅支持待办功能";
+"login.helper.body" = "登录后仅提供待办功能，保持专注。";
+
+"role.admin" = "管理员";
+"role.member" = "一般成员";
+
+"server.address" = "服务器地址";
+"server.address.placeholder" = "https://server.example.com";
+"server.address.helper" = "请输入包含 https:// 的完整地址";
+
+"action.configure" = "配置";
+"action.login" = "登录";
+"action.logout" = "退出登录";
+"action.add" = "新增";
+"action.save" = "保存";
+"action.cancel" = "取消";
+"action.ok" = "好";
+
+"todo.title" = "待办";
+"todo.add" = "新建待办";
+"todo.edit" = "编辑待办";
+"todo.empty.title" = "还没有待办";
+"todo.empty.message" = "创建第一条任务，保持专注。";
+"todo.form.title" = "标题";
+"todo.form.detail" = "详情";
+"todo.form.title.placeholder" = "需要做什么？";
+"todo.form.detail.placeholder" = "补充说明或备注";
+
+"settings.title" = "设置";
+
+"alert.title" = "登录失败";
+"error.invalid_server" = "请提供有效的服务器地址。";
+"error.missing_credentials" = "请输入用户名和密码。";
+
+"account" = "账号";
+
+"sample.todo.team" = "确认团队优先级";
+"sample.todo.team.detail" = "与服务器计划保持一致。";
+"sample.todo.personal" = "整理个人清单";
+"sample.todo.personal.detail" = "跟进自己的进度。";

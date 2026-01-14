@@ -1,0 +1,47 @@
+"app.name" = "LeBrain";
+"login.title" = "Welcome to LeBrain";
+"login.subtitle" = "Configure the server and sign in to access the todo workspace.";
+"login.role" = "Role";
+"login.account" = "Account";
+"login.username" = "Username";
+"login.password" = "Password";
+"login.helper.title" = "Only Todo is available";
+"login.helper.body" = "After signing in, you can only access the todo feature in this app.";
+
+"role.admin" = "Administrator";
+"role.member" = "Member";
+
+"server.address" = "Server Address";
+"server.address.placeholder" = "https://server.example.com";
+"server.address.helper" = "Enter the full URL including https://";
+
+"action.configure" = "Configure";
+"action.login" = "Sign In";
+"action.logout" = "Sign Out";
+"action.add" = "Add";
+"action.save" = "Save";
+"action.cancel" = "Cancel";
+"action.ok" = "OK";
+
+"todo.title" = "Todo";
+"todo.add" = "New Todo";
+"todo.edit" = "Edit Todo";
+"todo.empty.title" = "No todos yet";
+"todo.empty.message" = "Create your first task to stay focused.";
+"todo.form.title" = "Title";
+"todo.form.detail" = "Details";
+"todo.form.title.placeholder" = "What needs to be done?";
+"todo.form.detail.placeholder" = "Add context or notes";
+
+"settings.title" = "Settings";
+
+"alert.title" = "Login Failed";
+"error.invalid_server" = "Please provide a valid server URL.";
+"error.missing_credentials" = "Please enter both username and password.";
+
+"account" = "Account";
+
+"sample.todo.team" = "Review team priorities";
+"sample.todo.team.detail" = "Confirm tasks aligned with the server plan.";
+"sample.todo.personal" = "Draft personal checklist";
+"sample.todo.personal.detail" = "Keep track of your own progress.";
