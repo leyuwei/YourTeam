@@ -107,5 +107,10 @@ if($action === 'update'){
         $stmt->execute([$position,$o['id'],$user_id,$role]);
     }
     echo json_encode(['status'=>'ok']);
+} elseif($action === 'note_save'){
+    $content = $data['content'] ?? '';
+    $stmt = $pdo->prepare('INSERT INTO todolist_notes (user_id,user_role,content) VALUES (?,?,?) ON DUPLICATE KEY UPDATE content=VALUES(content), updated_at=CURRENT_TIMESTAMP');
+    $stmt->execute([$user_id,$role,$content]);
+    echo json_encode(['status'=>'ok']);
 }
 ?>

@@ -177,6 +177,14 @@ CREATE TABLE todolist_common_items (
   sort_order INT DEFAULT 0,
   INDEX idx_todolist_common_user (user_id, user_role)
 );
+CREATE TABLE todolist_notes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  user_role ENUM('manager','member') NOT NULL,
+  content TEXT NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_todolist_note_user (user_id, user_role)
+);
 CREATE TABLE notifications (
   id INT AUTO_INCREMENT PRIMARY KEY,
   content TEXT NOT NULL,
