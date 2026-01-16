@@ -22,6 +22,11 @@ foreach($stmt as $row){
 $commonStmt = $pdo->prepare('SELECT id, content FROM todolist_common_items WHERE user_id=? AND user_role=? ORDER BY sort_order, id');
 $commonStmt->execute([$user_id,$role]);
 $common_items = $commonStmt->fetchAll(PDO::FETCH_ASSOC);
+$noteStmt = $pdo->prepare('SELECT content, updated_at FROM todolist_notes WHERE user_id=? AND user_role=? LIMIT 1');
+$noteStmt->execute([$user_id,$role]);
+$note = $noteStmt->fetch(PDO::FETCH_ASSOC);
+$note_content = $note['content'] ?? '';
+$note_updated_at = $note['updated_at'] ?? '';
 $stats = ['work'=>['done'=>0,'total'=>0],
           'personal'=>['done'=>0,'total'=>0],
           'longterm'=>['done'=>0,'total'=>0]];
@@ -107,6 +112,9 @@ $today_key = strtolower(date('D'));
 .common-items-manager-empty[data-visible="true"]{display:block;}
 .undo-delete-banner{position:fixed;left:50%;bottom:4.5rem;transform:translateX(-50%);display:none;align-items:center;gap:0.75rem;padding:0.85rem 1rem;border-radius:0.75rem;box-shadow:0 1rem 2.5rem rgba(0,0,0,0.12);z-index:1080;}
 .undo-delete-banner .countdown{font-variant-numeric:tabular-nums;}
+.note-panel .note-textarea{resize:vertical;min-height:5.5rem;transition:height 0.2s ease;}
+.note-panel.is-expanded .note-textarea{resize:none;overflow:hidden;}
+.note-panel .note-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:0.5rem;}
 @keyframes status-pulse{0%{box-shadow:0 0 0 0 rgba(13,110,253,0.45);}70%{box-shadow:0 0 0 10px rgba(13,110,253,0);}100%{box-shadow:0 0 0 0 rgba(13,110,253,0);}}
 @media (max-width:575.98px){.save-status{left:1rem;right:1rem;transform:none;justify-content:center;padding:0.65rem 1rem;border-radius:0.85rem;}.save-status .status-text{white-space:normal;text-align:center;}}
 @media (max-width:575.98px){.common-suggestion-bar{left:0.75rem!important;right:0.75rem!important;width:auto!important;}}
@@ -130,6 +138,24 @@ $today_key = strtolower(date('D'));
 }
 </style>
 <h2 class="text-center"><span data-i18n="todolist.title">待办事项</span> @ <?= date('Y.m.d', strtotime($week_start)) ?> - <?= date('Y.m.d', strtotime($week_end)) ?></small></h2>
+<div class="note-panel card mb-3" id="todolistNotePanel">
+  <div class="card-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+      <div>
+        <h4 class="mb-0" data-i18n="todolist.note.title">跨平台记事本</h4>
+      </div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Note actions">
+        <button type="button" class="btn btn-outline-primary" id="noteExpandBtn" aria-expanded="false">展开</button>
+        <button type="button" class="btn btn-outline-danger" id="noteClearBtn" data-i18n="todolist.note.clear">清空</button>
+      </div>
+    </div>
+    <textarea class="form-control note-textarea" id="noteContent" rows="5" data-i18n-attr="placeholder:todolist.note.placeholder" placeholder="随手记录灵感或跨平台信息"></textarea>
+    <div class="note-meta mt-2">
+      <span class="text-muted small" id="noteCount"></span>
+      <span class="text-muted small" data-i18n="todolist.note.autosave">实时保存</span>
+    </div>
+  </div>
+</div>
 <?= $week_hint; ?>
 <form method="get" class="mb-3 d-flex flex-wrap align-items-center gap-2">
   <input type="week" name="week" class="form-control form-control-lg w-auto" value="<?= htmlspecialchars($week_param); ?>">
@@ -308,6 +334,7 @@ $today_key = strtolower(date('D'));
 </div>
 <script>
 window.commonTodoItems = <?= json_encode($common_items, JSON_UNESCAPED_UNICODE); ?>;
+window.todolistNoteContent = <?= json_encode($note_content, JSON_UNESCAPED_UNICODE); ?>;
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
@@ -335,6 +362,14 @@ window.addEventListener('DOMContentLoaded',()=>{
   let pendingDeletion=null;
   let undoTimer=null;
   let countdownTimer=null;
+  const notePanel=document.getElementById('todolistNotePanel');
+  const noteTextarea=document.getElementById('noteContent');
+  const noteExpandBtn=document.getElementById('noteExpandBtn');
+  const noteClearBtn=document.getElementById('noteClearBtn');
+  const noteCountEl=document.getElementById('noteCount');
+  const noteMinRows=5;
+  let noteExpanded=false;
+  let noteSaveTimer=null;
 
   function rebuildCommonContentSet(){
     const uniqueMap=new Map();
@@ -763,6 +798,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('scroll',updateSuggestionPosition,true);
   renderCommonManagerList();
   renderCommonSuggestions();
+  initNotePanel();
   function getLocalizedText(key,fallback='',params){
     const lang=document.documentElement.lang||'zh';
     let template='';
@@ -777,6 +813,99 @@ window.addEventListener('DOMContentLoaded',()=>{
       });
     }
     return template;
+  }
+
+  function updateNoteCount(){
+    if(!noteCountEl || !noteTextarea) return;
+    const count=noteTextarea.value.length;
+    noteCountEl.textContent=getLocalizedText('todolist.note.count','Characters: {count}',{count});
+  }
+
+  function adjustNoteHeight(){
+    if(!noteTextarea) return;
+    if(noteExpanded){
+      noteTextarea.style.height='auto';
+      noteTextarea.style.height=`${noteTextarea.scrollHeight}px`;
+    }else{
+      noteTextarea.style.height='';
+      noteTextarea.rows=noteMinRows;
+    }
+  }
+
+  function setNoteExpanded(expanded){
+    noteExpanded=expanded;
+    if(notePanel){
+      notePanel.classList.toggle('is-expanded',expanded);
+    }
+    if(noteExpandBtn){
+      const key=expanded ? 'todolist.note.collapse' : 'todolist.note.expand';
+      const fallback=expanded ? 'Collapse' : 'Expand';
+      const label=getLocalizedText(key,fallback);
+      noteExpandBtn.textContent=label;
+      noteExpandBtn.setAttribute('aria-expanded',expanded ? 'true' : 'false');
+      noteExpandBtn.setAttribute('aria-label',label);
+    }
+    adjustNoteHeight();
+  }
+
+  function saveNote(){
+    if(!enableEditing || !noteTextarea) return;
+    const content=noteTextarea.value;
+    postData({action:'note_save',content});
+  }
+
+  function updateNoteActions(){
+    if(!noteClearBtn || !noteTextarea) return;
+    const hasContent=noteTextarea.value.trim().length>0;
+    noteClearBtn.disabled=!enableEditing || !hasContent;
+  }
+
+  function scheduleNoteSave(){
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer=setTimeout(saveNote,400);
+  }
+
+  function initNotePanel(){
+    if(!noteTextarea) return;
+    noteTextarea.value=window.todolistNoteContent || '';
+    if(!enableEditing){
+      noteTextarea.setAttribute('readonly',true);
+      if(noteExpandBtn) noteExpandBtn.disabled=true;
+      if(noteClearBtn) noteClearBtn.disabled=true;
+    }
+    updateNoteCount();
+    updateNoteActions();
+    setNoteExpanded(false);
+    noteTextarea.addEventListener('input',()=>{
+      updateNoteCount();
+      updateNoteActions();
+      if(noteExpanded){
+        adjustNoteHeight();
+      }
+      scheduleNoteSave();
+    });
+    noteTextarea.addEventListener('focus',()=>{
+      if(noteExpanded){
+        adjustNoteHeight();
+      }
+    });
+    if(noteExpandBtn){
+      noteExpandBtn.addEventListener('click',()=>{
+        setNoteExpanded(!noteExpanded);
+      });
+    }
+    if(noteClearBtn){
+      noteClearBtn.addEventListener('click',()=>{
+        if(!noteTextarea.value.trim()) return;
+        const confirmText=getLocalizedText('todolist.note.clear_confirm','Clear this note?');
+        if(!window.confirm(confirmText)) return;
+        noteTextarea.value='';
+        updateNoteCount();
+        updateNoteActions();
+        adjustNoteHeight();
+        saveNote();
+      });
+    }
   }
 
   function getStatusMessage(state){
