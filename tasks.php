@@ -4,11 +4,11 @@ include 'header.php';
 $is_manager = ($_SESSION['role'] === 'manager');
 $status = $_GET['status'] ?? '';
 if($status){
-    $stmt = $pdo->prepare('SELECT * FROM tasks WHERE status=? ORDER BY id DESC');
+    $stmt = $pdo->prepare('SELECT * FROM tasks WHERE status=? ORDER BY sort_order ASC, id DESC');
     $stmt->execute([$status]);
     $tasks = $stmt->fetchAll();
 } else {
-    $tasks = $pdo->query('SELECT * FROM tasks ORDER BY id DESC')->fetchAll();
+    $tasks = $pdo->query('SELECT * FROM tasks ORDER BY sort_order ASC, id DESC')->fetchAll();
 }
 $pendStmt = $pdo->query("SELECT t.id,t.title,COUNT(a.id) cnt FROM tasks t JOIN task_affairs a ON t.id=a.task_id WHERE a.status='pending' GROUP BY t.id");
 $pending_affairs = $pendStmt->fetchAll();
@@ -17,6 +17,11 @@ foreach($pending_affairs as $pending){
     $pendingTaskMap[$pending['id']] = (int)$pending['cnt'];
 }
 ?>
+<style>
+  .task-drag-handle { cursor:grab; text-align:center; width:2.5rem; }
+  .task-drag-handle:active { cursor:grabbing; }
+  .task-order-index { width:3rem; text-align:center; }
+</style>
 <div class="d-flex justify-content-between mb-3">
   <h2 class="bold-target" data-i18n="tasks.title">Tasks Assignment</h2>
   <?php if($is_manager): ?>
@@ -51,11 +56,28 @@ foreach($pending_affairs as $pending){
 </div>
 <?php endif; ?>
 <table class="table table-bordered">
-<tr><th data-i18n="tasks.table_title">Title</th><th data-i18n="tasks.table_description">Description</th><th data-i18n="tasks.table_start">Start</th><th data-i18n="tasks.table_status">Status</th><th data-i18n="tasks.table_actions">Actions</th></tr>
-<?php foreach($tasks as $t): ?>
+<thead>
+  <tr>
+    <?php if($is_manager): ?>
+    <th class="task-drag-handle"></th>
+    <?php endif; ?>
+    <th class="task-order-index">#</th>
+    <th data-i18n="tasks.table_title">Title</th>
+    <th data-i18n="tasks.table_description">Description</th>
+    <th data-i18n="tasks.table_start">Start</th>
+    <th data-i18n="tasks.table_status">Status</th>
+    <th data-i18n="tasks.table_actions">Actions</th>
+  </tr>
+</thead>
+<tbody id="taskTableBody">
+<?php foreach($tasks as $index=>$t): ?>
 <?php $hasPendingWorkload = !empty($pendingTaskMap[$t['id']]); ?>
 <?php $canSelfFill = $is_manager || $t['status']==='active'; ?>
-<tr<?= $hasPendingWorkload ? ' class="task-row-pending"' : ''; ?>>
+<tr data-id="<?= $t['id']; ?>"<?= $hasPendingWorkload ? ' class="task-row-pending"' : ''; ?>>
+  <?php if($is_manager): ?>
+  <td class="task-drag-handle">&#9776;</td>
+  <?php endif; ?>
+  <td class="task-order-index" data-task-order><?= $index + 1; ?></td>
   <td class="bold-target"><?= htmlspecialchars($t['title']); ?></td>
   <td><?= htmlspecialchars($t['description'] ?? ''); ?></td>
   <td><?= htmlspecialchars($t['start_date']); ?></td>
@@ -82,7 +104,11 @@ foreach($pending_affairs as $pending){
   </td>
 </tr>
 <?php endforeach; ?>
+</tbody>
 </table>
+<?php if($is_manager): ?>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<?php endif; ?>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
   const taskModalEl = document.getElementById('taskModal');
@@ -93,6 +119,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   const descInput = document.getElementById('taskDescription');
   const startInput = document.getElementById('taskStart');
   const statusSelect = document.getElementById('taskStatus');
+  const taskTableBody = document.getElementById('taskTableBody');
+  const isManager = <?= $is_manager ? 'true' : 'false'; ?>;
 
   document.querySelectorAll('.delete-task').forEach(link=>{
     link.addEventListener('click',e=>{
@@ -142,6 +170,31 @@ document.addEventListener('DOMContentLoaded',()=>{
       });
     });
   });
+
+  const updateTaskOrderNumbers = () => {
+    document.querySelectorAll('[data-task-order]').forEach((cell, index) => {
+      cell.textContent = index + 1;
+    });
+  };
+
+  if (isManager && typeof Sortable !== 'undefined' && taskTableBody) {
+    Sortable.create(taskTableBody, {
+      handle: '.task-drag-handle',
+      animation: 150,
+      onEnd: () => {
+        updateTaskOrderNumbers();
+        const order = Array.from(taskTableBody.querySelectorAll('tr')).map((row, index) => ({
+          id: row.dataset.id,
+          position: index
+        }));
+        fetch('task_order.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({order})
+        });
+      }
+    });
+  }
 });
 </script>
 <div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="taskModalLabel" aria-hidden="true">

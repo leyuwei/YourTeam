@@ -116,6 +116,7 @@ CREATE TABLE project_member_log (
 
 CREATE TABLE tasks (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  sort_order INT DEFAULT 0,
   title VARCHAR(100) NOT NULL,
   description TEXT,
   start_date DATE,
@@ -368,6 +369,7 @@ CREATE TABLE IF NOT EXISTS askme_entries (
 
 CREATE TABLE `collect_templates` (
   `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `sort_order` int DEFAULT 0,
   `name` varchar(255) NOT NULL,
   `description` text,
   `status` enum('open','paused','ended','void') NOT NULL DEFAULT 'open',

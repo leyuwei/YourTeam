@@ -132,8 +132,9 @@ if ($is_manager && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ??
         $stmt = $pdo->prepare("UPDATE collect_templates SET name=?, description=?, status=?, deadline=?, allow_user_download=?, fields_json=?, target_member_ids=?, updated_at=? WHERE id=?");
         $stmt->execute([$name, $description, $status, $deadline, $allowUserDownload, $fieldsJson, $targetJson, $now, $id]);
     } else {
-        $stmt = $pdo->prepare("INSERT INTO collect_templates (name, description, status, deadline, allow_user_download, fields_json, target_member_ids, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)");
-        $stmt->execute([$name, $description, $status, $deadline, $allowUserDownload, $fieldsJson, $targetJson, $now, $now]);
+        $maxSort = (int)$pdo->query("SELECT COALESCE(MAX(sort_order), 0) FROM collect_templates")->fetchColumn();
+        $stmt = $pdo->prepare("INSERT INTO collect_templates (sort_order, name, description, status, deadline, allow_user_download, fields_json, target_member_ids, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([$maxSort + 1, $name, $description, $status, $deadline, $allowUserDownload, $fieldsJson, $targetJson, $now, $now]);
     }
     header('Location: collect.php');
     exit;
@@ -230,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
     exit;
 }
 
-$templates = $pdo->query("SELECT * FROM collect_templates ORDER BY (status IN ('ended','void')), COALESCE(deadline,'9999-12-31') ASC, updated_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+$templates = $pdo->query("SELECT * FROM collect_templates ORDER BY sort_order ASC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
 $members = $pdo->query("SELECT id,name,status,department,degree_pursuing,year_of_join FROM members ORDER BY status='in_work' DESC, name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $projectGroups = [];
 $directionGroups = [];
@@ -280,6 +281,12 @@ include 'header.php';
   .member-list-body { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:0.5rem; }
   .member-chip { border:1px solid var(--app-table-border); border-radius:0.45rem; padding:0.35rem 0.5rem; background:var(--app-surface-bg); display:flex; flex-direction:column; align-items:flex-start; gap:0.2rem; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
   .member-chip .meta { color:var(--bs-gray-600); font-size:0.85rem; }
+  .collect-card-header { display:flex; align-items:flex-start; gap:0.75rem; }
+  .collect-order-badge { font-size:0.9rem; padding:0.25rem 0.5rem; border-radius:999px; background:var(--app-table-striped-bg); border:1px solid var(--app-table-border); min-width:2.2rem; text-align:center; }
+  .collect-drag-handle { cursor:grab; border:none; background:transparent; padding:0.2rem; color:inherit; }
+  .collect-drag-handle:active { cursor:grabbing; }
+  .collect-drag-handle:focus { outline:none; box-shadow:0 0 0 0.15rem rgba(13,110,253,0.25); border-radius:0.35rem; }
+  .collect-card-sortable { min-height:1rem; }
 </style>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="mb-0" data-i18n="collect.title">Collect</h2>
@@ -308,7 +315,7 @@ foreach ($templates as $t) {
         $active[] = $t;
     }
 }
-function render_collect_card($t, $is_manager, $member_id, $members, $templateSubmissions) {
+function render_collect_card($t, $is_manager, $member_id, $members, $templateSubmissions, $index) {
     $targets = decode_json_or($t['target_member_ids']);
     $fields = decode_json_or($t['fields_json']);
     $subs = $templateSubmissions[$t['id']] ?? [];
@@ -319,18 +326,30 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
     ?>
     <div class="card mb-3 collect-card" data-template-id="<?= $t['id']; ?>">
       <div class="card-body">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <div>
-            <h4 class="mb-1"><?= htmlspecialchars($t['name']); ?></h4>
-            <div class="text-muted small" data-i18n="collect.template_card.status_label">Form status</div>
-            <span class="badge bg-info collect-status" data-i18n="collect.status.<?= $statusLabel; ?>"><?= htmlspecialchars($statusLabel); ?></span>
-            <?php if($t['deadline']): ?><span class="ms-2 text-muted small"><?= htmlspecialchars($t['deadline']); ?></span><?php endif; ?>
-          </div>
-          <div class="text-end">
-            <div class="small" data-i18n="collect.template_card.assignees">Assignees</div>
-            <div class="fs-5"><?= $assignedCount; ?></div>
-            <div class="small" data-i18n="collect.template_card.submissions">Submissions</div>
-            <div class="fs-6"><?= count($submittedMemberIds); ?></div>
+        <div class="collect-card-header">
+          <?php if($is_manager): ?>
+          <button type="button" class="collect-drag-handle" title="拖动排序" data-i18n-title="collect.drag_handle" aria-label="拖动排序">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M3 5h10M3 8h10M3 11h10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"></path>
+            </svg>
+          </button>
+          <?php endif; ?>
+          <div class="collect-order-badge" data-collect-order><?= $index; ?></div>
+          <div class="flex-grow-1">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div>
+                <h4 class="mb-1"><?= htmlspecialchars($t['name']); ?></h4>
+                <div class="text-muted small" data-i18n="collect.template_card.status_label">Form status</div>
+                <span class="badge bg-info collect-status" data-i18n="collect.status.<?= $statusLabel; ?>"><?= htmlspecialchars($statusLabel); ?></span>
+                <?php if($t['deadline']): ?><span class="ms-2 text-muted small"><?= htmlspecialchars($t['deadline']); ?></span><?php endif; ?>
+              </div>
+              <div class="text-end">
+                <div class="small" data-i18n="collect.template_card.assignees">Assignees</div>
+                <div class="fs-5"><?= $assignedCount; ?></div>
+                <div class="small" data-i18n="collect.template_card.submissions">Submissions</div>
+                <div class="fs-6"><?= count($submittedMemberIds); ?></div>
+              </div>
+            </div>
           </div>
         </div>
         <?php if(!empty($t['description'])): ?>
@@ -496,12 +515,16 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
 ?>
 <div class="active-section">
   <?php if(!$active): ?><div class="alert alert-light" data-i18n="collect.none">None</div><?php endif; ?>
-  <?php foreach($active as $t){ render_collect_card($t,$is_manager,$member_id,$members,$templateSubmissions); } ?>
+  <div class="collect-card-sortable" id="collectActiveList">
+    <?php foreach($active as $idx=>$t){ render_collect_card($t,$is_manager,$member_id,$members,$templateSubmissions,$idx + 1); } ?>
+  </div>
 </div>
 <div class="archived-section mt-4">
   <h5 class="mb-3" data-i18n="collect.hide_archived">Ended/void forms</h5>
   <?php if(!$archived): ?><div class="alert alert-light" data-i18n="collect.none">None</div><?php endif; ?>
-  <?php foreach($archived as $t){ render_collect_card($t,$is_manager,$member_id,$members,$templateSubmissions); } ?>
+  <div class="collect-card-sortable" id="collectArchivedList">
+    <?php foreach($archived as $idx=>$t){ render_collect_card($t,$is_manager,$member_id,$members,$templateSubmissions,$idx + 1); } ?>
+  </div>
 </div>
 
 <?php if($is_manager): ?>
@@ -622,6 +645,9 @@ function render_collect_card($t, $is_manager, $member_id, $members, $templateSub
 </div>
 <?php endif; ?>
 
+<?php if($is_manager): ?>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<?php endif; ?>
 <script>
 const collectMemberGroups = <?= json_encode(['projects' => $projectGroups, 'directions' => $directionGroups], JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>;
 
@@ -640,6 +666,8 @@ window.addEventListener('load', () => {
   const templateForm = document.getElementById('templateForm');
   const toggleArchivedBtn = document.getElementById('toggleArchived');
   const archivedSection = document.querySelector('.archived-section');
+  const activeList = document.getElementById('collectActiveList');
+  const archivedList = document.getElementById('collectArchivedList');
   const targetSelectAllBtn = document.getElementById('targetSelectAll');
   const targetInvertBtn = document.getElementById('targetInvert');
   const projectSelect = document.getElementById('collectProjectSelect');
@@ -649,6 +677,41 @@ window.addEventListener('load', () => {
   const directionAddBtn = document.getElementById('collectDirectionAdd');
   const directionRemoveBtn = document.getElementById('collectDirectionRemove');
   const groupData = collectMemberGroups || {projects: [], directions: []};
+  const isManager = <?= $is_manager ? 'true' : 'false'; ?>;
+
+  const updateCollectOrderNumbers = () => {
+    if (activeList) {
+      activeList.querySelectorAll('[data-collect-order]').forEach((badge, index) => {
+        badge.textContent = index + 1;
+      });
+    }
+    if (archivedList) {
+      archivedList.querySelectorAll('[data-collect-order]').forEach((badge, index) => {
+        badge.textContent = index + 1;
+      });
+    }
+  };
+
+  const persistCollectOrder = () => {
+    if (!isManager) return;
+    const order = [];
+    if (activeList) {
+      activeList.querySelectorAll('.collect-card').forEach(card => {
+        order.push({id: card.dataset.templateId, position: order.length});
+      });
+    }
+    if (archivedList) {
+      archivedList.querySelectorAll('.collect-card').forEach(card => {
+        order.push({id: card.dataset.templateId, position: order.length});
+      });
+    }
+    if (!order.length) return;
+    fetch('collect_order.php', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({order})
+    });
+  };
 
   function createFieldRow(field){
     const wrapper = document.createElement('div');
@@ -801,6 +864,24 @@ window.addEventListener('load', () => {
       if(window.applyTranslations) applyTranslations();
     });
   }
+
+  if (isManager && typeof Sortable !== 'undefined') {
+    const sortableOptions = {
+      handle: '.collect-drag-handle',
+      animation: 150,
+      onEnd: () => {
+        updateCollectOrderNumbers();
+        persistCollectOrder();
+      }
+    };
+    if (activeList) {
+      Sortable.create(activeList, sortableOptions);
+    }
+    if (archivedList) {
+      Sortable.create(archivedList, sortableOptions);
+    }
+  }
+  updateCollectOrderNumbers();
 
   function renderMemberPanels(){
     const lang = document.documentElement.lang || 'zh';
