@@ -23,8 +23,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         $stmt = $pdo->prepare('UPDATE tasks SET title=?, description=?, start_date=?, status=? WHERE id=?');
         $stmt->execute([$title,$description,$start_date,$status,$id]);
     } else {
-        $stmt = $pdo->prepare('INSERT INTO tasks(title,description,start_date,status) VALUES (?,?,?,?)');
-        $stmt->execute([$title,$description,$start_date,$status]);
+        $maxSort = (int)$pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM tasks')->fetchColumn();
+        $stmt = $pdo->prepare('INSERT INTO tasks(sort_order,title,description,start_date,status) VALUES (?,?,?,?,?)');
+        $stmt->execute([$maxSort + 1,$title,$description,$start_date,$status]);
         $newTaskId = $pdo->lastInsertId();
         if($newTaskId){
             $redirectUrl = 'task_affairs.php?id=' . $newTaskId;
