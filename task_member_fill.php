@@ -28,6 +28,9 @@ if(isset($_SESSION['fill_task_id']) && $_SESSION['fill_task_id'] != $task_id){
 $member_id = $_SESSION['fill_member_id'] ?? $loggedMemberId;
 $error = '';
 $msg = '';
+if(empty($_SESSION['fill_submit_token'])){
+    $_SESSION['fill_submit_token'] = bin2hex(random_bytes(16));
+}
 
 $canModify = $isManager || $taskStatus === 'active';
 if(!$canModify && $_SERVER['REQUEST_METHOD'] === 'POST'){
@@ -53,19 +56,43 @@ if(!$member_id && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'
     }
 }
 if($member_id && $canModify && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add'){
-    $description = $_POST['description'];
-    $start_date = $_POST['start_time'];
-    $end_date = $_POST['end_time'];
-    if(strtotime($end_date) < strtotime($start_date)){
+    $description = trim($_POST['description'] ?? '');
+    $start_date = $_POST['start_time'] ?? '';
+    $end_date = $_POST['end_time'] ?? '';
+    $submitToken = $_POST['submit_token'] ?? '';
+    if(!$submitToken || !hash_equals($_SESSION['fill_submit_token'], $submitToken)){
+        $error = '请勿重复提交，请刷新页面后重试。';
+    } elseif($description === ''){
+        $error = '事务描述不能为空';
+    } elseif(!$start_date || !$end_date){
+        $error = '请填写完整的起止日期';
+    } elseif(strtotime($end_date) < strtotime($start_date)){
         $error = '结束日期必须不早于起始日期';
     } else {
         $start_time = $start_date . ' 00:00:00';
         $end_time = date('Y-m-d 00:00:00', strtotime($end_date . ' +1 day'));
-        $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time,status) VALUES (?,?,?,?,?)');
-        $stmt->execute([$task_id,$description,$start_time,$end_time,'pending']);
-        $affair_id = $pdo->lastInsertId();
-        $pdo->prepare('INSERT INTO task_affair_members(affair_id,member_id) VALUES (?,?)')->execute([$affair_id,$member_id]);
-        $msg = '已提交';
+        $existingStmt = $pdo->prepare('SELECT a.id FROM task_affairs a INNER JOIN task_affair_members am ON am.affair_id = a.id WHERE a.task_id=? AND a.description=? AND a.start_time=? AND a.end_time=? AND am.member_id=? LIMIT 1');
+        $existingStmt->execute([$task_id, $description, $start_time, $end_time, $member_id]);
+        if($existingStmt->fetch()){
+            $error = '检测到重复申报：同一成员相同时间与描述的事务已存在。';
+        } else {
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare('INSERT INTO task_affairs(task_id,description,start_time,end_time,status) VALUES (?,?,?,?,?)');
+                $stmt->execute([$task_id,$description,$start_time,$end_time,'pending']);
+                $affair_id = $pdo->lastInsertId();
+                $pdo->prepare('INSERT INTO task_affair_members(affair_id,member_id) VALUES (?,?)')->execute([$affair_id,$member_id]);
+                $pdo->commit();
+                $_SESSION['fill_submit_token'] = bin2hex(random_bytes(16));
+                header('Location: task_member_fill.php?task_id=' . urlencode((string)$task_id) . '&result=added');
+                exit();
+            } catch (Throwable $e) {
+                if($pdo->inTransaction()){
+                    $pdo->rollBack();
+                }
+                $error = '提交失败，请稍后重试';
+            }
+        }
     }
 }
 if($member_id && $canModify && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'join'){
@@ -87,6 +114,9 @@ if($member_id){
     $stmt = $pdo->prepare('SELECT a.id,a.description,a.start_time,a.end_time,a.status,GROUP_CONCAT(m.name SEPARATOR ", ") AS members, GROUP_CONCAT(m.id) AS member_ids FROM task_affairs a LEFT JOIN task_affair_members am ON a.id=am.affair_id LEFT JOIN members m ON am.member_id=m.id WHERE a.task_id=? GROUP BY a.id ORDER BY a.start_time DESC');
     $stmt->execute([$task_id]);
     $affairs = $stmt->fetchAll();
+}
+if(isset($_GET['result']) && $_GET['result'] === 'added'){
+    $msg = '已提交';
 }
 ?>
 <!DOCTYPE html>
@@ -172,6 +202,7 @@ if($member_id){
  </div>
  <form method="post" class="mt-3" id="taskForm">
    <input type="hidden" name="action" value="add">
+   <input type="hidden" name="submit_token" value="<?= htmlspecialchars($_SESSION['fill_submit_token']); ?>">
    <div class="mb-3">
      <label class="form-label">工作事务描述(例如跑腿、开会、出差、临时材料等几天完成的紧急/具体事务)</label>
      <textarea name="description" class="form-control" rows="2" required></textarea>
@@ -186,7 +217,7 @@ if($member_id){
      <div id="timeWarning" class="text-danger mt-2" style="display:none;"></div>
    <div id="dayCount" class="mt-2"></div>
  </div>
- <button type="submit" class="btn btn-primary">申报该工作量</button>
+ <button type="submit" class="btn btn-primary" id="submitFillBtn">申报该工作量</button>
 </form>
  <?php else: ?>
  <div class="alert alert-warning">该任务当前不开放新增工作量填报。</div>
@@ -197,6 +228,7 @@ if($member_id){
  const warning = document.getElementById('timeWarning');
  const dayCount = document.getElementById('dayCount');
  const form = document.getElementById('taskForm');
+ const submitFillBtn = document.getElementById('submitFillBtn');
  if(form && startInput && endInput && warning && dayCount){
    function updateInfo(){
      if(startInput.value && endInput.value){
@@ -230,6 +262,11 @@ if($member_id){
    form.addEventListener('submit', function(e){
      if(!updateInfo()){
        e.preventDefault();
+       return;
+     }
+     if(submitFillBtn){
+       submitFillBtn.disabled = true;
+       submitFillBtn.textContent = '提交中...';
      }
    });
  }
