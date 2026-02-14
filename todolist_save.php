@@ -60,6 +60,53 @@ if($action === 'update'){
     $stmt = $pdo->prepare('UPDATE todolist_items SET week_start=?, day=? WHERE id=? AND user_id=? AND user_role=?');
     $stmt->execute([$new_week_start,$new_day,$id,$user_id,$role]);
     echo json_encode(['status'=>'ok','new_day'=>$new_day,'new_week_start'=>$new_week_start]);
+} elseif($action === 'schedule_create'){
+    $target_date = $data['target_date'] ?? '';
+    $category = $data['category'] ?? '';
+    $content = trim($data['content'] ?? '');
+    $allowed_categories = ['work','personal','longterm'];
+    if($target_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $target_date)){
+        http_response_code(400);
+        echo json_encode(['error'=>'invalid_date']);
+        exit;
+    }
+    if(!in_array($category, $allowed_categories, true)){
+        http_response_code(400);
+        echo json_encode(['error'=>'invalid_category']);
+        exit;
+    }
+    if($content === ''){
+        http_response_code(400);
+        echo json_encode(['error'=>'empty_content']);
+        exit;
+    }
+    $today = new DateTime('today');
+    $target_dt = DateTime::createFromFormat('Y-m-d', $target_date);
+    if(!$target_dt){
+        http_response_code(400);
+        echo json_encode(['error'=>'invalid_date']);
+        exit;
+    }
+    $target_dt->setTime(0,0,0);
+    if($target_dt <= $today){
+        http_response_code(400);
+        echo json_encode(['error'=>'not_future']);
+        exit;
+    }
+    $iso_year = (int)$target_dt->format('o');
+    $iso_week = (int)$target_dt->format('W');
+    $week_start_dt = new DateTime();
+    $week_start_dt->setISODate($iso_year, $iso_week);
+    $week_start = $week_start_dt->format('Y-m-d');
+    $iso_day = (int)$target_dt->format('N');
+    $day_map = [1=>'mon',2=>'tue',3=>'wed',4=>'thu',5=>'fri',6=>'sat',7=>'sun'];
+    $day = $category === 'longterm' ? null : ($day_map[$iso_day] ?? null);
+    $sortStmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order),-1)+1 FROM todolist_items WHERE user_id=? AND user_role=? AND week_start=? AND category=? AND ((day IS NULL AND ? IS NULL) OR day=?)');
+    $sortStmt->execute([$user_id,$role,$week_start,$category,$day,$day]);
+    $sort_order = (int)$sortStmt->fetchColumn();
+    $stmt = $pdo->prepare('INSERT INTO todolist_items (user_id,user_role,week_start,category,day,content,is_done,sort_order) VALUES (?,?,?,?,?,?,0,?)');
+    $stmt->execute([$user_id,$role,$week_start,$category,$day,$content,$sort_order]);
+    echo json_encode(['status'=>'ok','id'=>$pdo->lastInsertId(),'week_param'=>$week_start_dt->format('o-\WW')]);
 } elseif($action === 'common_create'){
     $content = trim($data['content'] ?? '');
     if($content === ''){

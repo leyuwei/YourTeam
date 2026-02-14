@@ -53,6 +53,11 @@ if($week_param === $current_week_param){
     $week_hint = '<div class="week-hint text-center mb-2 fs-4"><span class="badge bg-secondary" data-i18n="todolist.week.next">下周</span></div>';
 }
 $days = ['mon'=>'周一','tue'=>'周二','wed'=>'周三','thu'=>'周四','fri'=>'周五','sat'=>'周六','sun'=>'周日'];
+$day_offsets = ['mon'=>0,'tue'=>1,'wed'=>2,'thu'=>3,'fri'=>4,'sat'=>5,'sun'=>6];
+$day_dates = [];
+foreach($day_offsets as $day_key=>$day_offset){
+    $day_dates[$day_key] = date('Y-m-d', strtotime($week_start . " +{$day_offset} days"));
+}
 $is_current_week = ($week_param === $current_week_param);
 $today_key = strtolower(date('D'));
 ?>
@@ -161,6 +166,8 @@ $today_key = strtolower(date('D'));
   <input type="week" name="week" class="form-control form-control-lg w-auto" value="<?= htmlspecialchars($week_param); ?>">
   <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($prev_week_param); ?>" data-i18n="todolist.prev_week">看上周</a>
   <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($next_week_param); ?>" data-i18n="todolist.next_week">看下周</a>
+  <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($current_week_param); ?>" data-i18n="todolist.this_week">回本周</a>
+  <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#scheduleTodoModal" data-i18n="todolist.schedule.open">预定事项</button>
   <a class="btn btn-success" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
   <a class="btn btn-info" href="todolist_assessment.php" data-i18n="todolist.assessment">待办统计</a>
   <button type="button" class="btn btn-secondary" id="copyNextWeek" data-i18n="todolist.copy_next">鸽下周</button>
@@ -172,7 +179,7 @@ $today_key = strtolower(date('D'));
     <h3 data-category="work"><b data-i18n="todolist.category.work">工作</b> <small class="stats">(<?= $stats['work']['done']; ?>/<?= $stats['work']['total']; ?>)</small></h3>
     <?php foreach($days as $k=>$label): ?>
     <?php $is_today = $is_current_week && $k === $today_key; ?>
-    <h5 class="<?= $is_today ? 'today-heading' : '' ?>"><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="work" data-day="<?= $k; ?>">+</button></h5>
+    <h5 class="<?= $is_today ? 'today-heading' : '' ?>"><span class="day-label" data-day-key="<?= $k; ?>" data-date="<?= $day_dates[$k]; ?>" data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="work" data-day="<?= $k; ?>">+</button></h5>
     <ul class="list-group mb-3 todolist<?= $is_today ? ' today' : '' ?>" data-category="work" data-day="<?= $k; ?>">
       <?php if(!empty($items['work'][$k])): foreach($items['work'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
@@ -221,7 +228,7 @@ $today_key = strtolower(date('D'));
     <h3 data-category="personal"><b data-i18n="todolist.category.personal">私人</b> <small class="stats">(<?= $stats['personal']['done']; ?>/<?= $stats['personal']['total']; ?>)</small></h3>
     <?php foreach($days as $k=>$label): ?>
     <?php $is_today = $is_current_week && $k === $today_key; ?>
-    <h5 class="<?= $is_today ? 'today-heading' : '' ?>"><span data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="personal" data-day="<?= $k; ?>">+</button></h5>
+    <h5 class="<?= $is_today ? 'today-heading' : '' ?>"><span class="day-label" data-day-key="<?= $k; ?>" data-date="<?= $day_dates[$k]; ?>" data-i18n="todolist.days.<?= $k ?>"><?= $label; ?></span> <button type="button" class="btn btn-sm btn-outline-success add-item" data-category="personal" data-day="<?= $k; ?>">+</button></h5>
     <ul class="list-group mb-3 todolist<?= $is_today ? ' today' : '' ?>" data-category="personal" data-day="<?= $k; ?>">
       <?php if(!empty($items['personal'][$k])): foreach($items['personal'][$k] as $it): ?>
       <li class="list-group-item d-flex align-items-center flex-nowrap" data-id="<?= $it['id']; ?>">
@@ -302,6 +309,40 @@ $today_key = strtolower(date('D'));
     </ul>
   </div>
 </div>
+<div class="modal fade" id="scheduleTodoModal" tabindex="-1" aria-labelledby="scheduleTodoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="scheduleTodoForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="scheduleTodoModalLabel" data-i18n="todolist.schedule.title">预定事项</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭" data-i18n-attr="aria-label:todolist.schedule.cancel"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="scheduleTodoDate" class="form-label" data-i18n="todolist.schedule.date">日期</label>
+            <input type="date" class="form-control" id="scheduleTodoDate" required min="<?= date('Y-m-d', strtotime('+1 day')); ?>">
+          </div>
+          <div class="mb-3">
+            <label for="scheduleTodoCategory" class="form-label" data-i18n="todolist.schedule.category">类别</label>
+            <select class="form-select" id="scheduleTodoCategory" required>
+              <option value="work" data-i18n="todolist.category.work">工作</option>
+              <option value="personal" data-i18n="todolist.category.personal">私人</option>
+              <option value="longterm" data-i18n="todolist.category.longterm">长期</option>
+            </select>
+          </div>
+          <div>
+            <label for="scheduleTodoContent" class="form-label" data-i18n="todolist.schedule.content">事项内容</label>
+            <textarea class="form-control" id="scheduleTodoContent" rows="3" required maxlength="255" data-i18n-attr="placeholder:todolist.schedule.content_placeholder" placeholder="请输入待办事项"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="todolist.schedule.cancel">关闭</button>
+          <button type="submit" class="btn btn-primary" data-i18n="todolist.schedule.submit">创建</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 <div class="modal fade" id="commonItemsModal" tabindex="-1" aria-labelledby="commonItemsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -368,8 +409,44 @@ window.addEventListener('DOMContentLoaded',()=>{
   const noteClearBtn=document.getElementById('noteClearBtn');
   const noteCountEl=document.getElementById('noteCount');
   const noteMinRows=5;
+  const scheduleModalEl=document.getElementById('scheduleTodoModal');
+  const scheduleForm=document.getElementById('scheduleTodoForm');
+  const scheduleDateInput=document.getElementById('scheduleTodoDate');
+  const scheduleCategoryInput=document.getElementById('scheduleTodoCategory');
+  const scheduleContentInput=document.getElementById('scheduleTodoContent');
   let noteExpanded=false;
   let noteSaveTimer=null;
+
+  function formatDayWithDate(weekdayKey,dateStr){
+    const lang=document.documentElement.lang||'zh';
+    const weekdayLabel=getLocalizedText(`todolist.days.${weekdayKey}`,weekdayKey);
+    if(!dateStr) return weekdayLabel;
+    const dateObj=new Date(`${dateStr}T00:00:00`);
+    if(Number.isNaN(dateObj.getTime())) return `${weekdayLabel} ${dateStr}`;
+    if(lang.toLowerCase().startsWith('en')){
+      const formattedDate=new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric'}).format(dateObj);
+      return `${weekdayLabel} (${formattedDate})`;
+    }
+    const formattedDate=`${dateObj.getFullYear()}.${String(dateObj.getMonth()+1).padStart(2,'0')}.${String(dateObj.getDate()).padStart(2,'0')}`;
+    return `${weekdayLabel}（${formattedDate}）`;
+  }
+
+  function renderDayLabels(){
+    document.querySelectorAll('.day-label[data-day-key][data-date]').forEach(dayEl=>{
+      dayEl.textContent=formatDayWithDate(dayEl.dataset.dayKey,dayEl.dataset.date);
+    });
+  }
+
+  function watchLanguageChanges(){
+    const htmlEl=document.documentElement;
+    if(!htmlEl || typeof MutationObserver==='undefined') return;
+    const observer=new MutationObserver(mutations=>{
+      if(mutations.some(m=>m.attributeName==='lang')){
+        renderDayLabels();
+      }
+    });
+    observer.observe(htmlEl,{attributes:true,attributeFilter:['lang']});
+  }
 
   function rebuildCommonContentSet(){
     const uniqueMap=new Map();
@@ -798,7 +875,10 @@ window.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('scroll',updateSuggestionPosition,true);
   renderCommonManagerList();
   renderCommonSuggestions();
+  renderDayLabels();
+  watchLanguageChanges();
   initNotePanel();
+  initScheduleForm();
   function getLocalizedText(key,fallback='',params){
     const lang=document.documentElement.lang||'zh';
     let template='';
@@ -863,6 +943,55 @@ window.addEventListener('DOMContentLoaded',()=>{
   function scheduleNoteSave(){
     clearTimeout(noteSaveTimer);
     noteSaveTimer=setTimeout(saveNote,400);
+  }
+
+
+  function initScheduleForm(){
+    if(!scheduleForm || !scheduleDateInput || !scheduleCategoryInput || !scheduleContentInput) return;
+    scheduleForm.addEventListener('submit',evt=>{
+      evt.preventDefault();
+      const targetDate=scheduleDateInput.value;
+      const category=scheduleCategoryInput.value;
+      const content=scheduleContentInput.value.trim();
+      if(!targetDate){
+        window.alert(getLocalizedText('todolist.schedule.validation.date','Please choose a date.'));
+        scheduleDateInput.focus();
+        return;
+      }
+      if(!content){
+        window.alert(getLocalizedText('todolist.schedule.validation.content','Please enter todo content.'));
+        scheduleContentInput.focus();
+        return;
+      }
+      const today=new Date();
+      today.setHours(0,0,0,0);
+      const target=new Date(`${targetDate}T00:00:00`);
+      if(target<=today){
+        window.alert(getLocalizedText('todolist.schedule.validation.future','Please choose a future date.'));
+        scheduleDateInput.focus();
+        return;
+      }
+      postData({action:'schedule_create',target_date:targetDate,category,content})
+        .then(r=>r.json())
+        .then(result=>{
+          scheduleForm.reset();
+          const tomorrow=new Date(today);
+          tomorrow.setDate(tomorrow.getDate()+1);
+          scheduleDateInput.value=tomorrow.toISOString().slice(0,10);
+          if(window.bootstrap && scheduleModalEl){
+            window.bootstrap.Modal.getOrCreateInstance(scheduleModalEl).hide();
+          }
+          if(result?.week_param){
+            window.location=`todolist.php?week=${encodeURIComponent(result.week_param)}`;
+          }else{
+            window.location.reload();
+          }
+        });
+    });
+    const tomorrow=new Date();
+    tomorrow.setHours(0,0,0,0);
+    tomorrow.setDate(tomorrow.getDate()+1);
+    scheduleDateInput.value=tomorrow.toISOString().slice(0,10);
   }
 
   function initNotePanel(){
