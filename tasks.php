@@ -10,6 +10,19 @@ if($status){
 } else {
     $tasks = $pdo->query('SELECT * FROM tasks ORDER BY sort_order ASC, id DESC')->fetchAll();
 }
+$runningTasks = [];
+$finishedTasks = [];
+if($status === ''){
+    foreach($tasks as $task){
+        if(($task['status'] ?? '') === 'finished'){
+            $finishedTasks[] = $task;
+        } else {
+            $runningTasks[] = $task;
+        }
+    }
+} else {
+    $runningTasks = $tasks;
+}
 $pendStmt = $pdo->query("SELECT t.id,t.title,COUNT(a.id) cnt FROM tasks t JOIN task_affairs a ON t.id=a.task_id WHERE a.status='pending' GROUP BY t.id");
 $pending_affairs = $pendStmt->fetchAll();
 $pendingTaskMap = [];
@@ -70,7 +83,7 @@ foreach($pending_affairs as $pending){
   </tr>
 </thead>
 <tbody id="taskTableBody">
-<?php foreach($tasks as $index=>$t): ?>
+<?php foreach($runningTasks as $index=>$t): ?>
 <?php $hasPendingWorkload = !empty($pendingTaskMap[$t['id']]); ?>
 <?php $canSelfFill = $is_manager || $t['status']==='active'; ?>
 <tr data-id="<?= $t['id']; ?>"<?= $hasPendingWorkload ? ' class="task-row-pending"' : ''; ?>>
@@ -106,6 +119,62 @@ foreach($pending_affairs as $pending){
 <?php endforeach; ?>
 </tbody>
 </table>
+
+<?php if($status === '' && !empty($finishedTasks)): ?>
+<div class="accordion mb-3" id="finishedTasksAccordion">
+  <div class="accordion-item">
+    <h2 class="accordion-header" id="finishedTasksHeading">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#finishedTasksCollapse" aria-expanded="false" aria-controls="finishedTasksCollapse">
+        已结束任务（<?= count($finishedTasks); ?>）
+      </button>
+    </h2>
+    <div id="finishedTasksCollapse" class="accordion-collapse collapse" aria-labelledby="finishedTasksHeading" data-bs-parent="#finishedTasksAccordion">
+      <div class="accordion-body px-0 pb-0">
+        <table class="table table-bordered mb-0">
+          <thead>
+            <tr>
+              <th class="task-order-index">#</th>
+              <th data-i18n="tasks.table_title">Title</th>
+              <th data-i18n="tasks.table_description">Description</th>
+              <th data-i18n="tasks.table_start">Start</th>
+              <th data-i18n="tasks.table_status">Status</th>
+              <th data-i18n="tasks.table_actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+          <?php foreach($finishedTasks as $index=>$t): ?>
+          <?php $hasPendingWorkload = !empty($pendingTaskMap[$t['id']]); ?>
+          <tr<?= $hasPendingWorkload ? ' class="task-row-pending"' : ''; ?>>
+            <td class="task-order-index"><?= $index + 1; ?></td>
+            <td class="bold-target"><?= htmlspecialchars($t['title']); ?></td>
+            <td><?= htmlspecialchars($t['description'] ?? ''); ?></td>
+            <td><?= htmlspecialchars($t['start_date']); ?></td>
+            <td data-i18n="tasks.status.<?= htmlspecialchars($t['status']); ?>"><?= htmlspecialchars($t['status']); ?></td>
+            <td>
+              <?php if($is_manager): ?>
+              <button type="button" class="btn btn-sm btn-primary edit-task-btn"
+                      data-task-id="<?= $t['id']; ?>"
+                      data-task-title="<?= htmlspecialchars($t['title'], ENT_QUOTES); ?>"
+                      data-task-description="<?= htmlspecialchars($t['description'] ?? '', ENT_QUOTES); ?>"
+                      data-task-start="<?= htmlspecialchars($t['start_date']); ?>"
+                      data-task-status="<?= htmlspecialchars($t['status']); ?>"
+                      data-i18n="tasks.action_edit">Edit</button>
+              <?php endif; ?>
+              <a class="btn btn-sm btn-warning" href="task_affairs.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_affairs">Affairs</a>
+              <button type="button" class="btn btn-sm btn-info" disabled title="任务已暂停或结束，无法申报">Self Fill</button>
+              <?php if($is_manager): ?>
+              <a class="btn btn-sm btn-danger delete-task" href="task_delete.php?id=<?= $t['id']; ?>" data-i18n="tasks.action_delete">Delete</a>
+              <?php endif; ?>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 <?php if($is_manager): ?>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <?php endif; ?>
