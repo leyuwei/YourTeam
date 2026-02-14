@@ -166,6 +166,7 @@ $today_key = strtolower(date('D'));
   <input type="week" name="week" class="form-control form-control-lg w-auto" value="<?= htmlspecialchars($week_param); ?>">
   <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($prev_week_param); ?>" data-i18n="todolist.prev_week">看上周</a>
   <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($next_week_param); ?>" data-i18n="todolist.next_week">看下周</a>
+  <a class="btn btn-outline-secondary" href="todolist.php?week=<?= urlencode($current_week_param); ?>" data-i18n="todolist.this_week">回本周</a>
   <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#scheduleTodoModal" data-i18n="todolist.schedule.open">预定事项</button>
   <a class="btn btn-success" href="todolist_export.php?week=<?= urlencode($week_param); ?>" data-i18n="todolist.export">导出</a>
   <a class="btn btn-info" href="todolist_assessment.php" data-i18n="todolist.assessment">待办统计</a>
