@@ -191,6 +191,7 @@ CREATE TABLE notifications (
   content TEXT NOT NULL,
   valid_begin_date DATE NOT NULL,
   valid_end_date DATE NOT NULL,
+  is_must TINYINT(1) NOT NULL DEFAULT 0,
   is_revoked TINYINT(1) DEFAULT 0
 );
 

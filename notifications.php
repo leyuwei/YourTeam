@@ -6,11 +6,12 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     $content = trim($_POST['content'] ?? '');
     $begin = $_POST['valid_begin_date'] ?? '';
     $end = $_POST['valid_end_date'] ?? '';
+    $isMust = isset($_POST['is_must']) ? 1 : 0;
     $members_selected = $_POST['members'] ?? [];
 
     if($action==='create_notification' && $content && $begin && $end){
-        $stmt = $pdo->prepare('INSERT INTO notifications(content,valid_begin_date,valid_end_date) VALUES(?,?,?)');
-        $stmt->execute([$content,$begin,$end]);
+        $stmt = $pdo->prepare('INSERT INTO notifications(content,valid_begin_date,valid_end_date,is_must) VALUES(?,?,?,?)');
+        $stmt->execute([$content,$begin,$end,$isMust]);
         $nid = $pdo->lastInsertId();
         foreach($members_selected as $m){
             $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$nid,$m]);
@@ -20,8 +21,8 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if($action==='update_notification'){
         $nid = $_POST['notification_id'] ?? null;
         if($nid && $content && $begin && $end){
-            $stmt = $pdo->prepare('UPDATE notifications SET content=?, valid_begin_date=?, valid_end_date=? WHERE id=?');
-            $stmt->execute([$content,$begin,$end,$nid]);
+            $stmt = $pdo->prepare('UPDATE notifications SET content=?, valid_begin_date=?, valid_end_date=?, is_must=? WHERE id=?');
+            $stmt->execute([$content,$begin,$end,$isMust,$nid]);
             $pdo->prepare('DELETE FROM notification_targets WHERE notification_id=?')->execute([$nid]);
             foreach($members_selected as $m){
                 $pdo->prepare('INSERT INTO notification_targets(notification_id,member_id) VALUES(?,?)')->execute([$nid,$m]);
@@ -91,6 +92,9 @@ foreach ($directionGroupsRaw as $d) {
   <?php foreach($activeNotifications as $n): ?>
   <tr>
     <td>
+      <?php if((int)$n['is_must'] === 1): ?>
+      <span class="badge bg-danger me-2" data-i18n="notifications.must_badge">MUST</span>
+      <?php endif; ?>
       <?= nl2br(htmlspecialchars($n['content'])); ?>
       <?php
         $stmt = $pdo->prepare('SELECT m.id, m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
@@ -127,6 +131,7 @@ foreach ($directionGroupsRaw as $d) {
               data-content="<?= htmlspecialchars($n['content']); ?>"
               data-begin="<?= htmlspecialchars($n['valid_begin_date']); ?>"
               data-end="<?= htmlspecialchars($n['valid_end_date']); ?>"
+              data-must="<?= (int)$n['is_must']; ?>"
               data-members='<?= json_encode($targetIds, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>'
               data-i18n="notifications.action_edit">Edit</button>
       <a class="btn btn-sm btn-danger delete-notification" href="notification_revoke.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_revoke">Revoke</a>
@@ -159,6 +164,10 @@ foreach ($directionGroupsRaw as $d) {
               <label class="form-label" data-i18n="notification_edit.label_end">End Date</label>
               <input type="date" name="valid_end_date" class="form-control" required>
             </div>
+          </div>
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" name="is_must" value="1" id="notificationMust">
+            <label class="form-check-label" for="notificationMust" data-i18n="notification_edit.label_must">MUST (required before closing reminders)</label>
           </div>
           <div class="mt-3">
             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -236,6 +245,9 @@ foreach ($directionGroupsRaw as $d) {
       <?php foreach($expiredNotifications as $n): ?>
       <tr class="notification-expired">
         <td>
+          <?php if((int)$n['is_must'] === 1): ?>
+          <span class="badge bg-danger me-2" data-i18n="notifications.must_badge">MUST</span>
+          <?php endif; ?>
           <?= nl2br(htmlspecialchars($n['content'])); ?>
           <?php
             $stmt = $pdo->prepare('SELECT m.id, m.name, m.department, m.degree_pursuing, m.year_of_join, nt.status FROM notification_targets nt JOIN members m ON nt.member_id=m.id WHERE nt.notification_id=?');
@@ -272,6 +284,7 @@ foreach ($directionGroupsRaw as $d) {
                   data-content="<?= htmlspecialchars($n['content']); ?>"
                   data-begin="<?= htmlspecialchars($n['valid_begin_date']); ?>"
                   data-end="<?= htmlspecialchars($n['valid_end_date']); ?>"
+                  data-must="<?= (int)$n['is_must']; ?>"
                   data-members='<?= json_encode($targetIds, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT); ?>'
                   data-i18n="notifications.action_edit">Edit</button>
           <a class="btn btn-sm btn-danger delete-notification" href="notification_revoke.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_revoke">Revoke</a>
@@ -450,6 +463,7 @@ document.addEventListener('DOMContentLoaded', function(){
   const contentField = form?.querySelector('textarea[name="content"]');
   const beginField = form?.querySelector('input[name="valid_begin_date"]');
   const endField = form?.querySelector('input[name="valid_end_date"]');
+  const mustField = form?.querySelector('input[name="is_must"]');
   const memberCheckboxes = () => Array.from(form?.querySelectorAll('.member-checkbox') || []);
   const projectSelect = document.getElementById('notificationProjectSelect');
   const directionSelect = document.getElementById('notificationDirectionSelect');
@@ -554,6 +568,7 @@ document.addEventListener('DOMContentLoaded', function(){
       if(contentField) contentField.value = btn.dataset.content || '';
       if(beginField) beginField.value = btn.dataset.begin || '';
       if(endField) endField.value = btn.dataset.end || '';
+      if(mustField) mustField.checked = (btn.dataset.must || '0') === '1';
       const members = (()=>{ try { return JSON.parse(btn.dataset.members || '[]'); } catch(e){ return []; }})();
       setMemberSelections(members);
       titleEl.textContent = translations?.[document.documentElement.lang || 'zh']?.['notification_edit.title_edit'] || 'Edit Notification';

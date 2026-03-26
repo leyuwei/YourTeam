@@ -48,10 +48,11 @@ if($_SESSION['role']==='member'){
         $memberLoginFormMethod = is_array($memberAuthSettings) ? ($memberAuthSettings['login_method'] ?? 'identity') : 'identity';
     }
     $pdo->prepare('UPDATE notification_targets nt JOIN notifications n ON nt.notification_id=n.id SET nt.status="seen" WHERE nt.member_id=? AND nt.status="sent" AND n.is_revoked=0 AND CURDATE() BETWEEN n.valid_begin_date AND n.valid_end_date')->execute([$member_id]);
-    $stmt = $pdo->prepare('SELECT n.id,n.content,n.valid_begin_date,n.valid_end_date,nt.status FROM notifications n JOIN notification_targets nt ON n.id=nt.notification_id WHERE nt.member_id=? AND n.is_revoked=0 AND CURDATE() BETWEEN n.valid_begin_date AND n.valid_end_date ORDER BY CASE nt.status WHEN \'checked\' THEN 1 ELSE 0 END, n.id DESC');
+    $stmt = $pdo->prepare('SELECT n.id,n.content,n.valid_begin_date,n.valid_end_date,n.is_must,nt.status FROM notifications n JOIN notification_targets nt ON n.id=nt.notification_id WHERE nt.member_id=? AND n.is_revoked=0 AND CURDATE() BETWEEN n.valid_begin_date AND n.valid_end_date ORDER BY CASE nt.status WHEN \'checked\' THEN 1 ELSE 0 END, n.id DESC');
     $stmt->execute([$member_id]);
     $notifications = $stmt->fetchAll();
     $pendingNotifications = array_filter($notifications, fn($n) => $n['status'] !== 'checked');
+    $pendingMustNotifications = array_filter($pendingNotifications, fn($n) => (int)($n['is_must'] ?? 0) === 1);
 }
 ?>
 
@@ -132,6 +133,9 @@ if($_SESSION['role']==='member'){
       <small><?= htmlspecialchars($n['valid_begin_date']); ?> ~ <?= htmlspecialchars($n['valid_end_date']); ?></small>
     </div>
     <div class="mt-2">
+      <?php if((int)$n['is_must'] === 1): ?>
+      <span class="badge bg-danger me-2" data-i18n="notifications.must_badge">MUST</span>
+      <?php endif; ?>
       <span class="badge <?= $n['status']!=='checked' ? 'bg-warning text-dark' : 'bg-secondary'; ?> me-2" data-i18n="notifications.status.<?= $n['status']; ?>"><?= $n['status']; ?></span>
       <?php if($n['status']!=='checked'): ?>
       <a class="btn btn-sm btn-outline-success check-notification" href="notification_check.php?id=<?= $n['id']; ?>" data-i18n="notifications.action_check">Check</a>
@@ -160,6 +164,9 @@ if($_SESSION['role']==='member'){
               <small><?= htmlspecialchars($pn['valid_begin_date']); ?> ~ <?= htmlspecialchars($pn['valid_end_date']); ?></small>
             </div>
             <div class="mt-2">
+              <?php if((int)$pn['is_must'] === 1): ?>
+              <span class="badge bg-danger me-2" data-i18n="notifications.must_badge">MUST</span>
+              <?php endif; ?>
               <span class="badge bg-warning text-dark me-2" data-i18n="notifications.status.<?= $pn['status']; ?>"><?= $pn['status']; ?></span>
               <a class="btn btn-sm btn-outline-success check-notification" href="notification_check.php?id=<?= $pn['id']; ?>" data-i18n="notifications.action_check">Check</a>
             </div>
@@ -168,7 +175,11 @@ if($_SESSION['role']==='member'){
         </div>
       </div>
       <div class="modal-footer">
+        <?php if(!empty($pendingMustNotifications)): ?>
+        <div class="text-danger me-auto fw-semibold" data-i18n="index.pending_notifications.must_hint">MUST notifications must be checked before you can continue.</div>
+        <?php else: ?>
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-i18n="index.pending_notifications.maybe_later">Maybe Later</button>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -190,6 +201,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(modalEl){
     const reminderModal=new bootstrap.Modal(modalEl,{backdrop:'static',keyboard:false});
     reminderModal.show();
+    const hasMustPending=<?php echo json_encode(!empty($pendingMustNotifications)); ?>;
+    if(hasMustPending){
+      modalEl.addEventListener('hide.bs.modal', (e) => {
+        e.preventDefault();
+      });
+    }
   }
 });
 </script>
