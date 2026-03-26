@@ -12,15 +12,18 @@ function applyTeamName() {
     return str.slice(Math.max(0, offset - name.length), offset) === name ? match : name + match;
   };
   document.title = document.title.replace(regex, replacer);
-  (function walk(node) {
-    node.childNodes.forEach(child => {
+
+  const replaceElementTextNodes = (element) => {
+    if (!element) return;
+    element.childNodes.forEach((child) => {
       if (child.nodeType === Node.TEXT_NODE) {
         child.textContent = child.textContent.replace(regex, replacer);
-      } else {
-        walk(child);
       }
     });
-  })(document.body);
+  };
+
+  // Only apply to static UI copy that participates in i18n.
+  document.querySelectorAll('[data-i18n]').forEach(replaceElementTextNodes);
 }
 
 document.addEventListener('DOMContentLoaded', applyTeamName);
