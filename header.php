@@ -567,6 +567,7 @@
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'collect') === 0 ? 'active' : ''); ?>" href="collect.php" data-i18n="nav.collect">Collect</a></li>
           <li class="nav-item"><a class="nav-link <?php echo (strpos($current_page, 'reimburse') === 0 ? 'active' : ''); ?>" href="reimbursements.php" data-i18n="nav.reimburse">Reimbursement</a></li>
           <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'assets.php' ? 'active' : ''); ?>" href="assets.php" data-i18n="nav.assets">Assets</a></li>
+          <li class="nav-item"><a class="nav-link <?php echo ($current_page === 'leave.php' ? 'active' : ''); ?>" href="leave.php" data-i18n="nav.leave">Leave</a></li>
           <?php if($_SESSION['role']==='manager'): ?>
           <li class="nav-item"><a class="nav-link <?php echo ((strpos($current_page, 'notification') === 0 || strpos($current_page, 'regulation') === 0) ? 'active' : ''); ?>" href="notifications.php" data-i18n="nav.notifications">Notifications</a></li>
           <?php endif; ?>

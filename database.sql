@@ -204,6 +204,30 @@ CREATE TABLE notification_targets (
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
 
+CREATE TABLE leave_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  member_id INT NOT NULL,
+  leave_type ENUM('personal','sick','winter_summer','internship','group_activity','other','statutory_holiday') NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  reason TEXT NOT NULL,
+  status ENUM('pending','approved','rejected','returned') NOT NULL DEFAULT 'pending',
+  reject_reason TEXT DEFAULT NULL,
+  approved_by INT DEFAULT NULL,
+  approved_at DATETIME DEFAULT NULL,
+  rejected_by INT DEFAULT NULL,
+  rejected_at DATETIME DEFAULT NULL,
+  actual_end_date DATE DEFAULT NULL,
+  returned_at DATETIME DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_leave_member_created (member_id, created_at),
+  INDEX idx_leave_status_dates (status, start_date, end_date),
+  FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+  FOREIGN KEY (approved_by) REFERENCES managers(id) ON DELETE SET NULL,
+  FOREIGN KEY (rejected_by) REFERENCES managers(id) ON DELETE SET NULL
+);
+
 CREATE TABLE reimbursement_batches (
   id INT AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(100) NOT NULL,
